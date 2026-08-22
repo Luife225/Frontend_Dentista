@@ -1,0 +1,10 @@
+{
+  "description": "This web application offers a user-friendly interface for managing tasks and projects, enabling teams to collaborate efficiently and stay organized.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

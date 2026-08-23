@@ -1,34 +1,5 @@
 import { useState } from 'react'
-
-// ─── Logo ─────────────────────────────────────────────────────────────────────
-function CoroNyxLogo({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-      <defs>
-        <linearGradient id="pa-lg-main" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#5FC9BE"/>
-          <stop offset="50%" stopColor="#1E8C82"/>
-          <stop offset="100%" stopColor="#0B3D3A"/>
-        </linearGradient>
-        <linearGradient id="pa-lg-tooth" x1="35" y1="28" x2="65" y2="78" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#7DD9D3"/>
-          <stop offset="100%" stopColor="#1E8C82"/>
-        </linearGradient>
-      </defs>
-      <path d="M72 14 A38 38 0 1 0 72 86" stroke="url(#pa-lg-main)" strokeWidth="7" strokeLinecap="round" fill="none"/>
-      <circle cx="75" cy="12" r="4" fill="#5FC9BE"/>
-      <circle cx="84" cy="20" r="2.5" fill="#5FC9BE" opacity="0.6"/>
-      <circle cx="90" cy="29" r="1.5" fill="#5FC9BE" opacity="0.35"/>
-      <line x1="75" y1="12" x2="84" y2="20" stroke="#5FC9BE" strokeWidth="1.5" opacity="0.5"/>
-      <line x1="84" y1="20" x2="90" y2="29" stroke="#5FC9BE" strokeWidth="1.5" opacity="0.35"/>
-      <path d="M50 30 C42 30 36 36 36 44 L37.5 63 C37.8 66 39.5 67.5 42 67.5 C44.5 67.5 46 65.5 50 65.5 C54 65.5 55.5 67.5 58 67.5 C60.5 67.5 62.2 66 62.5 63 L64 44 C64 36 58 30 50 30 Z" fill="url(#pa-lg-tooth)" opacity="0.95"/>
-      <polyline points="37,33 40,23 50,30 60,23 63,33" stroke="#5FC9BE" strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" fill="none"/>
-      <circle cx="40" cy="23" r="2.5" fill="#5FC9BE" opacity="0.8"/>
-      <circle cx="50" cy="19" r="2.5" fill="#5FC9BE"/>
-      <circle cx="60" cy="23" r="2.5" fill="#5FC9BE" opacity="0.8"/>
-    </svg>
-  )
-}
+import CoroNyxLogo from './CoroNyxLogo'
 
 function SvgIcon({ d, className = 'w-4 h-4' }: { d: string; className?: string }) {
   return (
@@ -50,9 +21,37 @@ const PAT_NAV = [
   { id: 'perfil' as PatientView, label: 'Mi perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
 ]
 
+interface CitaItem {
+  id: number
+  fecha: string
+  hora: string
+  tipo: string
+  dr: string
+  virtual: boolean
+  estado?: string
+}
+
+const initialProximas: CitaItem[] = [
+  { id: 1, fecha: '25 ago 2026', hora: '10:30 AM', tipo: 'Control ortodoncia', dr: 'Dra. María Herrera', virtual: false, estado: 'confirmada' },
+  { id: 2, fecha: '10 sep 2026', hora: '09:00 AM', tipo: 'Limpieza dental', dr: 'Dr. Carlos Morales', virtual: false, estado: 'pendiente' },
+  { id: 3, fecha: '22 sep 2026', hora: '03:00 PM', tipo: 'Consulta virtual de seguimiento', dr: 'Dra. María Herrera', virtual: true, estado: 'pendiente' },
+]
+
+const historialCitas: CitaItem[] = [
+  { id: 4, fecha: '10 jul 2026', hora: '10:00 AM', tipo: 'Control mensual ortodoncia', dr: 'Dra. María Herrera', virtual: false },
+  { id: 5, fecha: '15 jun 2026', hora: '11:30 AM', tipo: 'Radiografías panorámicas', dr: 'Dr. Carlos Morales', virtual: false },
+  { id: 6, fecha: '01 may 2026', hora: '09:00 AM', tipo: 'Primera consulta y valoración', dr: 'Dra. María Herrera', virtual: false },
+]
+
 // ─── Sub-views ────────────────────────────────────────────────────────────────
 
-function PaInicio({ onNav }: { onNav: (v: PatientView) => void }) {
+function PaInicio({
+  onNav,
+  onOpenModal,
+}: {
+  onNav: (v: PatientView) => void
+  onOpenModal: (virtual?: boolean) => void
+}) {
   const proximaCita = { fecha: 'Lunes 25 de agosto, 2026', hora: '10:30 AM', tipo: 'Control de ortodoncia', dr: 'Dra. María Herrera', sala: 'Consultorio 2', virtual: false }
 
   return (
@@ -65,7 +64,7 @@ function PaInicio({ onNav }: { onNav: (v: PatientView) => void }) {
       {/* Layout 2 columnas en desktop */}
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Próxima cita — ocupa 2 columnas */}
-        <div className="lg:col-span-2 bg-gradient-to-br from-teal-600 to-teal-800 rounded-2xl p-6 text-white">
+        <div className="lg:col-span-2 bg-gradient-to-br from-teal-600 to-teal-800 rounded-2xl p-6 text-white shadow-md">
           <div className="flex items-start justify-between mb-4">
             <div>
               <p className="text-teal-200 text-xs font-semibold uppercase tracking-wide mb-1">Próxima cita</p>
@@ -86,10 +85,12 @@ function PaInicio({ onNav }: { onNav: (v: PatientView) => void }) {
           </div>
           <div className="flex gap-3">
             <button onClick={() => onNav('agenda')}
-              className="flex-1 py-2.5 bg-white text-teal-700 rounded-xl text-sm font-semibold hover:bg-teal-50 transition-colors">
+              className="flex-1 py-2.5 bg-white text-teal-800 rounded-xl text-sm font-bold hover:bg-teal-50 transition-colors shadow-sm">
               Ver detalle
             </button>
-            <button className="flex-1 py-2.5 bg-white/20 text-white rounded-xl text-sm font-semibold hover:bg-white/30 transition-colors">
+            <button
+              onClick={() => onOpenModal(false)}
+              className="flex-1 py-2.5 bg-white/20 text-white rounded-xl text-sm font-semibold hover:bg-white/30 transition-colors">
               Reprogramar
             </button>
           </div>
@@ -130,29 +131,25 @@ function PaInicio({ onNav }: { onNav: (v: PatientView) => void }) {
   )
 }
 
-function PaAgenda() {
+function PaAgenda({
+  citasList,
+  onOpenModal,
+}: {
+  citasList: CitaItem[]
+  onOpenModal: (virtual?: boolean) => void
+}) {
   const [activeTab, setActiveTab] = useState<'proximas' | 'historial'>('proximas')
-
-  const proximas = [
-    { id: 1, fecha: '25 ago 2026', hora: '10:30 AM', tipo: 'Control ortodoncia', dr: 'Dra. Herrera', virtual: false, estado: 'confirmada' },
-    { id: 2, fecha: '10 sep 2026', hora: '09:00 AM', tipo: 'Limpieza dental', dr: 'Dr. Morales', virtual: false, estado: 'pendiente' },
-    { id: 3, fecha: '22 sep 2026', hora: '03:00 PM', tipo: 'Consulta virtual de seguimiento', dr: 'Dra. Herrera', virtual: true, estado: 'pendiente' },
-  ]
-
-  const historial = [
-    { id: 4, fecha: '10 jul 2026', hora: '10:00 AM', tipo: 'Control mensual ortodoncia', dr: 'Dra. Herrera', virtual: false },
-    { id: 5, fecha: '15 jun 2026', hora: '11:30 AM', tipo: 'Radiografías panorámicas', dr: 'Dr. Morales', virtual: false },
-    { id: 6, fecha: '01 may 2026', hora: '09:00 AM', tipo: 'Primera consulta', dr: 'Dra. Herrera', virtual: false },
-  ]
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Mi agenda</h2>
-          <p className="text-slate-400 text-sm">Gestiona tus citas presenciales y virtuales</p>
+          <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Mi agenda de citas</h2>
+          <p className="text-slate-400 text-sm">Gestiona tus consultas presenciales y virtuales con tu odontólogo</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+        <button
+          onClick={() => onOpenModal(false)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-90 transition-all"
           style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
           <SvgIcon d="M12 4v16m8-8H4"/>
           Solicitar cita
@@ -161,7 +158,7 @@ function PaAgenda() {
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-        {[{ v: 'proximas', l: 'Próximas' }, { v: 'historial', l: 'Historial' }].map(t => (
+        {[{ v: 'proximas', l: `Próximas (${citasList.length})` }, { v: 'historial', l: `Historial (${historialCitas.length})` }].map(t => (
           <button key={t.v} onClick={() => setActiveTab(t.v as typeof activeTab)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === t.v ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'}`}>
             {t.l}
@@ -170,33 +167,44 @@ function PaAgenda() {
       </div>
 
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {(activeTab === 'proximas' ? proximas : historial).map(c => (
-          <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:border-teal-200 hover:shadow-md transition-all">
-            <div className="flex items-start justify-between mb-3">
-              <div className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${c.virtual ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-teal-50 text-teal-700 border-teal-200'}`}>
-                {c.virtual ? '📹 Virtual' : '🏥 Presencial'}
+        {(activeTab === 'proximas' ? citasList : historialCitas).map(c => (
+          <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:border-teal-200 hover:shadow-md transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex items-start justify-between mb-3">
+                <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${c.virtual ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-teal-50 text-teal-700 border-teal-200'}`}>
+                  {c.virtual ? '📹 Virtual' : '🏥 Presencial'}
+                </div>
+                {'estado' in c && (
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${c.estado === 'confirmada' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                    {c.estado === 'confirmada' ? '✓ Confirmada' : 'Pendiente'}
+                  </span>
+                )}
               </div>
-              {'estado' in c && (
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${c.estado === 'confirmada' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                  {c.estado === 'confirmada' ? '✓ Confirmada' : 'Pendiente'}
-                </span>
-              )}
+              <h3 className="font-semibold text-slate-800 text-sm mb-1" style={{ fontFamily: 'Outfit' }}>{c.tipo}</h3>
+              <p className="text-teal-700 text-xs font-semibold mb-3">{c.dr}</p>
+              <div className="flex items-center gap-3 text-xs text-slate-500">
+                <span>📅 {c.fecha}</span>
+                <span>🕐 {c.hora}</span>
+              </div>
             </div>
-            <h3 className="font-semibold text-slate-800 text-sm mb-1" style={{ fontFamily: 'Outfit' }}>{c.tipo}</h3>
-            <p className="text-teal-600 text-xs font-medium mb-3">{c.dr}</p>
-            <div className="flex items-center gap-3 text-xs text-slate-400">
-              <span>📅 {c.fecha}</span>
-              <span>🕐 {c.hora}</span>
-            </div>
+
             {activeTab === 'proximas' && (
-              <div className="flex gap-2 mt-4">
-                {(c as typeof proximas[0]).virtual && (
-                  <button className="flex-1 py-2 text-xs font-semibold rounded-lg text-white"
+              <div className="flex gap-2 mt-5 pt-3 border-t border-slate-50">
+                {c.virtual ? (
+                  <button
+                    onClick={() => onOpenModal(true)}
+                    className="flex-1 py-2 text-xs font-semibold rounded-xl text-white shadow-sm"
                     style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
                     Unirme ahora
                   </button>
+                ) : (
+                  <button
+                    onClick={() => onOpenModal(false)}
+                    className="flex-1 py-2 text-xs font-semibold rounded-xl bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors">
+                    Reprogramar
+                  </button>
                 )}
-                <button className="flex-1 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                <button className="flex-1 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
                   Cancelar
                 </button>
               </div>
@@ -224,18 +232,18 @@ function PaPagos() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Pagos</h2>
-        <p className="text-slate-400 text-sm">Estado de tus pagos y tratamientos</p>
+        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Pagos y Facturación</h2>
+        <p className="text-slate-400 text-sm">Estado de tus cuotas, tratamientos y comprobantes de pago</p>
       </div>
 
       {/* Resumen layout 2 cols */}
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-2xl p-5 text-white">
+        <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-2xl p-5 text-white shadow-md">
           <p className="text-teal-200 text-xs font-semibold uppercase tracking-wide mb-1">Total pendiente</p>
           <p className="text-3xl font-bold" style={{ fontFamily: 'Outfit' }}>$205.000</p>
-          <p className="text-teal-200 text-sm mt-1">2 cuotas por pagar</p>
-          <button className="mt-4 w-full py-2.5 bg-white text-teal-700 rounded-xl text-sm font-semibold hover:bg-teal-50 transition-colors">
-            Pagar ahora en línea
+          <p className="text-teal-200 text-sm mt-1">2 cuotas pendientes de pago</p>
+          <button className="mt-4 w-full py-2.5 bg-white text-teal-800 rounded-xl text-sm font-bold hover:bg-teal-50 transition-colors shadow-sm">
+            Pagar ahora en línea (PSE / Tarjeta)
           </button>
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
@@ -385,7 +393,11 @@ function PaTratamientos() {
   )
 }
 
-function PaTeleodontologia() {
+function PaTeleodontologia({
+  onOpenModal,
+}: {
+  onOpenModal: (virtual?: boolean) => void
+}) {
   const [sala, setSala] = useState<'espera' | 'activa'>('espera')
 
   if (sala === 'activa') {
@@ -407,7 +419,7 @@ function PaTeleodontologia() {
               <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl"
                 style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>👩‍⚕️</div>
               <p className="font-semibold text-lg" style={{ fontFamily: 'Outfit' }}>Dra. María Herrera</p>
-              <p className="text-slate-400 text-sm">Conectando cámara...</p>
+              <p className="text-slate-400 text-sm">Conectando cámara y micrófono...</p>
             </div>
           </div>
           {/* Self view */}
@@ -435,7 +447,7 @@ function PaTeleodontologia() {
     <div className="space-y-5">
       <div>
         <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Teleodontología</h2>
-        <p className="text-slate-400 text-sm">Consultas virtuales con tu odontólogo</p>
+        <p className="text-slate-400 text-sm">Consultas virtuales con tu odontólogo tratante</p>
       </div>
 
       {/* Sala de espera */}
@@ -459,11 +471,11 @@ function PaTeleodontologia() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-          <h3 className="font-bold text-slate-700 text-sm" style={{ fontFamily: 'Outfit' }}>Verificación previa</h3>
+          <h3 className="font-bold text-slate-700 text-sm" style={{ fontFamily: 'Outfit' }}>Verificación técnica previa</h3>
           {[
-            { label: 'Cámara detectada', ok: true },
-            { label: 'Micrófono detectado', ok: true },
-            { label: 'Conexión a internet', ok: true },
+            { label: 'Cámara HD detectada', ok: true },
+            { label: 'Micrófono con cancelación detectado', ok: true },
+            { label: 'Conexión a internet estable', ok: true },
             { label: 'Sala de espera activa', ok: true },
           ].map(v => (
             <div key={v.label} className="flex items-center gap-3">
@@ -476,9 +488,15 @@ function PaTeleodontologia() {
         </div>
       </div>
 
-      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
-        <p className="text-sm font-semibold text-slate-600 mb-3">No tienes videollamadas programadas próximamente</p>
-        <button className="flex items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-900 transition-colors">
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <p className="text-sm font-semibold text-slate-800 mb-1">¿Necesitas una consulta virtual adicional?</p>
+          <p className="text-xs text-slate-500">Programa una sesión de orientación o revisión con tu odontólogo sin salir de casa.</p>
+        </div>
+        <button
+          onClick={() => onOpenModal(true)}
+          className="flex items-center gap-2 text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl text-white shadow-sm hover:opacity-90 transition-colors"
+          style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
           <SvgIcon d="M12 4v16m8-8H4"/>
           Solicitar consulta virtual
         </button>
@@ -497,8 +515,8 @@ function PaDocumentos() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Documentos</h2>
-        <p className="text-slate-400 text-sm">Archivos compartidos por tu clínica</p>
+        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Documentos y Radiografías</h2>
+        <p className="text-slate-400 text-sm">Archivos, consentimientos y radiografías compartidos por tu clínica</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -538,7 +556,7 @@ function PaPerfil() {
   return (
     <div className="max-w-2xl space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Mi perfil</h2>
+        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Mi perfil de paciente</h2>
         <p className="text-slate-400 text-sm">Datos personales y configuración de tu cuenta</p>
       </div>
 
@@ -577,14 +595,8 @@ function PaPerfil() {
         <button onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 1800) }}
           className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
           style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-          {saved ? '✓ Guardado' : 'Guardar cambios'}
+          {saved ? '✓ Guardado exitosamente' : 'Guardar cambios'}
         </button>
-      </div>
-
-      {/* Seguridad */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-3">
-        <h3 className="text-sm font-semibold text-slate-700 border-b border-slate-100 pb-3" style={{ fontFamily: 'Outfit' }}>Seguridad</h3>
-        <button className="text-sm text-teal-700 font-semibold hover:text-teal-900 transition-colors">Cambiar contraseña →</button>
       </div>
     </div>
   )
@@ -596,14 +608,53 @@ interface Props { onLogout: () => void }
 export default function PatientApp({ onLogout }: Props) {
   const [active, setActive] = useState<PatientView>('inicio')
   const [collapsed, setCollapsed] = useState(false)
+  const [citasList, setCitasList] = useState<CitaItem[]>(initialProximas)
+  const [showSolicitarModal, setShowSolicitarModal] = useState(false)
+  const [modalIsVirtual, setModalIsVirtual] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
+
+  // Solicitar cita form state
+  const [scDr, setScDr] = useState('Dra. María Herrera (Ortodoncia)')
+  const [scType, setScType] = useState('Control de ortodoncia')
+  const [scDate, setScDate] = useState('2026-08-30')
+  const [scTime, setScTime] = useState('10:00 AM')
+  const [scNotes, setScNotes] = useState('')
+
+  function openSolicitarModal(isVirtual = false) {
+    setModalIsVirtual(isVirtual)
+    if (isVirtual) {
+      setScType('Consulta virtual de seguimiento')
+    } else {
+      setScType('Control de ortodoncia')
+    }
+    setShowSolicitarModal(true)
+  }
+
+  function handleConfirmarSolicitud() {
+    const newCita: CitaItem = {
+      id: Date.now(),
+      fecha: scDate,
+      hora: scTime,
+      tipo: scType,
+      dr: scDr.split(' (')[0],
+      virtual: modalIsVirtual,
+      estado: 'pendiente',
+    }
+
+    setCitasList([newCita, ...citasList])
+    setShowSolicitarModal(false)
+    setScNotes('')
+    setToastMsg(`¡Solicitud enviada! Tu cita de ${scType} para el ${scDate} está registrada.`)
+    setTimeout(() => setToastMsg(''), 4500)
+  }
 
   function renderContent() {
     switch (active) {
-      case 'inicio': return <PaInicio onNav={v => setActive(v)}/>
-      case 'agenda': return <PaAgenda/>
+      case 'inicio': return <PaInicio onNav={v => setActive(v)} onOpenModal={openSolicitarModal} />
+      case 'agenda': return <PaAgenda citasList={citasList} onOpenModal={openSolicitarModal} />
       case 'pagos': return <PaPagos/>
       case 'tratamientos': return <PaTratamientos/>
-      case 'teleodontologia': return <PaTeleodontologia/>
+      case 'teleodontologia': return <PaTeleodontologia onOpenModal={openSolicitarModal} />
       case 'documentos': return <PaDocumentos/>
       case 'perfil': return <PaPerfil/>
     }
@@ -612,14 +663,25 @@ export default function PatientApp({ onLogout }: Props) {
   const currentNav = PAT_NAV.find(n => n.id === active)
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden relative">
+      {/* Toast */}
+      {toastMsg && (
+        <div className="fixed top-5 right-5 z-50 bg-[#0B3D3A] text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-400/40 fade-in">
+          <span className="text-emerald-400 font-bold text-xl">✓</span>
+          <div>
+            <p className="font-semibold text-sm text-white" style={{ fontFamily: 'Outfit' }}>Cita Solicitada</p>
+            <p className="text-xs text-emerald-100">{toastMsg}</p>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar paciente */}
       <aside className={`${collapsed ? 'w-14' : 'w-56'} shrink-0 flex flex-col h-full transition-all duration-200`}
         style={{ backgroundColor: '#0B3D3A' }}>
 
         {/* Logo */}
         <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/8 ${collapsed ? 'justify-center' : ''}`}>
-          <CoroNyxLogo size={28}/>
+          <CoroNyxLogo size={48}/>
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-bold leading-tight tracking-wide" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
@@ -682,6 +744,135 @@ export default function PatientApp({ onLogout }: Props) {
           {renderContent()}
         </main>
       </div>
+
+      {/* ── Modal: Solicitar Cita Odontológica ── */}
+      {showSolicitarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden fade-in flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>
+                  Solicitar Cita Odontológica
+                </h2>
+                <p className="text-xs text-slate-400">Elige la modalidad, doctor y fecha preferida</p>
+              </div>
+              <button
+                onClick={() => setShowSolicitarModal(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center text-xl leading-none transition-colors">
+                ×
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-6 space-y-4 flex-1">
+              {/* Modalidad Selector */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Modalidad de atención</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalIsVirtual(false)}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                      !modalIsVirtual ? 'border-teal-600 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}>
+                    <span>🏥</span> Presencial en clínica
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalIsVirtual(true)}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                      modalIsVirtual ? 'border-violet-600 bg-violet-50 text-violet-800 shadow-sm' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}>
+                    <span>📹</span> Teleodontología virtual
+                  </button>
+                </div>
+              </div>
+
+              {/* Profesional */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Odontólogo / Especialista</label>
+                <select
+                  value={scDr}
+                  onChange={e => setScDr(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-white">
+                  <option value="Dra. María Herrera (Ortodoncia)">Dra. María Herrera — Ortodoncia & Estética</option>
+                  <option value="Dr. Carlos Morales (General)">Dr. Carlos Morales — Odontología General & Profilaxis</option>
+                  <option value="Dr. Roberto Patiño (Endodoncia)">Dr. Roberto Patiño — Endodoncia & Cirugía</option>
+                </select>
+              </div>
+
+              {/* Motivo */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Motivo de la consulta</label>
+                <select
+                  value={scType}
+                  onChange={e => setScType(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-white">
+                  <option value="Control de ortodoncia">Control mensual de ortodoncia</option>
+                  <option value="Limpieza dental">Limpieza dental / Profilaxis</option>
+                  <option value="Consulta virtual de seguimiento">Consulta virtual de seguimiento</option>
+                  <option value="Dolor o molestia aguda">Dolor, sensibilidad o molestia aguda</option>
+                  <option value="Valoración estética">Valoración estética / Blanqueamiento</option>
+                  <option value="Otro motivo">Otro procedimiento</option>
+                </select>
+              </div>
+
+              {/* Fecha y Hora preferida */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Fecha deseada</label>
+                  <input
+                    type="date"
+                    value={scDate}
+                    onChange={e => setScDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Horario preferido</label>
+                  <select
+                    value={scTime}
+                    onChange={e => setScTime(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-white">
+                    <option value="08:30 AM">08:30 AM</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="11:30 AM">11:30 AM</option>
+                    <option value="02:30 PM">02:30 PM</option>
+                    <option value="04:00 PM">04:00 PM</option>
+                    <option value="05:30 PM">05:30 PM</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Notas para el doctor */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Describe brevemente tus síntomas o comentarios</label>
+                <textarea
+                  rows={3}
+                  value={scNotes}
+                  onChange={e => setScNotes(e.target.value)}
+                  placeholder="Ej: Siento molestia en el alambre del bracket superior derecho..."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              <button
+                onClick={() => setShowSolicitarModal(false)}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-100 transition-colors font-medium">
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarSolicitud}
+                className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
+                Confirmar solicitud de cita
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

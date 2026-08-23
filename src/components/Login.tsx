@@ -1,47 +1,18 @@
 import { useState } from 'react'
+import CoroNyxLogo from './CoroNyxLogo'
 
 type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
-
-// ─── Logo isotipo fiel al proporcionado ───────────────────────────────────────
-function CoroNyxLogo({ size = 36 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-      <defs>
-        <linearGradient id="lg-login-main" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#5FC9BE"/>
-          <stop offset="50%" stopColor="#1E8C82"/>
-          <stop offset="100%" stopColor="#0B3D3A"/>
-        </linearGradient>
-        <linearGradient id="lg-login-tooth" x1="35" y1="28" x2="65" y2="78" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#7DD9D3"/>
-          <stop offset="100%" stopColor="#1E8C82"/>
-        </linearGradient>
-      </defs>
-      <path d="M72 14 A38 38 0 1 0 72 86" stroke="url(#lg-login-main)" strokeWidth="7" strokeLinecap="round" fill="none"/>
-      <circle cx="75" cy="12" r="4" fill="#5FC9BE"/>
-      <circle cx="84" cy="20" r="2.5" fill="#5FC9BE" opacity="0.6"/>
-      <circle cx="90" cy="29" r="1.5" fill="#5FC9BE" opacity="0.35"/>
-      <line x1="75" y1="12" x2="84" y2="20" stroke="#5FC9BE" strokeWidth="1.5" opacity="0.5"/>
-      <line x1="84" y1="20" x2="90" y2="29" stroke="#5FC9BE" strokeWidth="1.5" opacity="0.35"/>
-      <path d="M50 30 C42 30 36 36 36 44 L37.5 63 C37.8 66 39.5 67.5 42 67.5 C44.5 67.5 46 65.5 50 65.5 C54 65.5 55.5 67.5 58 67.5 C60.5 67.5 62.2 66 62.5 63 L64 44 C64 36 58 30 50 30 Z" fill="url(#lg-login-tooth)" opacity="0.95"/>
-      <polyline points="37,33 40,23 50,30 60,23 63,33" stroke="#5FC9BE" strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" fill="none"/>
-      <circle cx="40" cy="23" r="2.5" fill="#5FC9BE" opacity="0.8"/>
-      <circle cx="50" cy="19" r="2.5" fill="#5FC9BE"/>
-      <circle cx="60" cy="23" r="2.5" fill="#5FC9BE" opacity="0.8"/>
-    </svg>
-  )
-}
 
 interface Props {
   onLogin: (role: Role) => void
 }
 
 const ROLE_META: Record<Role, { label: string; desc: string; icon: string; color: string }> = {
-  SUPER_ADMIN:   { label: 'Super Admin',   desc: 'Gestión global de la plataforma',       icon: '🛡️', color: 'from-amber-600 to-amber-700' },
-  ODONTOLOGO:    { label: 'Odontólogo',    desc: 'Historia clínica, pacientes, IA',        icon: '🦷', color: 'from-cyan-600 to-cyan-700' },
-  RECEPCIONISTA: { label: 'Recepcionista', desc: 'Agenda, citas, inventario',              icon: '📋', color: 'from-violet-600 to-violet-700' },
-  ADMIN_CLINICA: { label: 'Administrador', desc: 'Configuración, usuarios, reportes',      icon: '⚙️', color: 'from-slate-700 to-slate-800' },
-  PACIENTE:      { label: 'Paciente',      desc: 'Portal web — mis citas y avances',       icon: '👤', color: 'from-emerald-600 to-emerald-700' },
+  SUPER_ADMIN: { label: 'Super Admin', desc: 'Gestión global de la plataforma', icon: '🛡️', color: 'from-amber-600 to-amber-700' },
+  ODONTOLOGO: { label: 'Odontólogo', desc: 'Historia clínica, pacientes, IA', icon: '🦷', color: 'from-cyan-600 to-cyan-700' },
+  RECEPCIONISTA: { label: 'Recepcionista', desc: 'Agenda, citas, inventario', icon: '📋', color: 'from-violet-600 to-violet-700' },
+  ADMIN_CLINICA: { label: 'Administrador', desc: 'Configuración, usuarios, reportes', icon: '⚙️', color: 'from-slate-700 to-slate-800' },
+  PACIENTE: { label: 'Paciente', desc: 'Portal web — mis citas y avances', icon: '👤', color: 'from-emerald-600 to-emerald-700' },
 }
 
 export default function Login({ onLogin }: Props) {
@@ -81,7 +52,7 @@ export default function Login({ onLogin }: Props) {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="w-full max-w-sm fade-in">
           <div className="flex items-center gap-3 mb-8">
-            <CoroNyxLogo size={36}/>
+            <CoroNyxLogo size={36} />
             <div>
               <span className="text-white text-xl font-bold tracking-wide" style={{ fontFamily: 'Outfit' }}>CORONYX</span>
               <p className="text-xs" style={{ color: '#5FC9BE' }}>Sistema Dental</p>
@@ -92,7 +63,7 @@ export default function Login({ onLogin }: Props) {
             {forgotSent ? (
               <div className="text-center">
                 <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                 </div>
                 <h2 className="text-white font-semibold text-lg mb-2" style={{ fontFamily: 'Outfit' }}>Revisa tu correo</h2>
                 <p className="text-white/50 text-sm mb-6">Enviamos instrucciones a <span className="text-white/80">{email}</span></p>
@@ -109,7 +80,7 @@ export default function Login({ onLogin }: Props) {
                   <div>
                     <label className="text-xs text-white/50 font-medium block mb-1.5">Email</label>
                     <input value={email} onChange={e => setEmail(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50"/>
+                      className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50" />
                   </div>
                   <button onClick={handleForgot} disabled={loading}
                     className="w-full py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors disabled:opacity-60">
@@ -134,7 +105,7 @@ export default function Login({ onLogin }: Props) {
         style={{ background: 'linear-gradient(to bottom, #0B3D3A, #062422)' }}>
         <div>
           <div className="flex items-center gap-3 mb-12">
-            <CoroNyxLogo size={44}/>
+            <CoroNyxLogo size={44} />
             <div>
               <p className="text-white text-xl font-bold tracking-wide leading-tight" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
               <p className="text-xs" style={{ color: '#5FC9BE' }}>Sistema Dental</p>
@@ -162,7 +133,7 @@ export default function Login({ onLogin }: Props) {
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md fade-in">
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <CoroNyxLogo size={32}/>
+            <CoroNyxLogo size={32} />
             <div>
               <span className="text-white text-lg font-bold tracking-wide" style={{ fontFamily: 'Outfit' }}>CORONYX</span>
               <p className="text-xs" style={{ color: '#5FC9BE' }}>Sistema Dental</p>
@@ -178,7 +149,7 @@ export default function Login({ onLogin }: Props) {
                 <label className="text-xs text-white/50 font-medium block mb-1.5">Correo electrónico</label>
                 <input value={email} onChange={e => handleEmailChange(e.target.value)}
                   className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
-                  placeholder="usuario@clinica.co"/>
+                  placeholder="usuario@clinica.co" />
                 {detectedRole && (
                   <p className="text-xs text-cyan-400 mt-1.5 flex items-center gap-1">
                     <span>{ROLE_META[detectedRole].icon}</span>
@@ -191,7 +162,7 @@ export default function Login({ onLogin }: Props) {
                 <label className="text-xs text-white/50 font-medium block mb-1.5">Contraseña</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                   className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
-                  placeholder="••••••••"/>
+                  placeholder="••••••••" />
               </div>
 
               <div className="flex justify-end">
@@ -218,7 +189,7 @@ export default function Login({ onLogin }: Props) {
                 className="w-full py-3 bg-cyan-600 text-white rounded-xl font-semibold text-sm hover:bg-cyan-500 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
                 {loading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Verificando rol...
                   </>
                 ) : 'Ingresar'}

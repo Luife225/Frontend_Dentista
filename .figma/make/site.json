@@ -1,5 +1,6 @@
 {
-  "description": "This web application offers a user-friendly interface for managing tasks and projects, enabling teams to collaborate efficiently and stay organized.",
+  "title": "CORONYX — Sistema Dental",
+  "description": "Plataforma SaaS de gestión odontológica con asistente de IA por voz, odontograma digital, análisis de radiografías con Machine Learning y teleodontología integrada.",
   "robots": {
     "index": false
   },

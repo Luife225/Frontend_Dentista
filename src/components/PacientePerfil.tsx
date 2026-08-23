@@ -1,12 +1,27 @@
 import { useState } from 'react'
 import Odontogram from './Odontogram'
 
+// ─── Modal base ────────────────────────────────────────────────────────────────
+function Modal({ title, onClose, children, size = 'md' }: { title: string; onClose: () => void; children: React.ReactNode; size?: 'md' | 'lg' }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${size === 'lg' ? 'max-w-2xl' : 'max-w-md'} max-h-[90vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="text-lg font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>{title}</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors text-xl leading-none">×</button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 // Unified Patient Profile — combines Patients + Historia Clínica + Odontograma + Radiografías
 // (Feedback items 2, 3, 4)
 
 type Tab = 'resumen' | 'historial' | 'odontograma' | 'radiografias' | 'documentos'
 
-const patients = [
+const initialPatients = [
   { id: 1, name: 'Carlos Rivas', age: 52, phone: '315 987 6543', email: 'c.rivas@hotmail.com',
     isNew: false, tags: ['diabético', 'anticoagulante'],
     lastVisit: '2026-08-01', nextVisit: '2026-08-08',
@@ -24,12 +39,6 @@ const patients = [
     lastVisit: '2026-06-20', nextVisit: '2026-08-10',
     vitals: { pa:'110/70', fc:'80', peso:'68kg' },
     medHistory: { meds:'Ácido fólico 1mg', allergies:'Penicilina — reacción cutánea', conditions:'Embarazo 18 semanas', blood:'B+' },
-  },
-  { id: 4, name: 'Nuevo Paciente', age: 0, phone: '', email: '',
-    isNew: true, tags: [],
-    lastVisit: '', nextVisit: '2026-08-08',
-    vitals: { pa:'—', fc:'—', peso:'—' },
-    medHistory: { meds:'—', allergies:'—', conditions:'—', blood:'—' },
   },
 ]
 
@@ -74,21 +83,55 @@ interface Props {
 }
 
 export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly = false }: Props) {
+  const [patientsList, setPatientsList] = useState(initialPatients)
   const [selectedId, setSelectedId] = useState(initialPatientId)
   const [tab, setTab] = useState<Tab>('resumen')
   const [search, setSearch] = useState('')
   const [aiMode, setAiMode] = useState<null | 'historia' | 'odontograma'>(null)
-  const [showNewRecord, setShowNewRecord] = useState(false)
+  const [modal, setModal] = useState<null | 'nueva_consulta' | 'nueva_cita' | 'nuevo_paciente' | 'registro' | 'xray'>(null)
+  const [xraySelected, setXraySelected] = useState<typeof XRAYS[0] | null>(null)
+  const [localRecords, setLocalRecords] = useState(clinicalRecords)
 
-  const patient = patients.find(p => p.id === selectedId) || patients[0]
+  // New patient form fields
+  const [npName, setNpName] = useState('')
+  const [npPhone, setNpPhone] = useState('')
+  const [npEmail, setNpEmail] = useState('')
+  const [npAge, setNpAge] = useState('28')
+  const [npBlood, setNpBlood] = useState('O+')
+  const [npEps, setNpEps] = useState('Sura EPS')
+  const [npAllergies, setNpAllergies] = useState('Sin alergias conocidas')
+  const [npMeds, setNpMeds] = useState('Ninguno')
+
+  const patient = patientsList.find(p => p.id === selectedId) || patientsList[0]
   const timeline = buildTimeline(patient.id)
   const patientXrays = XRAYS.filter(x => x.patientId === patient.id)
-  const patientRecords = clinicalRecords.filter(r => r.patientId === patient.id)
+  const patientRecords = localRecords.filter(r => r.patientId === patient.id)
 
-  const filteredPatients = patients.filter(p =>
+  const filteredPatients = patientsList.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.phone.includes(search)
   )
+
+  function handleCreateNewPatient() {
+    if (!npName.trim()) return
+    const newP = {
+      id: Date.now(),
+      name: npName.trim(),
+      age: Number(npAge) || 30,
+      phone: npPhone || '300 000 0000',
+      email: npEmail || 'paciente@email.com',
+      isNew: false,
+      tags: [],
+      lastVisit: new Date().toISOString().split('T')[0],
+      nextVisit: 'Por agendar',
+      vitals: { pa: '120/80', fc: '75', peso: '70kg' },
+      medHistory: { meds: npMeds, allergies: npAllergies, conditions: 'Ninguna', blood: npBlood },
+    }
+    setPatientsList(prev => [...prev, newP])
+    setSelectedId(newP.id)
+    setModal(null)
+    setNpName('')
+  }
 
   const TABS: { id: Tab; label: string; hidden?: boolean }[] = [
     { id:'resumen',      label:'Resumen' },
@@ -99,13 +142,14 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
   ]
 
   return (
-    <div className="flex h-full fade-in">
-      {/* Patient list sidebar */}
-      <div className="w-64 shrink-0 border-r border-slate-200 bg-white flex flex-col h-full">
+    <>
+      <div className="flex h-full fade-in">
+        {/* Patient list sidebar */}
+        <div className="w-64 shrink-0 border-r border-slate-200 bg-white flex flex-col h-full">
         <div className="p-4 border-b border-slate-100">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-slate-800 text-sm" style={{fontFamily:'Outfit'}}>Pacientes</h2>
-            <button className="text-xs px-2.5 py-1 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors">+ Nuevo</button>
+            <button onClick={() => setModal('nuevo_paciente')} className="text-xs px-2.5 py-1 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors">+ Nuevo</button>
           </div>
           <div className="relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -172,7 +216,7 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
                   </button>
                 </div>
               )}
-              <button className="px-3 py-1.5 text-sm border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50">Nueva cita</button>
+              <button onClick={() => setModal('nueva_cita')} className="px-3 py-1.5 text-sm border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50">Nueva cita</button>
             </div>
           </div>
 
@@ -212,7 +256,7 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
                     Este paciente no tiene historial clínico aún. Completa el registro y crea la primera historia clínica.
                   </p>
                   <div className="flex gap-3 justify-center">
-                    <button className="px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors">
+                    <button onClick={() => setModal('registro')} className="px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors">
                       Completar registro del paciente
                     </button>
                     <button onClick={() => setTab('historial')} className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors">
@@ -293,7 +337,7 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
             <div className="p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-slate-900" style={{fontFamily:'Outfit'}}>Historia clínica</h3>
-                <button onClick={() => setShowNewRecord(true)}
+                <button onClick={() => setModal('nueva_consulta')}
                   className="px-3 py-1.5 bg-cyan-600 text-white text-sm font-medium rounded-lg hover:bg-cyan-700 transition-colors">
                   + Nueva consulta
                 </button>
@@ -304,7 +348,7 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
                   <p className="text-3xl mb-3">📋</p>
                   <h4 className="font-semibold text-slate-700 mb-1" style={{fontFamily:'Outfit'}}>Sin consultas previas</h4>
                   <p className="text-sm text-slate-400 mb-5">Este es el primer registro clínico del paciente</p>
-                  <button onClick={() => setShowNewRecord(true)} className="px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500">
+                  <button onClick={() => setModal('nueva_consulta')} className="px-5 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500">
                     Crear primera historia clínica
                   </button>
                 </div>
@@ -318,7 +362,7 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
                           <h4 className="font-semibold text-slate-800 mt-0.5">{r.motivo}</h4>
                           <p className="text-xs text-slate-400">{r.dr} · {r.duration} min</p>
                         </div>
-                        <button className="text-xs text-cyan-600 hover:underline">Editar</button>
+                      <button onClick={() => setModal('nueva_consulta')} className="text-xs text-cyan-600 hover:underline">Editar</button>
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         {[
@@ -338,33 +382,6 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
                 </div>
               )}
 
-              {/* New record form */}
-              {showNewRecord && (
-                <div className="bg-white rounded-xl border border-cyan-200 p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-slate-900" style={{fontFamily:'Outfit'}}>Nueva consulta — {new Date().toLocaleDateString('es-CO')}</h4>
-                    <button onClick={() => setShowNewRecord(false)} className="text-slate-400 hover:text-slate-600 text-lg">×</button>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    {['PA (mmHg)', 'FC (bpm)', 'Peso (kg)'].map(l => (
-                      <div key={l}>
-                        <label className="text-xs text-slate-400 block mb-1">{l}</label>
-                        <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" />
-                      </div>
-                    ))}
-                  </div>
-                  {['Motivo de consulta', 'Diagnóstico', 'Procedimiento realizado', 'Plan de tratamiento', 'Indicaciones'].map(l => (
-                    <div key={l} className="mb-3">
-                      <label className="text-xs text-slate-400 font-medium block mb-1">{l}</label>
-                      <textarea rows={2} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50" />
-                    </div>
-                  ))}
-                  <div className="flex gap-2">
-                    <button onClick={() => setShowNewRecord(false)} className="flex-1 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50">Cancelar</button>
-                    <button onClick={() => setShowNewRecord(false)} className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-500">Guardar</button>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -390,7 +407,7 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
                 <h3 className="font-semibold text-slate-900" style={{fontFamily:'Outfit'}}>Radiografías</h3>
                 <div className="flex gap-2">
                   <span className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full font-medium">ML análisis · Fase 2</span>
-                  <button className="px-3 py-1.5 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">+ Cargar imagen</button>
+                  <button onClick={() => setModal('xray')} className="px-3 py-1.5 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">+ Cargar imagen</button>
                 </div>
               </div>
 
@@ -420,7 +437,7 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
                         <p className="text-xs text-white/50 font-mono">{xr.date}</p>
                         <p className="text-xs text-white/60 mt-1">{xr.finding}</p>
                       </div>
-                      <button className="px-3 py-1.5 bg-white/10 text-white/60 text-xs rounded-lg hover:bg-white/20 transition-colors">Ver</button>
+                      <button onClick={() => { setXraySelected(xr); setModal('xray') }} className="px-3 py-1.5 bg-white/10 text-white/60 text-xs rounded-lg hover:bg-white/20 transition-colors">Ver</button>
                     </div>
                   ))}
                 </div>
@@ -469,5 +486,252 @@ export default function PacientePerfil({ initialPatientId = 1, onBack, readOnly 
         </div>
       </div>
     </div>
+
+      {/* ── Modales ── */}
+
+      {/* Nueva consulta */}
+      {modal === 'nueva_consulta' && (
+        <Modal title="Nueva consulta" onClose={() => setModal(null)} size="lg">
+          <p className="text-sm text-slate-400 mb-4">Paciente: <strong className="text-slate-700">{patient.name}</strong> · {new Date().toLocaleDateString('es-CO')}</p>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {['Presión arterial', 'FC (bpm)', 'Peso (kg)'].map(l => (
+              <div key={l}>
+                <label className="text-xs text-slate-500 font-medium block mb-1">{l}</label>
+                <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+              </div>
+            ))}
+          </div>
+          {['Motivo de consulta', 'Diagnóstico', 'Procedimiento realizado', 'Plan de tratamiento', 'Indicaciones al paciente'].map(l => (
+            <div key={l} className="mb-3">
+              <label className="text-xs text-slate-500 font-semibold block mb-1.5" style={{ fontFamily: 'Outfit' }}>{l}</label>
+              <textarea rows={2} className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50 bg-white"/>
+            </div>
+          ))}
+          <div className="flex gap-3 pt-4 border-t border-slate-100 mt-2">
+            <button onClick={() => setModal(null)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50">Cancelar</button>
+            <button onClick={() => { setLocalRecords(prev => [...prev, { id: Date.now(), patientId: patient.id, date: new Date().toISOString().split('T')[0], motivo: 'Nueva consulta', diagnostico: '', procedimiento: '', plan: '', indicaciones: '', dr: 'Dr. Herrera', duration: 30 }]); setModal(null) }}
+              className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-500 transition-colors">
+              Guardar consulta
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Nueva cita */}
+      {modal === 'nueva_cita' && (
+        <Modal title="Programar nueva cita" onClose={() => setModal(null)}>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-slate-500 font-medium block mb-1.5">Fecha</label>
+              <input type="date" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-500 font-medium block mb-1.5">Hora</label>
+                <input type="time" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 font-medium block mb-1.5">Duración</label>
+                <select className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                  {['30 min', '45 min', '60 min', '90 min'].map(o => <option key={o}>{o}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 font-medium block mb-1.5">Tipo de cita</label>
+              <select className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                {['Control', 'Primera consulta', 'Procedimiento', 'Teleodontología', 'Urgencia'].map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 font-medium block mb-1.5">Notas (opcional)</label>
+              <textarea rows={2} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setModal(null)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50">Cancelar</button>
+              <button onClick={() => setModal(null)} className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold transition-colors" style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
+                Agendar cita
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Nuevo paciente */}
+      {modal === 'nuevo_paciente' && (
+        <Modal title="Registrar nuevo paciente" onClose={() => setModal(null)} size="lg">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-slate-600 font-semibold block mb-1.5">Nombre completo *</label>
+              <input
+                type="text"
+                value={npName}
+                onChange={e => setNpName(e.target.value)}
+                placeholder="Ej: Juan Camilo Pérez"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 font-semibold block mb-1.5">Edad</label>
+              <input
+                type="number"
+                value={npAge}
+                onChange={e => setNpAge(e.target.value)}
+                placeholder="28"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 font-semibold block mb-1.5">Teléfono</label>
+              <input
+                type="text"
+                value={npPhone}
+                onChange={e => setNpPhone(e.target.value)}
+                placeholder="+57 310 000 0000"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 font-semibold block mb-1.5">Correo electrónico</label>
+              <input
+                type="email"
+                value={npEmail}
+                onChange={e => setNpEmail(e.target.value)}
+                placeholder="juan.perez@email.com"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 font-semibold block mb-1.5">Grupo sanguíneo</label>
+              <select
+                value={npBlood}
+                onChange={e => setNpBlood(e.target.value)}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
+                {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-600 font-semibold block mb-1.5">EPS / Aseguradora</label>
+              <input
+                type="text"
+                value={npEps}
+                onChange={e => setNpEps(e.target.value)}
+                placeholder="Sura EPS, Sanitas, Compensar..."
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-slate-600 font-semibold block mb-1.5">Alergias conocidas</label>
+              <textarea
+                rows={2}
+                value={npAllergies}
+                onChange={e => setNpAllergies(e.target.value)}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-slate-600 font-semibold block mb-1.5">Medicamentos actuales</label>
+              <textarea
+                rows={2}
+                value={npMeds}
+                onChange={e => setNpMeds(e.target.value)}
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4 border-t border-slate-100 mt-4">
+            <button onClick={() => setModal(null)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50 transition-colors font-medium">Cancelar</button>
+            <button onClick={handleCreateNewPatient} className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm" style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
+              Registrar Paciente
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Completar registro */}
+      {modal === 'registro' && (
+        <Modal title="Completar registro del paciente" onClose={() => setModal(null)} size="lg">
+          <div className="grid sm:grid-cols-2 gap-4">
+            {[
+              { l: 'Nombre completo', ph: patient.name },
+              { l: 'Edad', ph: '' },
+              { l: 'Teléfono', ph: patient.phone },
+              { l: 'Correo electrónico', ph: patient.email },
+            ].map(f => (
+              <div key={f.l}>
+                <label className="text-xs text-slate-500 font-medium block mb-1.5">{f.l}</label>
+                <input defaultValue={f.ph} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+              </div>
+            ))}
+            <div className="sm:col-span-2">
+              <label className="text-xs text-slate-500 font-medium block mb-1.5">Antecedentes médicos</label>
+              <textarea rows={3} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4 border-t border-slate-100 mt-4">
+            <button onClick={() => setModal(null)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50">Cancelar</button>
+            <button onClick={() => setModal(null)} className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold" style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
+              Guardar registro
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Ver / Cargar radiografía */}
+      {modal === 'xray' && (
+        <Modal title={xraySelected ? `Radiografía — ${xraySelected.type} ${xraySelected.tooth}` : 'Cargar radiografía'} onClose={() => { setModal(null); setXraySelected(null) }} size="lg">
+          {xraySelected ? (
+            <div className="space-y-4">
+              <div className="bg-slate-900 rounded-xl aspect-video flex items-center justify-center">
+                <div className="text-center text-white/30">
+                  <p className="text-5xl mb-2">🔬</p>
+                  <p className="text-sm font-mono">RX {xraySelected.type} — {xraySelected.tooth}</p>
+                  <p className="text-xs mt-1">{xraySelected.date}</p>
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-4">
+                <p className="text-xs text-slate-400 font-semibold mb-1 uppercase">Hallazgo ML</p>
+                <p className="text-sm text-slate-700">{xraySelected.finding}</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => { setModal(null); setXraySelected(null) }} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50">Cerrar</button>
+                <button className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold" style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>Descargar</button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center hover:border-teal-400 transition-colors cursor-pointer">
+                <p className="text-4xl mb-3">📁</p>
+                <p className="text-slate-500 font-medium text-sm">Arrastra aquí tu imagen</p>
+                <p className="text-slate-400 text-xs mt-1">DICOM, JPG o PNG · Máx 25 MB</p>
+                <button className="mt-4 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+                  Seleccionar archivo
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 font-medium block mb-1.5">Tipo</label>
+                  <select className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                    {['Periapical', 'Panorámica', 'Bitewing', 'Cefalométrica'].map(o => <option key={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 font-medium block mb-1.5">Diente / Zona</label>
+                  <input placeholder="#14" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setModal(null)} className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-50">Cancelar</button>
+                <button onClick={() => setModal(null)} className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold" style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
+                  Cargar imagen
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
   )
 }

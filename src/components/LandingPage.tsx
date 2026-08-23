@@ -1,42 +1,8 @@
 import { useState, useEffect } from 'react'
+import CoroNyxLogo from './CoroNyxLogo'
 
 interface Props {
   onLogin: () => void
-}
-
-// ─── Logo isotipo SVG fiel al logo proporcionado ──────────────────────────────
-function CoroNyxLogo({ size = 40 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-      <defs>
-        <linearGradient id="lg-main" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#5FC9BE"/>
-          <stop offset="50%" stopColor="#1E8C82"/>
-          <stop offset="100%" stopColor="#0B3D3A"/>
-        </linearGradient>
-        <linearGradient id="lg-tooth" x1="35" y1="28" x2="65" y2="78" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#7DD9D3"/>
-          <stop offset="100%" stopColor="#1E8C82"/>
-        </linearGradient>
-      </defs>
-      {/* C arc — open right, ~300° */}
-      <path d="M72 14 A38 38 0 1 0 72 86" stroke="url(#lg-main)" strokeWidth="7" strokeLinecap="round" fill="none"/>
-      {/* Tech nodes at the open end */}
-      <circle cx="75" cy="12" r="4" fill="#5FC9BE"/>
-      <circle cx="84" cy="20" r="2.5" fill="#5FC9BE" opacity="0.6"/>
-      <circle cx="90" cy="29" r="1.5" fill="#5FC9BE" opacity="0.35"/>
-      <line x1="75" y1="12" x2="84" y2="20" stroke="#5FC9BE" strokeWidth="1.5" opacity="0.5"/>
-      <line x1="84" y1="20" x2="90" y2="29" stroke="#5FC9BE" strokeWidth="1.5" opacity="0.35"/>
-      {/* Tooth body */}
-      <path d="M50 30 C42 30 36 36 36 44 L37.5 63 C37.8 66 39.5 67.5 42 67.5 C44.5 67.5 46 65.5 50 65.5 C54 65.5 55.5 67.5 58 67.5 C60.5 67.5 62.2 66 62.5 63 L64 44 C64 36 58 30 50 30 Z" fill="url(#lg-tooth)" opacity="0.95"/>
-      {/* Crown — 3 points */}
-      <polyline points="37,33 40,23 50,30 60,23 63,33" stroke="#5FC9BE" strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" fill="none"/>
-      {/* Crown orbs */}
-      <circle cx="40" cy="23" r="2.5" fill="#5FC9BE" opacity="0.8"/>
-      <circle cx="50" cy="19" r="2.5" fill="#5FC9BE"/>
-      <circle cx="60" cy="23" r="2.5" fill="#5FC9BE" opacity="0.8"/>
-    </svg>
-  )
 }
 
 const FEATURES = [

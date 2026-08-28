@@ -1,532 +1,476 @@
 import { useState } from 'react'
 
-// Agenda updated per feedback #1:
-// Clicking a cita shows patient history panel. New patient → explicit empty state.
+// ── Types & data ──────────────────────────────────────────────────────────────
+const HOUR_START = 8
+const HOUR_END   = 19
+const TOTAL_H    = HOUR_END - HOUR_START
 
-const HOURS = Array.from({ length: 11 }, (_, i) => i + 7)
-const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-const FULL_DAYS = ['Lunes 4 Ago', 'Martes 5 Ago', 'Miércoles 6 Ago', 'Jueves 7 Ago', 'Viernes 8 Ago', 'Sábado 9 Ago']
-const CELL_HEIGHT = 60
-
-const COLORS: Record<string, string> = {
-  limpieza:       'bg-sky-100 border-sky-300 text-sky-800',
-  extraccion:     'bg-rose-100 border-rose-300 text-rose-800',
-  ortodoncia:     'bg-violet-100 border-violet-300 text-violet-800',
-  corona:         'bg-amber-100 border-amber-300 text-amber-800',
-  blanqueamiento: 'bg-emerald-100 border-emerald-300 text-emerald-800',
-  endodoncia:     'bg-orange-100 border-orange-300 text-orange-800',
-  control:        'bg-slate-100 border-slate-300 text-slate-700',
-  primera:        'bg-cyan-50 border-cyan-300 text-cyan-800',
+interface Cita {
+  id: number; patientId: number; patient: string; doc: string
+  day: number   // 0=Mon … 4=Fri
+  hour: number; minute: number; duration: number // minutes
+  procedure: string; doctor: string; box: string; type: 'Presencial'|'Virtual'
+  status: 'confirmed'|'pending'|'completed'|'cancelled'
+  phone: string; email: string; notes: string
 }
 
-const PROC_LABELS: Record<string, string> = {
-  limpieza: 'Limpieza / Profilaxis',
-  extraccion: 'Extracción dental',
-  ortodoncia: 'Control ortodoncia',
-  corona: 'Corona / Prótesis',
-  blanqueamiento: 'Blanqueamiento',
-  endodoncia: 'Endodoncia',
-  control: 'Control general',
-  primera: 'Primera consulta / Valoración',
+const PROC_COLORS: Record<string,string> = {
+  'Ortodoncia':   '#7C3AED',
+  'Endodoncia':   '#DC2626',
+  'Extracción':   '#D97706',
+  'Limpieza':     '#1E8C82',
+  'Restauración': '#0369A1',
+  'Control':      '#059669',
+  'Urgencia':     '#BE123C',
+  'Implante':     '#9333EA',
+}
+function procColor(proc: string) {
+  for(const [k,v] of Object.entries(PROC_COLORS)) { if(proc.includes(k)) return v }
+  return '#64748B'
 }
 
-const INITIAL_APPOINTMENTS = [
-  { id: 1, day: 0, startH: 8, startM: 30, duration: 45, patient: 'María González', patientId: 2, type: 'limpieza', room: 1, isNew: false, dr: 'Dra. Suárez', notes: 'Limpieza semestral de rutina' },
-  { id: 2, day: 0, startH: 9, startM: 15, duration: 60, patient: 'Carlos Rivas', patientId: 1, type: 'extraccion', room: 1, isNew: false, dr: 'Dr. Herrera', notes: 'Extracción molar #38' },
-  { id: 3, day: 0, startH: 10, startM: 30, duration: 90, patient: 'Sofía Mendez', patientId: 3, type: 'corona', room: 1, isNew: false, dr: 'Dr. Herrera', notes: 'Toma de impresión definitiva' },
-  { id: 4, day: 0, startH: 12, startM: 0, duration: 75, patient: 'Andrés Torres', patientId: 99, type: 'primera', room: 2, isNew: true, dr: 'Dra. Suárez', notes: 'Paciente nuevo por dolor en premolar' },
-  { id: 5, day: 0, startH: 14, startM: 0, duration: 30, patient: 'Lucía Reyes', patientId: 5, type: 'ortodoncia', room: 1, isNew: false, dr: 'Dr. Herrera', notes: 'Ajuste de brackets superior' },
-  { id: 6, day: 0, startH: 16, startM: 30, duration: 60, patient: 'Valentina Cruz', patientId: 6, type: 'limpieza', room: 1, isNew: false, dr: 'Dra. Suárez', notes: 'Limpieza ultrasónica' },
-  { id: 7, day: 1, startH: 9, startM: 0, duration: 90, patient: 'Roberto Patiño', patientId: 7, type: 'endodoncia', room: 1, isNew: false, dr: 'Dr. Herrera', notes: 'Segunda sesión conductos' },
-  { id: 8, day: 2, startH: 10, startM: 0, duration: 45, patient: 'Ana López', patientId: 98, type: 'primera', room: 1, isNew: true, dr: 'Dra. Suárez', notes: 'Primera valoración estética' },
+const CITAS: Cita[] = [
+  { id:1, patientId:1, patient:'María González', doc:'52.453.121', day:0, hour:9, minute:0, duration:60, procedure:'Limpieza ultrasónica', doctor:'Dr. Herrera', box:'Box 1', type:'Presencial', status:'confirmed', phone:'+57 320 455 1234', email:'maria@gmail.com', notes:'' },
+  { id:2, patientId:2, patient:'Carlos Rivas', doc:'1.015.672.340', day:0, hour:10, minute:30, duration:90, procedure:'Extracción #38', doctor:'Dr. Herrera', box:'Box 2', type:'Presencial', status:'confirmed', phone:'+57 310 455 7821', email:'carlos@gmail.com', notes:'Diabético, revisar glicemia' },
+  { id:3, patientId:3, patient:'Sofía Martínez', doc:'43.876.521', day:1, hour:9, minute:0, duration:45, procedure:'Ortodoncia ajuste', doctor:'Dra. Suárez', box:'Box 3', type:'Presencial', status:'confirmed', phone:'+57 300 111 2222', email:'sofia@gmail.com', notes:'' },
+  { id:4, patientId:4, patient:'Roberto Díaz', doc:'79.654.320', day:1, hour:14, minute:0, duration:120, procedure:'Endodoncia #16', doctor:'Dr. Herrera', box:'Box 1', type:'Presencial', status:'pending', phone:'+57 315 555 6677', email:'roberto@gmail.com', notes:'Bruxismo severo' },
+  { id:5, patientId:5, patient:'Ana Pérez', doc:'31.456.789', day:2, hour:8, minute:30, duration:30, procedure:'Control post-op', doctor:'Dr. Herrera', box:'Box 2', type:'Presencial', status:'confirmed', phone:'+57 311 444 5566', email:'ana@gmail.com', notes:'' },
+  { id:6, patientId:6, patient:'Luis Mendoza', doc:'12.345.678', day:2, hour:10, minute:0, duration:60, procedure:'Restauración #14', doctor:'Dr. Mejía', box:'Box 3', type:'Presencial', status:'pending', phone:'+57 320 777 8899', email:'luis@gmail.com', notes:'' },
+  { id:7, patientId:3, patient:'Sofía Martínez', doc:'43.876.521', day:3, hour:11, minute:0, duration:30, procedure:'Control ortodoncia', doctor:'Dra. Suárez', box:'Box 3', type:'Virtual', status:'confirmed', phone:'+57 300 111 2222', email:'sofia@gmail.com', notes:'' },
+  { id:8, patientId:7, patient:'Valentina Cruz', doc:'55.321.654', day:3, hour:15, minute:0, duration:90, procedure:'Implante — fase 1', doctor:'Dr. Mejía', box:'Box 1', type:'Presencial', status:'confirmed', phone:'+57 312 000 1234', email:'vale@gmail.com', notes:'Sin anticoagulantes 5 días antes' },
+  { id:9, patientId:8, patient:'Jorge Salazar', doc:'88.123.456', day:4, hour:9, minute:30, duration:60, procedure:'Urgencia dental', doctor:'Dr. Herrera', box:'Box 2', type:'Presencial', status:'confirmed', phone:'+57 316 888 9900', email:'jorge@gmail.com', notes:'Dolor agudo' },
+  { id:10, patientId:1, patient:'María González', doc:'52.453.121', day:4, hour:16, minute:0, duration:60, procedure:'Limpieza — seguimiento', doctor:'Dr. Herrera', box:'Box 1', type:'Presencial', status:'pending', phone:'+57 320 455 1234', email:'maria@gmail.com', notes:'' },
 ]
 
-const PATIENT_OPTIONS = [
-  { id: 1, name: 'Carlos Rivas', isNew: false },
-  { id: 2, name: 'María González', isNew: false },
-  { id: 3, name: 'Sofía Mendez', isNew: false },
-  { id: 5, name: 'Lucía Reyes', isNew: false },
-  { id: 6, name: 'Valentina Cruz', isNew: false },
-  { id: 7, name: 'Roberto Patiño', isNew: false },
-  { id: 99, name: 'Andrés Torres', isNew: true },
-]
+const DOCTORS = ['Dr. Andrés Herrera', 'Dra. Laura Suárez', 'Dr. Carlos Mejía']
+const BOXES = ['Box 1', 'Box 2', 'Box 3', 'Box 4']
+const PROCS = ['Limpieza ultrasónica','Extracción','Ortodoncia ajuste','Control ortodoncia','Endodoncia','Implante — fase 1','Restauración','Control post-op','Urgencia dental','Evaluación inicial']
+const DAYS_SHORT = ['Lun','Mar','Mié','Jue','Vie']
+const DAYS_LONG  = ['Lunes','Martes','Miércoles','Jueves','Viernes']
+const WEEK_DATES = [24,25,26,27,28] // Aug 2026
 
-const patientHistories: Record<number, { lastVisit: string, records: { date: string, motivo: string, proc: string }[] }> = {
-  1: { lastVisit: '2026-08-01', records: [
-    { date: '2026-08-01', motivo: 'Dolor posterior inferior', proc: 'Exploración + Flúor' },
-    { date: '2026-05-22', motivo: 'Control periódico', proc: 'Limpieza ultrasónica' },
-  ]},
-  2: { lastVisit: '2026-07-14', records: [
-    { date: '2026-07-14', motivo: 'Control ortodoncia', proc: 'Activación brackets' },
-    { date: '2026-05-10', motivo: 'Control mensual', proc: 'Ajuste elásticos' },
-  ]},
-  3: { lastVisit: '2026-06-20', records: [
-    { date: '2026-06-20', motivo: 'Corona provisional', proc: 'Preparación para corona definitiva' },
-  ]},
+function Icon({ d, className='w-4 h-4' }: { d: string; className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d={d}/></svg>
 }
 
-interface SelectedAppt {
-  id: number
-  patient: string
-  patientId: number
-  type: string
-  isNew: boolean
-  day: number
-  startH: number
-  duration: number
-  room: number
-  dr?: string
-  notes?: string
-}
+// ── Modal + Nueva Cita ────────────────────────────────────────────────────────
+function ModalNuevaCita({ cita, onSave, onClose }: { cita?: Partial<Cita>; onSave: (c: Omit<Cita,'id'>) => void; onClose: () => void }) {
+  const [form, setForm] = useState<Omit<Cita,'id'>>({
+    patientId: 0, patient: cita?.patient??'', doc: '', day: cita?.day??0,
+    hour: cita?.hour??9, minute: 0, duration: 60, procedure: PROCS[0],
+    doctor: DOCTORS[0], box: BOXES[0], type: 'Presencial', status: 'pending',
+    phone:'', email:'', notes: '',
+    ...cita,
+  })
 
-export default function AgendaUpdated() {
-  const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS)
-  const [view, setView] = useState<'week' | 'day'>('week')
-  const [selectedDay, setSelectedDay] = useState(0)
-  const [selected, setSelected] = useState<SelectedAppt | null>(null)
-  const [showNewModal, setShowNewModal] = useState(false)
-
-  // Form state for new appointment
-  const [formPatient, setFormPatient] = useState('Carlos Rivas')
-  const [customPatientName, setCustomPatientName] = useState('')
-  const [isNewPatientCheck, setIsNewPatientCheck] = useState(false)
-  const [formDay, setFormDay] = useState(0)
-  const [formHour, setFormHour] = useState(9)
-  const [formMinute, setFormMinute] = useState(0)
-  const [formDuration, setFormDuration] = useState(45)
-  const [formType, setFormType] = useState('control')
-  const [formDr, setFormDr] = useState('Dr. Herrera')
-  const [formRoom, setFormRoom] = useState(1)
-  const [formNotes, setFormNotes] = useState('')
-  const [toastMsg, setToastMsg] = useState('')
-
-  function getStyle(a: typeof appointments[0]) {
-    const top = (a.startH - 7) * CELL_HEIGHT + (a.startM / 60) * CELL_HEIGHT
-    const height = (a.duration / 60) * CELL_HEIGHT - 2
-    if (view === 'week') {
-      return { top, height, left: `${(a.day / 6) * 100}%`, width: `${(1 / 6) * 100 - 1}%`, position: 'absolute' as const }
-    }
-    return { top, height, left: '0%', width: '98%', position: 'absolute' as const }
-  }
-
-  function handleOpenCreate(dayIdx = 0, hour = 9) {
-    setFormDay(dayIdx)
-    setFormHour(hour)
-    setFormMinute(0)
-    setShowNewModal(true)
-  }
-
-  function handleSaveNewAppointment() {
-    const finalPatientName = isNewPatientCheck ? (customPatientName || 'Paciente Nuevo') : formPatient
-    const matchedPatient = PATIENT_OPTIONS.find(p => p.name === finalPatientName)
-    const pId = matchedPatient ? matchedPatient.id : Date.now()
-
-    const newAppt = {
-      id: Date.now(),
-      day: Number(formDay),
-      startH: Number(formHour),
-      startM: Number(formMinute),
-      duration: Number(formDuration),
-      patient: finalPatientName,
-      patientId: pId,
-      type: formType,
-      room: Number(formRoom),
-      isNew: isNewPatientCheck,
-      dr: formDr,
-      notes: formNotes,
-    }
-
-    setAppointments(prev => [...prev, newAppt])
-    setShowNewModal(false)
-    setCustomPatientName('')
-    setIsNewPatientCheck(false)
-    setFormNotes('')
-    setToastMsg(`Cita agendada para ${finalPatientName} el ${FULL_DAYS[formDay]} a las ${formHour}:${String(formMinute).padStart(2, '0')}`)
-    setTimeout(() => setToastMsg(''), 4000)
-  }
-
-  const visibleAppts = view === 'week' ? appointments : appointments.filter(a => a.day === selectedDay)
-  const history = selected && !selected.isNew ? patientHistories[selected.patientId] : null
+  const minutes = [0,15,30,45]
+  const durations = [30,45,60,75,90,105,120]
 
   return (
-    <div className="flex h-full fade-in relative">
-      {/* Toast Notification */}
-      {toastMsg && (
-        <div className="fixed top-5 right-5 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-teal-500/40 fade-in">
-          <span className="text-emerald-400 font-bold text-lg">✓</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(0,0,0,0.65)',backdropFilter:'blur(4px)'}}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>+ Nueva cita</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5"/></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {/* Patient */}
           <div>
-            <p className="font-semibold text-xs text-white" style={{ fontFamily: 'Outfit' }}>Cita confirmada</p>
-            <p className="text-xs text-slate-300">{toastMsg}</p>
+            <label className="text-xs font-semibold text-slate-500 block mb-1.5">Paciente</label>
+            <input value={form.patient} onChange={e=>setForm(f=>({...f,patient:e.target.value}))} placeholder="Nombre del paciente..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
           </div>
-        </div>
-      )}
-
-      {/* Calendar */}
-      <div className={`${selected ? 'flex-1' : 'w-full'} flex flex-col transition-all duration-200 min-w-0`}>
-        {/* Toolbar */}
-        <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-100">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold text-slate-900" style={{ fontFamily: 'Outfit' }}>Agenda Clínica</h1>
-            <div className="flex items-center gap-1 text-sm text-slate-500">
-              <button className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700">‹</button>
-              <span className="font-medium text-slate-700 px-2 text-xs sm:text-sm">4–9 Ago 2026</span>
-              <button className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700">›</button>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Documento</label>
+              <input value={form.doc} onChange={e=>setForm(f=>({...f,doc:e.target.value}))} placeholder="N° ID..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Teléfono</label>
+              <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="+57..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
             </div>
           </div>
-          <div className="flex gap-2">
-            <div className="flex border border-slate-200 rounded-lg overflow-hidden text-sm">
-              {(['week', 'day'] as const).map(v => (
-                <button key={v} onClick={() => setView(v)}
-                  className={`px-3 py-1.5 font-medium transition-colors text-xs sm:text-sm ${view === v ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
-                  {v === 'week' ? 'Semana' : 'Día'}
+
+          {/* Day + Time */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Día</label>
+              <select value={form.day} onChange={e=>setForm(f=>({...f,day:+e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                {DAYS_LONG.map((d,i)=><option key={i} value={i}>{d} {WEEK_DATES[i]}/08</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Hora</label>
+              <select value={form.hour} onChange={e=>setForm(f=>({...f,hour:+e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                {Array.from({length:HOUR_END-HOUR_START},(_,i)=><option key={i} value={HOUR_START+i}>{String(HOUR_START+i).padStart(2,'0')}:00</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Minuto</label>
+              <select value={form.minute} onChange={e=>setForm(f=>({...f,minute:+e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                {minutes.map(m=><option key={m} value={m}>{String(m).padStart(2,'0')}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Duration + type */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Duración</label>
+              <select value={form.duration} onChange={e=>setForm(f=>({...f,duration:+e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                {durations.map(d=><option key={d} value={d}>{d} min</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Modalidad</label>
+              <div className="flex gap-2">
+                {(['Presencial','Virtual'] as const).map(t=>(
+                  <button key={t} onClick={()=>setForm(f=>({...f,type:t}))}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border-2 transition-all ${form.type===t?'border-cyan-500 bg-cyan-50 text-cyan-700':'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Procedure + Doctor + Box */}
+          <div>
+            <label className="text-xs font-semibold text-slate-500 block mb-1.5">Procedimiento</label>
+            <select value={form.procedure} onChange={e=>setForm(f=>({...f,procedure:e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+              {PROCS.map(p=><option key={p}>{p}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Doctor</label>
+              <select value={form.doctor} onChange={e=>setForm(f=>({...f,doctor:e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                {DOCTORS.map(d=><option key={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Box asignado</label>
+              <select value={form.box} onChange={e=>setForm(f=>({...f,box:e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                {BOXES.map(b=><option key={b}>{b}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-500 block mb-1.5">Notas (opcional)</label>
+            <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2}
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="Observaciones previas, indicaciones especiales..."/>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 flex gap-2 justify-end shrink-0">
+          <button onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+          <button onClick={()=>onSave(form)} className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500">Agendar cita</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Panel lateral del paciente ────────────────────────────────────────────────
+function PatientPanel({ cita, onClose, onEdit, onConfirm }: { cita: Cita; onClose: () => void; onEdit: () => void; onConfirm: (id: number) => void }) {
+  const color = procColor(cita.procedure)
+  const [confirming, setConfirming] = useState(false)
+
+  function handleConfirm() {
+    setConfirming(true)
+    setTimeout(() => { onConfirm(cita.id); setConfirming(false) }, 700)
+  }
+
+  const statusMeta: Record<Cita['status'], { label: string; cls: string }> = {
+    confirmed:  { label: 'Confirmada',  cls: 'bg-emerald-100 text-emerald-700' },
+    pending:    { label: 'Pendiente',   cls: 'bg-amber-100 text-amber-700' },
+    completed:  { label: 'Completada',  cls: 'bg-slate-100 text-slate-600' },
+    cancelled:  { label: 'Cancelada',   cls: 'bg-rose-100 text-rose-600' },
+  }
+
+  return (
+    <div className="w-72 shrink-0 flex flex-col bg-white border-l border-slate-100 shadow-xl">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100" style={{backgroundColor: color+'18'}}>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-slate-800 text-sm truncate" style={{fontFamily:'Outfit'}}>{cita.patient}</p>
+          <p className="text-xs text-slate-500">{cita.doc}</p>
+        </div>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 ml-2">
+          <Icon d="M6 18L18 6M6 6l12 12" className="w-4 h-4"/>
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="rounded-xl p-3" style={{backgroundColor: color+'12', borderLeft:`3px solid ${color}`}}>
+          <p className="font-semibold text-sm" style={{color}}>{cita.procedure}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{DAYS_LONG[cita.day]} {WEEK_DATES[cita.day]}/08 · {String(cita.hour).padStart(2,'0')}:{String(cita.minute).padStart(2,'0')}</p>
+          <p className="text-xs text-slate-400">{cita.duration} min · {cita.box}</p>
+        </div>
+
+        {[
+          ['Doctor', cita.doctor],
+          ['Modalidad', cita.type],
+          ['Teléfono', cita.phone],
+          ['Email', cita.email],
+        ].filter(([,v])=>v).map(([l,v])=>(
+          <div key={l} className="flex justify-between text-sm py-1.5 border-b border-slate-50 last:border-0">
+            <span className="text-slate-500 text-xs">{l}</span>
+            <span className="font-medium text-slate-700 text-xs text-right max-w-[150px] truncate">{v}</span>
+          </div>
+        ))}
+
+        <div className="flex justify-between text-sm py-1.5">
+          <span className="text-slate-500 text-xs">Estado</span>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusMeta[cita.status].cls}`}>{statusMeta[cita.status].label}</span>
+        </div>
+
+        {cita.notes && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <p className="text-xs font-semibold text-amber-700 mb-1">⚠ Notas</p>
+            <p className="text-xs text-amber-800">{cita.notes}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 border-t border-slate-100 space-y-2">
+        {/* Confirmar — only when pending */}
+        {cita.status === 'pending' && (
+          <button onClick={handleConfirm} disabled={confirming}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+            style={{background:'linear-gradient(135deg,#1E8C82,#0B3D3A)'}}>
+            {confirming ? (
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+            ) : (
+              <Icon d="M5 13l4 4L19 7" className="w-4 h-4"/>
+            )}
+            {confirming ? 'Confirmando...' : 'Confirmar cita'}
+          </button>
+        )}
+        {cita.status === 'confirmed' && (
+          <div className="w-full py-2 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center justify-center gap-1.5">
+            <Icon d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" className="w-3.5 h-3.5"/>
+            Cita confirmada
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button onClick={onEdit} className="flex-1 py-2 text-xs font-semibold text-cyan-600 border border-cyan-200 rounded-xl hover:bg-cyan-50 transition-colors">Editar cita</button>
+          <button className="flex-1 py-2 text-xs font-semibold text-white rounded-xl transition-colors" style={{backgroundColor:'#1E8C82'}}>Ver HC</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Weekly calendar ───────────────────────────────────────────────────────────
+function WeekView({ citas, onCitaClick, onSlotClick }: { citas: Cita[]; onCitaClick: (c: Cita) => void; onSlotClick: (day: number, hour: number) => void }) {
+  const hours = Array.from({length: TOTAL_H}, (_,i) => HOUR_START + i)
+  const CELL_H = 48 // px per hour
+
+  return (
+    <div className="flex-1 overflow-auto">
+      <div className="min-w-[700px]">
+        {/* Header */}
+        <div className="grid sticky top-0 z-10 bg-white border-b border-slate-200" style={{gridTemplateColumns:'48px repeat(5, 1fr)'}}>
+          <div className="px-2 py-3"/>
+          {DAYS_SHORT.map((d,i)=>(
+            <div key={i} className="px-2 py-3 text-center border-l border-slate-100">
+              <p className="text-xs text-slate-500">{d}</p>
+              <p className="font-bold text-slate-800">{WEEK_DATES[i]}</p>
+              <p className="text-[10px] text-slate-400">ago</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Grid */}
+        <div className="relative grid" style={{gridTemplateColumns:'48px repeat(5, 1fr)'}}>
+          {/* Time labels */}
+          <div>
+            {hours.map(h=>(
+              <div key={h} className="flex items-start justify-end pr-2 text-[10px] text-slate-400 font-medium" style={{height:CELL_H}}>
+                {String(h).padStart(2,'0')}:00
+              </div>
+            ))}
+          </div>
+
+          {/* Day columns */}
+          {DAYS_SHORT.map((_,dayIdx)=>(
+            <div key={dayIdx} className="relative border-l border-slate-100" style={{height: TOTAL_H * CELL_H}}>
+              {/* Hour rows */}
+              {hours.map(h=>(
+                <div key={h} onClick={()=>onSlotClick(dayIdx,h)} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors cursor-pointer" style={{height:CELL_H}}/>
+              ))}
+              {/* Appointments */}
+              {citas.filter(c=>c.day===dayIdx).map(c=>{
+                const topPct  = ((c.hour - HOUR_START) + c.minute / 60) / TOTAL_H * 100
+                const heightPx = (c.duration / 60) * CELL_H
+                const color = procColor(c.procedure)
+                return (
+                  <button key={c.id} onClick={e=>{e.stopPropagation();onCitaClick(c)}}
+                    className="absolute left-1 right-1 rounded-lg overflow-hidden text-left shadow-sm hover:shadow-md transition-all group"
+                    style={{ top:`${topPct}%`, height: Math.max(heightPx-4,22), backgroundColor: color+'20', borderLeft:`3px solid ${color}` }}>
+                    <div className="px-1.5 py-1">
+                      <p className="text-[10px] font-bold leading-tight truncate" style={{color}}>{c.procedure}</p>
+                      <p className="text-[9px] text-slate-500 truncate">{c.patient}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Day view ─────────────────────────────────────────────────────────────────
+function DayView({ dayIdx, citas, onCitaClick, onSlotClick }: { dayIdx: number; citas: Cita[]; onCitaClick: (c: Cita) => void; onSlotClick: (day: number, hour: number) => void }) {
+  const hours = Array.from({length: TOTAL_H}, (_,i) => HOUR_START + i)
+  const CELL_H = 64
+  const dayCitas = citas.filter(c=>c.day===dayIdx)
+
+  return (
+    <div className="flex-1 overflow-auto">
+      <div className="min-w-0">
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-3">
+          <p className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>{DAYS_LONG[dayIdx]}, {WEEK_DATES[dayIdx]} de agosto 2026</p>
+          <p className="text-xs text-slate-400">{dayCitas.length} cita{dayCitas.length!==1?'s':''}</p>
+        </div>
+        <div className="relative grid" style={{gridTemplateColumns:'56px 1fr', minHeight: TOTAL_H * CELL_H}}>
+          <div>
+            {hours.map(h=>(
+              <div key={h} className="flex items-start justify-end pr-2 pt-1 text-[10px] text-slate-400 font-medium" style={{height:CELL_H}}>
+                {String(h).padStart(2,'0')}:00
+              </div>
+            ))}
+          </div>
+          <div className="relative border-l border-slate-100" style={{height: TOTAL_H * CELL_H}}>
+            {hours.map(h=>(
+              <div key={h} onClick={()=>onSlotClick(dayIdx,h)} className="border-b border-slate-100 hover:bg-slate-50/50 cursor-pointer" style={{height:CELL_H}}/>
+            ))}
+            {dayCitas.map(c=>{
+              const top = ((c.hour - HOUR_START) + c.minute / 60) / TOTAL_H * 100
+              const h   = (c.duration / 60) * CELL_H
+              const col = procColor(c.procedure)
+              return (
+                <button key={c.id} onClick={e=>{e.stopPropagation();onCitaClick(c)}}
+                  className="absolute left-2 right-2 rounded-xl overflow-hidden text-left shadow-sm hover:shadow-md transition-all"
+                  style={{ top:`${top}%`, height: Math.max(h-4,28), backgroundColor:col+'18', borderLeft:`4px solid ${col}` }}>
+                  <div className="px-3 py-2">
+                    <p className="text-xs font-bold" style={{color:col}}>{c.procedure}</p>
+                    <p className="text-xs text-slate-600">{c.patient}</p>
+                    <p className="text-[10px] text-slate-400">{String(c.hour).padStart(2,'0')}:{String(c.minute).padStart(2,'0')} · {c.duration}min · {c.doctor} · {c.box}</p>
+                  </div>
                 </button>
-              ))}
-            </div>
-            <button
-              onClick={() => handleOpenCreate(view === 'day' ? selectedDay : 0, 9)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:bg-cyan-700 transition-colors shadow-sm">
-              <span>+</span> Nueva cita
-            </button>
-          </div>
-        </div>
-
-        {view === 'week' && (
-          <div className="flex bg-white border-b border-slate-100">
-            <div className="w-14 shrink-0" />
-            {DAYS.map((d, i) => (
-              <div key={i} className="flex-1 text-center py-2.5 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => { setSelectedDay(i); setView('day') }}>
-                <p className="text-xs text-slate-400 font-medium">{d}</p>
-                <p className={`text-base font-bold mt-0.5 ${i === 0 ? 'text-cyan-600' : 'text-slate-700'}`} style={{ fontFamily: 'Outfit' }}>{4 + i}</p>
-                <p className="text-[10px] text-slate-400">{appointments.filter(a => a.day === i).length} citas</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {view === 'day' && (
-          <div className="flex items-center gap-2 bg-white border-b border-slate-100 px-5 py-2">
-            <button onClick={() => setView('week')} className="text-xs text-slate-400 hover:text-slate-600 font-medium">← Ver semana</button>
-            <span className="text-slate-300">|</span>
-            {DAYS.map((d, i) => (
-              <button key={i} onClick={() => setSelectedDay(i)}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${selectedDay === i ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
-                {d} {4 + i}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto bg-slate-50">
-          <div className="flex min-h-full">
-            <div className="w-14 shrink-0 bg-white border-r border-slate-100">
-              {HOURS.map(h => (
-                <div key={h} className="border-b border-slate-100" style={{ height: CELL_HEIGHT }}>
-                  <span className="text-xs text-slate-400 font-mono pl-2 -translate-y-2 block">{h}:00</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex-1 relative">
-              {HOURS.map(h => (
-                <div key={h} className="border-b border-slate-100 hover:bg-cyan-50/40 transition-colors cursor-cell group"
-                  style={{ height: CELL_HEIGHT }}
-                  onClick={() => handleOpenCreate(view === 'day' ? selectedDay : 0, h)}>
-                  <span className="absolute left-2 top-1 text-xs text-cyan-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                    + Agendar a las {h}:00
-                  </span>
-                </div>
-              ))}
-
-              {visibleAppts.map(a => (
-                <div key={a.id}
-                  style={getStyle(a)}
-                  onClick={e => { e.stopPropagation(); setSelected(a as any) }}
-                  className={`${COLORS[a.type] || 'bg-slate-100 border-slate-300 text-slate-800'} border rounded-lg px-2 py-1 overflow-hidden cursor-pointer transition-shadow hover:shadow-md ${selected?.id === a.id ? 'ring-2 ring-cyan-500 shadow-md' : ''} ${a.isNew ? 'border-dashed' : ''}`}>
-                  <p className="text-xs font-semibold truncate">{a.patient}</p>
-                  {(a.duration / 60) * CELL_HEIGHT > 30 && (
-                    <p className="text-[11px] opacity-80 truncate">{PROC_LABELS[a.type] || a.type}</p>
-                  )}
-                  {a.isNew && <span className="text-[9px] font-bold text-cyan-800 bg-cyan-100/80 px-1 py-0.2 rounded">★ NUEVO</span>}
-                </div>
-              ))}
-
-              <div className="absolute inset-x-0 pointer-events-none z-10"
-                style={{ top: ((new Date().getHours() - 7) * CELL_HEIGHT) + (new Date().getMinutes() / 60 * CELL_HEIGHT) }}>
-                <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></div><div className="flex-1 h-px bg-rose-400"></div></div>
-              </div>
-            </div>
+              )
+            })}
           </div>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Patient history side panel — feedback #1 */}
-      {selected && (
-        <div className="w-80 shrink-0 border-l border-slate-200 bg-white flex flex-col h-full overflow-y-auto slide-up">
-          <div className="p-4 border-b border-slate-100 flex items-start justify-between">
-            <div>
-              <p className="text-xs text-slate-400 font-medium">{FULL_DAYS[selected.day]} · {selected.startH}:00 · {selected.duration} min</p>
-              <p className="font-semibold text-slate-900 mt-0.5" style={{ fontFamily: 'Outfit' }}>{selected.patient}</p>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${COLORS[selected.type] || 'bg-slate-100 text-slate-700'} font-medium`}>
-                {PROC_LABELS[selected.type] || selected.type}
-              </span>
-            </div>
-            <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 text-lg leading-none p-1">×</button>
+// ── Main ──────────────────────────────────────────────────────────────────────
+export default function AgendaUpdated() {
+  const [citas, setCitas] = useState(CITAS)
+  const [view, setView] = useState<'week'|'day'>('week')
+  const [dayIdx, setDayIdx] = useState(0)
+  const [selCita, setSelCita] = useState<Cita|null>(null)
+  const [showModal, setShowModal] = useState(false)
+  const [prefill, setPrefill] = useState<Partial<Cita>>({})
+  const [filterDoc, setFilterDoc] = useState('')
+
+  const filtered = filterDoc ? citas.filter(c=>c.doctor===filterDoc) : citas
+
+  function addCita(data: Omit<Cita,'id'>) {
+    setCitas(cs=>[...cs,{...data,id:Date.now()}])
+    setShowModal(false)
+  }
+
+  function confirmCita(id: number) {
+    setCitas(cs => cs.map(c => c.id === id ? {...c, status:'confirmed'} : c))
+    setSelCita(sc => sc && sc.id === id ? {...sc, status:'confirmed'} : sc)
+  }
+
+  function handleSlotClick(day: number, hour: number) {
+    setPrefill({day, hour})
+    setShowModal(true)
+  }
+
+  return (
+    <div className="flex h-full bg-white">
+      {showModal && <ModalNuevaCita cita={prefill} onSave={addCita} onClose={()=>setShowModal(false)}/>}
+
+      {/* Main area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 shrink-0">
+          {/* View toggle */}
+          <div className="flex bg-slate-100 rounded-lg p-0.5">
+            {(['week','day'] as const).map(v=>(
+              <button key={v} onClick={()=>setView(v)}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${view===v?'bg-white text-slate-800 shadow-sm':'text-slate-500 hover:text-slate-700'}`}>
+                {v==='week'?'Semana':'Día'}
+              </button>
+            ))}
           </div>
 
-          {selected.notes && (
-            <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-xs text-slate-600">
-              <span className="font-semibold text-slate-500">Nota:</span> {selected.notes}
+          {view==='day'&&(
+            <div className="flex items-center gap-1">
+              <button onClick={()=>setDayIdx(d=>Math.max(0,d-1))} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50">
+                <Icon d="M15 19l-7-7 7-7" className="w-3.5 h-3.5 text-slate-500"/>
+              </button>
+              <span className="text-sm font-semibold text-slate-700 min-w-[100px] text-center">{DAYS_LONG[dayIdx]} {WEEK_DATES[dayIdx]}</span>
+              <button onClick={()=>setDayIdx(d=>Math.min(4,d+1))} className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50">
+                <Icon d="M9 5l7 7-7 7" className="w-3.5 h-3.5 text-slate-500"/>
+              </button>
             </div>
           )}
 
-          {/* New patient empty state — feedback #1 */}
-          {selected.isNew ? (
-            <div className="flex-1 p-6 flex flex-col items-center justify-center text-center">
-              <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+          <div className="flex-1"/>
+
+          {/* Doctor filter */}
+          <select value={filterDoc} onChange={e=>setFilterDoc(e.target.value)} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 text-slate-600">
+            <option value="">Todos los doctores</option>
+            {DOCTORS.map(d=><option key={d}>{d}</option>)}
+          </select>
+
+          {/* Legend */}
+          <div className="flex items-center gap-2">
+            {Object.entries(PROC_COLORS).slice(0,4).map(([k,v])=>(
+              <div key={k} className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-sm" style={{backgroundColor:v}}/>
+                <span className="text-[10px] text-slate-500">{k}</span>
               </div>
-              <h4 className="font-semibold text-slate-800 mb-1" style={{ fontFamily: 'Outfit' }}>Paciente nuevo</h4>
-              <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-                <strong className="text-slate-700">{selected.patient}</strong> asiste por primera vez a CORONYX. No tiene antecedentes clínicos registrados.
-              </p>
-              <div className="w-full space-y-2">
-                <button
-                  onClick={() => {
-                    setToastMsg(`Ficha de registro abierta para ${selected.patient}`)
-                    setTimeout(() => setToastMsg(''), 3000)
-                  }}
-                  className="w-full py-2.5 bg-cyan-600 text-white rounded-xl text-xs font-semibold hover:bg-cyan-500 transition-colors">
-                  Registrar datos del paciente
-                </button>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-4">Podrás crear la historia clínica al finalizar la consulta</p>
-            </div>
-          ) : (
-            /* Existing patient history */
-            <div className="flex-1 p-4 space-y-4">
-              {history ? (
-                <>
-                  <div className="bg-slate-50 rounded-xl p-3 text-xs">
-                    <p className="text-slate-400 mb-1 font-medium">Última visita registrada</p>
-                    <p className="font-semibold text-slate-700 text-sm">{history.lastVisit}</p>
-                  </div>
-
-                  {/* Mini timeline */}
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2" style={{ fontFamily: 'Outfit' }}>Historial previo</p>
-                    <div className="relative">
-                      <div className="absolute left-3 top-0 bottom-0 w-px bg-slate-100"></div>
-                      <div className="space-y-3">
-                        {history.records.map((r, i) => (
-                          <div key={i} className="flex gap-3 items-start pl-1">
-                            <div className="w-5 h-5 bg-cyan-100 rounded-full flex items-center justify-center shrink-0 z-10">
-                              <div className="w-1.5 h-1.5 rounded-full bg-cyan-500"></div>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-mono text-slate-400">{r.date}</p>
-                              <p className="text-xs font-semibold text-slate-700">{r.motivo}</p>
-                              <p className="text-[11px] text-slate-500">{r.proc}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2">
-                    <button
-                      onClick={() => {
-                        setToastMsg(`Abriendo expediente de ${selected.patient}`)
-                        setTimeout(() => setToastMsg(''), 3000)
-                      }}
-                      className="w-full py-2.5 bg-cyan-600 text-white rounded-xl text-xs font-semibold hover:bg-cyan-500 transition-colors">
-                      Ver historia clínica completa
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-slate-400 text-center py-6">Sin historial adicional</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Modal: Programar Nueva Cita (Detallado) ── */}
-      {showNewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden fade-in flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>
-                  Agendar nueva cita
-                </h2>
-                <p className="text-xs text-slate-400">Selecciona paciente, día, hora y procedimiento</p>
-              </div>
-              <button
-                onClick={() => setShowNewModal(false)}
-                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center text-xl leading-none transition-colors">
-                ×
-              </button>
-            </div>
-
-            <div className="overflow-y-auto p-6 space-y-4 flex-1">
-              {/* Paciente selection / toggle nuevo */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-semibold text-slate-600">Paciente</label>
-                  <label className="flex items-center gap-1.5 text-xs text-cyan-700 cursor-pointer font-medium">
-                    <input
-                      type="checkbox"
-                      checked={isNewPatientCheck}
-                      onChange={e => setIsNewPatientCheck(e.target.checked)}
-                      className="rounded text-cyan-600 focus:ring-cyan-500"
-                    />
-                    ¿Es paciente nuevo?
-                  </label>
-                </div>
-
-                {isNewPatientCheck ? (
-                  <input
-                    type="text"
-                    value={customPatientName}
-                    onChange={e => setCustomPatientName(e.target.value)}
-                    placeholder="Escribe el nombre completo del paciente nuevo..."
-                    className="w-full px-3 py-2.5 border border-cyan-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-cyan-50/20"
-                  />
-                ) : (
-                  <select
-                    value={formPatient}
-                    onChange={e => setFormPatient(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
-                    {PATIENT_OPTIONS.map(p => (
-                      <option key={p.id} value={p.name}>{p.name} {p.isNew ? '(Nuevo)' : ''}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Día y Hora */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Día de la semana</label>
-                  <select
-                    value={formDay}
-                    onChange={e => setFormDay(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
-                    {FULL_DAYS.map((d, i) => (
-                      <option key={i} value={i}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1.5">Hora</label>
-                    <select
-                      value={formHour}
-                      onChange={e => setFormHour(Number(e.target.value))}
-                      className="w-full px-2 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
-                      {HOURS.map(h => (
-                        <option key={h} value={h}>{h}:00</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1.5">Minuto</label>
-                    <select
-                      value={formMinute}
-                      onChange={e => setFormMinute(Number(e.target.value))}
-                      className="w-full px-2 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
-                      <option value={0}>:00</option>
-                      <option value={15}>:15</option>
-                      <option value={30}>:30</option>
-                      <option value={45}>:45</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Procedimiento y Duración */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Procedimiento / Motivo</label>
-                  <select
-                    value={formType}
-                    onChange={e => setFormType(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
-                    {Object.entries(PROC_LABELS).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Duración estimada</label>
-                  <select
-                    value={formDuration}
-                    onChange={e => setFormDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
-                    <option value={30}>30 minutos</option>
-                    <option value={45}>45 minutos</option>
-                    <option value={60}>60 minutos (1h)</option>
-                    <option value={90}>90 minutos (1.5h)</option>
-                    <option value={120}>120 minutos (2h)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Odontólogo y Box */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Odontólogo asignado</label>
-                  <select
-                    value={formDr}
-                    onChange={e => setFormDr(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
-                    <option value="Dr. Herrera">Dr. Carlos Herrera</option>
-                    <option value="Dra. Suárez">Dra. Marcela Suárez</option>
-                    <option value="Dr. Morales">Dr. Carlos Morales</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Box / Consultorio</label>
-                  <select
-                    value={formRoom}
-                    onChange={e => setFormRoom(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 bg-white">
-                    <option value={1}>Box 1 (General + Rx)</option>
-                    <option value={2}>Box 2 (Estética / Limpieza)</option>
-                    <option value={3}>Box 3 (Ortodoncia)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Observaciones */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Notas adicionales o requerimientos</label>
-                <textarea
-                  rows={2}
-                  value={formNotes}
-                  onChange={e => setFormNotes(e.target.value)}
-                  placeholder="Ej: Requiere anestesia especial, radiografía previa, paciente alérgico..."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
-              <button
-                onClick={() => setShowNewModal(false)}
-                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-100 transition-colors font-medium">
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveNewAppointment}
-                className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
-                Confirmar y Agendar Cita
-              </button>
-            </div>
+            ))}
           </div>
+
+          <button onClick={()=>{setPrefill({});setShowModal(true)}}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white rounded-xl transition-colors" style={{backgroundColor:'#1E8C82'}}>
+            <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5"/>
+            Nueva cita
+          </button>
         </div>
+
+        {/* Calendar */}
+        {view==='week'
+          ? <WeekView citas={filtered} onCitaClick={setSelCita} onSlotClick={handleSlotClick}/>
+          : <DayView dayIdx={dayIdx} citas={filtered} onCitaClick={setSelCita} onSlotClick={handleSlotClick}/>
+        }
+      </div>
+
+      {/* Patient side panel */}
+      {selCita && (
+        <PatientPanel
+          cita={selCita}
+          onClose={()=>setSelCita(null)}
+          onEdit={()=>{setPrefill(selCita);setSelCita(null);setShowModal(true)}}
+          onConfirm={confirmCita}
+        />
       )}
     </div>
   )

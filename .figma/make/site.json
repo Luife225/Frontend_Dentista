@@ -1,6 +1,6 @@
 {
   "title": "CORONYX — Sistema Dental",
-  "description": "Plataforma SaaS de gestión odontológica con asistente de IA por voz, odontograma digital, análisis de radiografías con Machine Learning y teleodontología integrada.",
+  "description": "Plataforma SaaS de gestión odontológica con asistente IA, odontograma interactivo, teleodontología y análisis ML de radiografías.",
   "robots": {
     "index": false
   },

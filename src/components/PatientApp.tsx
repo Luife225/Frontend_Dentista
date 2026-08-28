@@ -1,129 +1,318 @@
 import { useState } from 'react'
-import CoroNyxLogo from './CoroNyxLogo'
 
-function SvgIcon({ d, className = 'w-4 h-4' }: { d: string; className?: string }) {
+type Tab = 'inicio' | 'agenda' | 'pagos' | 'tratamientos' | 'tele' | 'documentos' | 'perfil'
+
+// ── Brand ─────────────────────────────────────────────────────────────────────
+function CxLogo({ size = 28 }: { size?: number }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      <defs>
+        <linearGradient id="ptG" x1="4" y1="4" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#5FC9BE"/>
+          <stop offset="100%" stopColor="#0B3D3A"/>
+        </linearGradient>
+      </defs>
+      <path d="M27 5.5 A13.5 13.5 0 1 0 27 30.5" stroke="url(#ptG)" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <circle cx="28.5" cy="4.5" r="1.6" fill="#5FC9BE"/>
+      <circle cx="31.5" cy="7.5" r="1" fill="#5FC9BE" opacity="0.55"/>
+      <path d="M18 11 C15.5 11 13.5 13 13.5 15.8 L14 22.8 C14.1 23.7 14.7 24.2 15.6 24.2 C16.5 24.2 17 23.4 18 23.4 C19 23.4 19.5 24.2 20.4 24.2 C21.3 24.2 21.9 23.7 22 22.8 L22.5 15.8 C22.5 13 20.5 11 18 11 Z" fill="url(#ptG)" opacity="0.92"/>
+      <polyline points="14,12 15.2,8.5 18,11 20.8,8.5 22,12" stroke="#5FC9BE" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" fill="none"/>
+    </svg>
+  )
+}
+
+function Icon({ d, className = 'w-4 h-4' }: { d: string; className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
       <path d={d}/>
     </svg>
   )
 }
 
-type PatientView = 'inicio' | 'agenda' | 'pagos' | 'tratamientos' | 'teleodontologia' | 'documentos' | 'perfil'
+// ── Data ──────────────────────────────────────────────────────────────────────
+const PATIENT = { name: 'Carlos Rivas', email: 'carlos.rivas@gmail.com', phone: '+57 310 455 7821', dob: '1988-04-12', blood: 'O+', eps: 'Sura EPS', doc: '1.015.672.340', city: 'Bogotá', address: 'Cra. 7 # 45-20 Apto 302' }
 
-const PAT_NAV = [
-  { id: 'inicio' as PatientView, label: 'Inicio', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-  { id: 'agenda' as PatientView, label: 'Mi agenda', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-  { id: 'pagos' as PatientView, label: 'Pagos', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
-  { id: 'tratamientos' as PatientView, label: 'Mis tratamientos', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-  { id: 'teleodontologia' as PatientView, label: 'Videollamada', icon: 'M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
-  { id: 'documentos' as PatientView, label: 'Documentos', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-  { id: 'perfil' as PatientView, label: 'Mi perfil', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+const NEXT_APPT = { date: '2026-08-28', time: '10:30', dr: 'Dr. Andrés Herrera', specialty: 'Odontología general', procedure: 'Extracción #38', box: 'Box 2', type: 'Presencial' as const, confirmed: true }
+
+const APPTS = [
+  { id:1, date:'2026-08-28', time:'10:30', dr:'Dr. Andrés Herrera', procedure:'Extracción #38',           type:'Presencial', status:'confirmed' },
+  { id:2, date:'2026-09-15', time:'09:00', dr:'Dra. Laura Suárez',  procedure:'Control ortodoncia',       type:'Virtual',    status:'pending'   },
+  { id:3, date:'2026-10-02', time:'11:30', dr:'Dr. Andrés Herrera', procedure:'Control post-extracción',  type:'Presencial', status:'pending'   },
+  { id:4, date:'2026-08-05', time:'10:00', dr:'Dra. Laura Suárez',  procedure:'Ajuste brackets',          type:'Presencial', status:'completed' },
+  { id:5, date:'2026-07-18', time:'09:30', dr:'Dr. Andrés Herrera', procedure:'Limpieza ultrasónica',     type:'Presencial', status:'completed' },
+  { id:6, date:'2026-05-20', time:'08:00', dr:'Dr. Andrés Herrera', procedure:'Restauración composit #14','type':'Presencial', status:'completed' },
 ]
 
-interface CitaItem {
-  id: number
-  fecha: string
-  hora: string
-  tipo: string
-  dr: string
-  virtual: boolean
-  estado?: string
-}
-
-const initialProximas: CitaItem[] = [
-  { id: 1, fecha: '25 ago 2026', hora: '10:30 AM', tipo: 'Control ortodoncia', dr: 'Dra. María Herrera', virtual: false, estado: 'confirmada' },
-  { id: 2, fecha: '10 sep 2026', hora: '09:00 AM', tipo: 'Limpieza dental', dr: 'Dr. Carlos Morales', virtual: false, estado: 'pendiente' },
-  { id: 3, fecha: '22 sep 2026', hora: '03:00 PM', tipo: 'Consulta virtual de seguimiento', dr: 'Dra. María Herrera', virtual: true, estado: 'pendiente' },
+const PAYMENTS = [
+  { id:1, date:'2026-08-28', procedure:'Extracción #38',             amount:380000,  status:'pending', due:'2026-09-05', receipt:'' },
+  { id:2, date:'2026-08-05', procedure:'Ajuste de brackets',         amount:120000,  status:'paid',    paidDate:'2026-08-05', receipt:'REC-0412' },
+  { id:3, date:'2026-07-18', procedure:'Limpieza ultrasónica',       amount:95000,   status:'paid',    paidDate:'2026-07-18', receipt:'REC-0401' },
+  { id:4, date:'2026-05-20', procedure:'Restauración composit #14',  amount:180000,  status:'paid',    paidDate:'2026-05-20', receipt:'REC-0388' },
 ]
 
-const historialCitas: CitaItem[] = [
-  { id: 4, fecha: '10 jul 2026', hora: '10:00 AM', tipo: 'Control mensual ortodoncia', dr: 'Dra. María Herrera', virtual: false },
-  { id: 5, fecha: '15 jun 2026', hora: '11:30 AM', tipo: 'Radiografías panorámicas', dr: 'Dr. Carlos Morales', virtual: false },
-  { id: 6, fecha: '01 may 2026', hora: '09:00 AM', tipo: 'Primera consulta y valoración', dr: 'Dra. María Herrera', virtual: false },
+const PLAN_TOTAL   = 2_400_000
+const PLAN_PAID    = 395_000
+const INSTALLMENTS = [
+  { n:1, amount:395000, due:'2026-06-05', status:'paid' },
+  { n:2, amount:395000, due:'2026-07-05', status:'paid' },
+  { n:3, amount:395000, due:'2026-08-05', status:'pending' },
+  { n:4, amount:395000, due:'2026-09-05', status:'pending' },
+  { n:5, amount:395000, due:'2026-10-05', status:'pending' },
+  { n:6, amount:425000, due:'2026-11-05', status:'pending' },
 ]
 
-// ─── Sub-views ────────────────────────────────────────────────────────────────
+const TREATMENTS = [
+  { name:'Ortodoncia metálica', progress:42, phases:['Diagnóstico ✓','Colocación brackets ✓','Fase activa 1 ✓','Fase activa 2','Retención'], current:3, color:'#7C3AED', start:'2026-01-10', est:'2027-06-01' },
+  { name:'Restauración #14',    progress:100, phases:['Diagnóstico ✓','Preparación ✓','Restauración ✓'], current:3, color:'#1E8C82', start:'2026-05-15', est:'2026-05-20' },
+  { name:'Extracción #38',      progress:10, phases:['Diagnóstico ✓','Cirugía (28 Ago)','Control post-op'], current:1, color:'#D97706', start:'2026-08-23', est:'2026-09-20' },
+]
 
-function PaInicio({
-  onNav,
-  onOpenModal,
-}: {
-  onNav: (v: PatientView) => void
-  onOpenModal: (virtual?: boolean) => void
-}) {
-  const proximaCita = { fecha: 'Lunes 25 de agosto, 2026', hora: '10:30 AM', tipo: 'Control de ortodoncia', dr: 'Dra. María Herrera', sala: 'Consultorio 2', virtual: false }
+const DOCUMENTS = [
+  { id:1, name:'Consentimiento informado — Ortodoncia',  type:'PDF', size:'312 KB', date:'2026-01-08', category:'Consentimiento' },
+  { id:2, name:'Presupuesto ortodoncia v2',               type:'PDF', size:'180 KB', date:'2026-01-10', category:'Presupuesto'    },
+  { id:3, name:'Radiografía panorámica — Ene 2026',      type:'IMG', size:'2.4 MB', date:'2026-01-08', category:'Radiografía'    },
+  { id:4, name:'Consentimiento — Extracción #38',        type:'PDF', size:'290 KB', date:'2026-08-23', category:'Consentimiento' },
+  { id:5, name:'Radiografía periapical #38',             type:'IMG', size:'1.1 MB', date:'2026-08-23', category:'Radiografía'    },
+  { id:6, name:'Presupuesto extracción + cuotas',        type:'PDF', size:'155 KB', date:'2026-08-23', category:'Presupuesto'    },
+]
+
+const DOCTORS = ['Dr. Andrés Herrera', 'Dra. Laura Suárez', 'Dr. Carlos Mejía']
+const MOTIVOS = ['Revisión / control', 'Dolor dental', 'Consulta ortodoncia', 'Limpieza', 'Otro']
+const TIME_SLOTS = ['08:00', '09:00', '09:30', '10:00', '10:30', '11:00', '14:00', '14:30', '15:00', '16:00']
+
+function fmt(n: number) { return new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', maximumFractionDigits:0 }).format(n) }
+function fmtDate(iso: string) { return new Date(iso + 'T00:00').toLocaleDateString('es-CO', { day:'numeric', month:'long', year:'numeric' }) }
+
+// ── Modal Solicitar Cita ───────────────────────────────────────────────────────
+function ModalCita({ onClose }: { onClose: () => void }) {
+  const [step, setStep] = useState(1)
+  const [form, setForm] = useState({ modality:'Presencial', doctor:'', motivo:'', date:'', time:'', notes:'' })
+  const [sent, setSent] = useState(false)
+
+  function submit() {
+    setSent(true)
+    setTimeout(() => { setSent(false); onClose() }, 2000)
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Bienvenido, Carlos 👋</h2>
-        <p className="text-slate-400 mt-1">Aquí está el resumen de tu atención en Clínica Herrera &amp; Asociados</p>
-      </div>
-
-      {/* Layout 2 columnas en desktop */}
-      <div className="grid lg:grid-cols-3 gap-5">
-        {/* Próxima cita — ocupa 2 columnas */}
-        <div className="lg:col-span-2 bg-gradient-to-br from-teal-600 to-teal-800 rounded-2xl p-6 text-white shadow-md">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-teal-200 text-xs font-semibold uppercase tracking-wide mb-1">Próxima cita</p>
-              <h3 className="text-xl font-bold" style={{ fontFamily: 'Outfit' }}>{proximaCita.tipo}</h3>
-              <p className="text-teal-200 text-sm mt-1">{proximaCita.dr} · {proximaCita.sala}</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl">📅</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor:'rgba(0,0,0,0.6)', backdropFilter:'blur(4px)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div>
+            <h2 className="font-bold text-slate-800 text-base" style={{fontFamily:'Outfit'}}>Solicitar cita</h2>
+            {!sent && <p className="text-xs text-slate-400 mt-0.5">Paso {step} de 3</p>}
           </div>
-          <div className="flex items-center gap-4 mb-5">
-            <div className="bg-white/15 rounded-xl px-4 py-2.5 text-center">
-              <p className="text-teal-100 text-xs">Fecha</p>
-              <p className="text-white font-semibold text-sm mt-0.5">{proximaCita.fecha}</p>
-            </div>
-            <div className="bg-white/15 rounded-xl px-4 py-2.5 text-center">
-              <p className="text-teal-100 text-xs">Hora</p>
-              <p className="text-white font-semibold text-sm mt-0.5">{proximaCita.hora}</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button onClick={() => onNav('agenda')}
-              className="flex-1 py-2.5 bg-white text-teal-800 rounded-xl text-sm font-bold hover:bg-teal-50 transition-colors shadow-sm">
-              Ver detalle
-            </button>
-            <button
-              onClick={() => onOpenModal(false)}
-              className="flex-1 py-2.5 bg-white/20 text-white rounded-xl text-sm font-semibold hover:bg-white/30 transition-colors">
-              Reprogramar
-            </button>
-          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5"/>
+          </button>
         </div>
 
-        {/* Accesos rápidos */}
-        <div className="space-y-3">
+        {sent ? (
+          <div className="px-6 py-12 text-center">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+              <Icon d="M5 13l4 4L19 7" className="w-7 h-7 text-emerald-600"/>
+            </div>
+            <p className="font-bold text-slate-800 text-lg mb-1" style={{fontFamily:'Outfit'}}>¡Solicitud enviada!</p>
+            <p className="text-slate-500 text-sm">Te confirmaremos por correo y WhatsApp.</p>
+          </div>
+        ) : (
+          <>
+            {/* Step progress */}
+            <div className="flex px-6 pt-4 gap-2">
+              {[1,2,3].map(s => (
+                <div key={s} className={`flex-1 h-1 rounded-full transition-all ${s <= step ? 'bg-cyan-500' : 'bg-slate-100'}`}/>
+              ))}
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {step === 1 && (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-2">Modalidad</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['Presencial','Virtual'].map(m => (
+                        <button key={m} onClick={() => setForm(f => ({...f, modality:m}))}
+                          className={`py-3 rounded-xl text-sm font-semibold border-2 transition-all ${form.modality === m ? 'border-cyan-500 bg-cyan-50 text-cyan-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                          {m === 'Presencial' ? '🏥' : '💻'} {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-2">Doctor</label>
+                    <select value={form.doctor} onChange={e => setForm(f=>({...f, doctor:e.target.value}))}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 bg-white">
+                      <option value="">Seleccionar...</option>
+                      {DOCTORS.map(d => <option key={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-2">Motivo de consulta</label>
+                    <select value={form.motivo} onChange={e => setForm(f=>({...f, motivo:e.target.value}))}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 bg-white">
+                      <option value="">Seleccionar...</option>
+                      {MOTIVOS.map(m => <option key={m}>{m}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-2">Fecha preferida</label>
+                    <input type="date" value={form.date} onChange={e => setForm(f=>({...f, date:e.target.value}))}
+                      min="2026-08-24"
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-2">Hora preferida</label>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {TIME_SLOTS.map(t => (
+                        <button key={t} onClick={() => setForm(f=>({...f, time:t}))}
+                          className={`py-2 rounded-lg text-xs font-medium transition-all border ${form.time === t ? 'bg-cyan-500 border-cyan-500 text-white' : 'border-slate-200 text-slate-600 hover:border-cyan-300 hover:text-cyan-600'}`}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  {/* Summary */}
+                  <div className="bg-slate-50 rounded-xl p-4 space-y-2.5">
+                    {[
+                      ['Modalidad', form.modality],
+                      ['Doctor', form.doctor || '—'],
+                      ['Motivo', form.motivo || '—'],
+                      ['Fecha', form.date ? fmtDate(form.date) : '—'],
+                      ['Hora', form.time || '—'],
+                    ].map(([l, v]) => (
+                      <div key={l} className="flex justify-between text-sm">
+                        <span className="text-slate-500">{l}</span>
+                        <span className="font-medium text-slate-800">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 block mb-2">Notas adicionales (opcional)</label>
+                    <textarea value={form.notes} onChange={e => setForm(f=>({...f, notes:e.target.value}))} rows={3}
+                      placeholder="Ej: tengo alergia a la lidocaína..."
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-5 flex gap-2">
+              {step > 1 && (
+                <button onClick={() => setStep(s => s - 1)}
+                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                  Atrás
+                </button>
+              )}
+              {step < 3 ? (
+                <button onClick={() => setStep(s => s + 1)}
+                  className="flex-1 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors">
+                  Continuar
+                </button>
+              ) : (
+                <button onClick={submit}
+                  className="flex-1 py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors">
+                  Confirmar solicitud
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+const NAV: Array<{ id: Tab; label: string; iconPath: string }> = [
+  { id:'inicio',       label:'Inicio',           iconPath:'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+  { id:'agenda',       label:'Mi agenda',         iconPath:'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+  { id:'pagos',        label:'Pagos',             iconPath:'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
+  { id:'tratamientos', label:'Mis tratamientos',  iconPath:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+  { id:'tele',         label:'Teleodontología',   iconPath:'M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
+  { id:'documentos',   label:'Documentos',        iconPath:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+  { id:'perfil',       label:'Mi perfil',         iconPath:'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+]
+
+// ── TAB SECTIONS ──────────────────────────────────────────────────────────────
+
+function TabInicio({ onRequestAppt }: { onRequestAppt: () => void }) {
+  return (
+    <div className="space-y-6">
+      {/* Next appointment hero card */}
+      <div className="rounded-2xl p-6 text-white relative overflow-hidden"
+        style={{ background:'linear-gradient(135deg, #0B3D3A, #1E8C82)' }}>
+        <div className="absolute right-4 top-4 text-6xl opacity-10">🦷</div>
+        <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-3" style={{fontFamily:'Outfit'}}>Próxima cita</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-2xl font-bold mb-1" style={{fontFamily:'Outfit'}}>{NEXT_APPT.procedure}</p>
+            <p className="text-white/80 text-sm">{NEXT_APPT.dr} · {NEXT_APPT.box}</p>
+            <div className="flex items-center gap-3 mt-4">
+              <div className="bg-white/15 rounded-lg px-3 py-1.5">
+                <p className="text-[10px] text-white/60 font-medium">Fecha</p>
+                <p className="text-sm font-bold">{fmtDate(NEXT_APPT.date)}</p>
+              </div>
+              <div className="bg-white/15 rounded-lg px-3 py-1.5">
+                <p className="text-[10px] text-white/60 font-medium">Hora</p>
+                <p className="text-sm font-bold">{NEXT_APPT.time}</p>
+              </div>
+              <div className="bg-white/15 rounded-lg px-3 py-1.5">
+                <p className="text-[10px] text-white/60 font-medium">Tipo</p>
+                <p className="text-sm font-bold">{NEXT_APPT.type}</p>
+              </div>
+            </div>
+          </div>
+          {NEXT_APPT.confirmed && (
+            <span className="bg-emerald-400/20 border border-emerald-400/40 text-emerald-300 text-xs font-semibold px-3 py-1 rounded-full">Confirmada</span>
+          )}
+        </div>
+      </div>
+
+      {/* Quick actions */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3" style={{fontFamily:'Outfit'}}>Accesos rápidos</p>
+        <div className="grid grid-cols-4 gap-3">
           {[
-            { label: 'Pagar tratamiento', icon: '💳', view: 'pagos' as PatientView, color: '#1E8C82' },
-            { label: 'Ver mis avances', icon: '📊', view: 'tratamientos' as PatientView, color: '#2BA89D' },
-            { label: 'Unirme a videollamada', icon: '📹', view: 'teleodontologia' as PatientView, color: '#0B3D3A' },
-          ].map(a => (
-            <button key={a.label} onClick={() => onNav(a.view)}
-              className="w-full flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-100 hover:border-teal-200 hover:shadow-md transition-all text-left group">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl" style={{ background: `${a.color}15` }}>{a.icon}</div>
-              <span className="text-sm font-semibold text-slate-700 group-hover:text-teal-700 transition-colors">{a.label}</span>
-              <SvgIcon d="M9 5l7 7-7 7" className="w-4 h-4 text-slate-300 group-hover:text-teal-500 ml-auto transition-colors"/>
+            { icon:'📅', label:'Solicitar cita', action: onRequestAppt, accent:'#1E8C82' },
+            { icon:'💳', label:'Ver pagos',      action: undefined,     accent:'#7C3AED' },
+            { icon:'📋', label:'Documentos',     action: undefined,     accent:'#D97706' },
+            { icon:'📹', label:'Videoconsulta',  action: undefined,     accent:'#059669' },
+          ].map((q, i) => (
+            <button key={i} onClick={q.action}
+              className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border border-slate-100 hover:shadow-md hover:border-transparent transition-all group">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                style={{ backgroundColor: q.accent + '15' }}>
+                {q.icon}
+              </div>
+              <span className="text-xs font-semibold text-slate-600 text-center">{q.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Resumen estado */}
-      <div className="grid sm:grid-cols-3 gap-4">
+      {/* Summary strip */}
+      <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Tratamientos activos', val: '2', icon: '🦷', color: '#1E8C82' },
-          { label: 'Pagos pendientes', val: '$120.000', icon: '💰', color: '#f59e0b' },
-          { label: 'Documentos disponibles', val: '3', icon: '📄', color: '#2BA89D' },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-            <p className="text-2xl mb-2">{s.icon}</p>
-            <p className="text-xl font-bold" style={{ fontFamily: 'Outfit', color: s.color }}>{s.val}</p>
-            <p className="text-xs text-slate-500 mt-1">{s.label}</p>
+          { label:'Pago pendiente',    value: fmt(380000),    sub:'Extracción #38',      color:'#D97706', bg:'bg-amber-50' },
+          { label:'Tratamientos activos', value:'2 activos',  sub:'Ortodoncia + Extr.',  color:'#7C3AED', bg:'bg-violet-50' },
+          { label:'Próximo control',   value:'28 Ago',        sub:'10:30 — Dr. Herrera', color:'#1E8C82', bg:'bg-cyan-50'  },
+        ].map((s, i) => (
+          <div key={i} className={`${s.bg} rounded-2xl p-4 border border-transparent`}>
+            <p className="text-xs text-slate-500 mb-1">{s.label}</p>
+            <p className="font-bold text-lg" style={{ color: s.color, fontFamily:'Outfit' }}>{s.value}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{s.sub}</p>
           </div>
         ))}
       </div>
@@ -131,84 +320,337 @@ function PaInicio({
   )
 }
 
-function PaAgenda({
-  citasList,
-  onOpenModal,
-}: {
-  citasList: CitaItem[]
-  onOpenModal: (virtual?: boolean) => void
-}) {
-  const [activeTab, setActiveTab] = useState<'proximas' | 'historial'>('proximas')
+function TabAgenda({ onRequestAppt }: { onRequestAppt: () => void }) {
+  const upcoming = APPTS.filter(a => a.status !== 'completed')
+  const past     = APPTS.filter(a => a.status === 'completed')
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Mi agenda de citas</h2>
-          <p className="text-slate-400 text-sm">Gestiona tus consultas presenciales y virtuales con tu odontólogo</p>
-        </div>
-        <button
-          onClick={() => onOpenModal(false)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:opacity-90 transition-all"
-          style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-          <SvgIcon d="M12 4v16m8-8H4"/>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold text-slate-800 text-lg" style={{fontFamily:'Outfit'}}>Mi agenda</h2>
+        <button onClick={onRequestAppt}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl transition-colors"
+          style={{ backgroundColor:'#1E8C82' }}>
+          <Icon d="M12 4v16m8-8H4" className="w-4 h-4"/>
           Solicitar cita
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-        {[{ v: 'proximas', l: `Próximas (${citasList.length})` }, { v: 'historial', l: `Historial (${historialCitas.length})` }].map(t => (
-          <button key={t.v} onClick={() => setActiveTab(t.v as typeof activeTab)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === t.v ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'}`}>
-            {t.l}
-          </button>
-        ))}
+      {/* Upcoming */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3" style={{fontFamily:'Outfit'}}>Próximas citas</p>
+        <div className="space-y-2">
+          {upcoming.map(a => (
+            <div key={a.id} className="flex items-center gap-4 bg-white rounded-2xl border border-slate-100 px-5 py-4 hover:shadow-sm transition-all">
+              <div className="text-center w-12 shrink-0">
+                <p className="text-lg font-bold text-slate-800 leading-none">{new Date(a.date+'T00:00').getDate()}</p>
+                <p className="text-[10px] text-slate-400 uppercase">{new Date(a.date+'T00:00').toLocaleString('es-CO',{month:'short'})}</p>
+              </div>
+              <div className="w-px h-10 bg-slate-100" />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-800 text-sm">{a.procedure}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{a.dr} · {a.time}</p>
+              </div>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                a.type === 'Virtual' ? 'bg-violet-100 text-violet-600' : 'bg-cyan-50 text-cyan-700'
+              }`}>{a.type}</span>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                a.status === 'confirmed' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
+              }`}>{a.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {(activeTab === 'proximas' ? citasList : historialCitas).map(c => (
-          <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:border-teal-200 hover:shadow-md transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-start justify-between mb-3">
-                <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${c.virtual ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-teal-50 text-teal-700 border-teal-200'}`}>
-                  {c.virtual ? '📹 Virtual' : '🏥 Presencial'}
-                </div>
-                {'estado' in c && (
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${c.estado === 'confirmada' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                    {c.estado === 'confirmada' ? '✓ Confirmada' : 'Pendiente'}
-                  </span>
-                )}
-              </div>
-              <h3 className="font-semibold text-slate-800 text-sm mb-1" style={{ fontFamily: 'Outfit' }}>{c.tipo}</h3>
-              <p className="text-teal-700 text-xs font-semibold mb-3">{c.dr}</p>
-              <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span>📅 {c.fecha}</span>
-                <span>🕐 {c.hora}</span>
-              </div>
-            </div>
+      {/* History */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3" style={{fontFamily:'Outfit'}}>Historial</p>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-slate-100">
+              {['Fecha','Procedimiento','Doctor','Tipo'].map(h => (
+                <th key={h} className="text-left text-xs text-slate-400 font-medium px-4 py-3">{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {past.map(a => (
+                <tr key={a.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(a.date)}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-slate-700">{a.procedure}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{a.dr}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${a.type === 'Virtual' ? 'bg-violet-100 text-violet-600' : 'bg-slate-100 text-slate-500'}`}>{a.type}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-            {activeTab === 'proximas' && (
-              <div className="flex gap-2 mt-5 pt-3 border-t border-slate-50">
-                {c.virtual ? (
-                  <button
-                    onClick={() => onOpenModal(true)}
-                    className="flex-1 py-2 text-xs font-semibold rounded-xl text-white shadow-sm"
-                    style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-                    Unirme ahora
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => onOpenModal(false)}
-                    className="flex-1 py-2 text-xs font-semibold rounded-xl bg-teal-50 text-teal-800 hover:bg-teal-100 transition-colors">
-                    Reprogramar
-                  </button>
-                )}
-                <button className="flex-1 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
-                  Cancelar
-                </button>
+function TabPagos() {
+  const pending  = PAYMENTS.filter(p => p.status === 'pending')
+  const totalPending = pending.reduce((s, p) => s + p.amount, 0)
+  const pct = Math.round((PLAN_PAID / PLAN_TOTAL) * 100)
+
+  return (
+    <div className="space-y-6">
+      {/* Pending banner */}
+      {totalPending > 0 && (
+        <div className="rounded-2xl p-5 flex items-center justify-between"
+          style={{ background:'linear-gradient(135deg, #D97706, #B45309)' }}>
+          <div>
+            <p className="text-white/80 text-xs font-semibold uppercase tracking-widest mb-1">Pago pendiente</p>
+            <p className="text-white text-3xl font-bold" style={{fontFamily:'Outfit'}}>{fmt(totalPending)}</p>
+            <p className="text-white/70 text-xs mt-1">Vence el {fmtDate(pending[0]?.due ?? '')}</p>
+          </div>
+          <button className="px-5 py-2.5 bg-white text-amber-700 font-bold text-sm rounded-xl hover:shadow-lg transition-all">
+            Pagar ahora
+          </button>
+        </div>
+      )}
+
+      {/* Installment plan */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>Plan de cuotas — Ortodoncia</p>
+          <span className="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-medium">{pct}% pagado</span>
+        </div>
+        <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-4">
+          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width:`${pct}%` }}/>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {INSTALLMENTS.map(c => (
+            <div key={c.n} className={`rounded-xl p-3 border ${c.status === 'paid' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-slate-500">Cuota {c.n}</span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${c.status === 'paid' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                  {c.status === 'paid' ? '✓ Pagada' : 'Pendiente'}
+                </span>
               </div>
-            )}
+              <p className="text-sm font-bold text-slate-700">{fmt(c.amount)}</p>
+              <p className="text-[10px] text-slate-400">{fmtDate(c.due)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Receipts table */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3" style={{fontFamily:'Outfit'}}>Recibos y facturas</p>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-slate-100">
+              {['Fecha','Procedimiento','Monto','Estado','Recibo'].map(h => (
+                <th key={h} className="text-left text-xs text-slate-400 font-medium px-4 py-3">{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {PAYMENTS.map(p => (
+                <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-xs text-slate-500">{fmtDate(p.date)}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-slate-700">{p.procedure}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-slate-800 font-mono">{fmt(p.amount)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${p.status === 'paid' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                      {p.status === 'paid' ? 'Pagado' : 'Pendiente'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {p.status === 'paid' && (
+                      <button className="flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-700 font-medium transition-colors">
+                        <Icon d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" className="w-3.5 h-3.5"/>
+                        Descargar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TabTratamientos() {
+  return (
+    <div className="space-y-5">
+      <h2 className="font-bold text-slate-800 text-lg" style={{fontFamily:'Outfit'}}>Mis tratamientos</h2>
+      {TREATMENTS.map(t => (
+        <div key={t.name} className="bg-white rounded-2xl border border-slate-100 p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>{t.name}</p>
+              <p className="text-xs text-slate-400 mt-0.5">Inicio: {fmtDate(t.start)} · Est. finalización: {fmtDate(t.est)}</p>
+            </div>
+            <span className="text-sm font-bold px-3 py-1 rounded-full" style={{ backgroundColor: t.color+'15', color: t.color }}>
+              {t.progress}%
+            </span>
+          </div>
+
+          {/* Progress bar */}
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-5">
+            <div className="h-full rounded-full transition-all duration-700" style={{ width:`${t.progress}%`, backgroundColor: t.color }}/>
+          </div>
+
+          {/* Phases */}
+          <div className="flex gap-0 items-start">
+            {t.phases.map((phase, i) => {
+              const done = i < t.current
+              const active = i === t.current
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center">
+                  <div className="flex items-center w-full">
+                    {i > 0 && <div className={`flex-1 h-0.5 ${done ? '' : 'bg-slate-200'}`} style={done ? { backgroundColor: t.color } : {}}/>}
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border-2 transition-all ${done ? 'text-white' : active ? 'bg-white border-current' : 'bg-white border-slate-200 text-slate-300'}`}
+                      style={done ? { backgroundColor: t.color, borderColor: t.color } : active ? { color: t.color, borderColor: t.color } : {}}>
+                      {done ? '✓' : i + 1}
+                    </div>
+                    {i < t.phases.length - 1 && <div className={`flex-1 h-0.5 ${done ? '' : 'bg-slate-200'}`} style={done ? { backgroundColor: t.color } : {}}/>}
+                  </div>
+                  <p className="text-[10px] text-center mt-1.5 leading-tight px-1"
+                    style={{ color: done ? t.color : active ? t.color : '#94a3b8', fontWeight: active ? 600 : 400 }}>
+                    {phase.replace(' ✓', '')}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TabTele({ onRequestAppt }: { onRequestAppt: () => void }) {
+  const [inCall, setInCall] = useState(false)
+  const [checks, setChecks] = useState({ cam: false, mic: false, conn: false, quiet: false })
+  const allChecked = Object.values(checks).every(Boolean)
+
+  if (inCall) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-slate-800 text-lg" style={{fontFamily:'Outfit'}}>Videoconsulta en curso</h2>
+          <div className="flex items-center gap-2 bg-emerald-100 text-emerald-600 text-xs font-semibold px-3 py-1.5 rounded-full">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"/>
+            Conectado · 02:34
+          </div>
+        </div>
+
+        {/* Video area */}
+        <div className="relative rounded-2xl overflow-hidden bg-slate-900" style={{height:320}}>
+          {/* Doctor feed (main) */}
+          <div className="absolute inset-0 flex items-center justify-center" style={{background:'linear-gradient(135deg,#0B3D3A,#062422)'}}>
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-700 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-3">AH</div>
+              <p className="text-white font-semibold">Dr. Andrés Herrera</p>
+              <p className="text-white/50 text-sm">Odontología general</p>
+            </div>
+          </div>
+          {/* Self preview */}
+          <div className="absolute bottom-4 right-4 w-32 h-24 rounded-xl bg-slate-700 border-2 border-white/20 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm mx-auto mb-1">CR</div>
+              <p className="text-white/70 text-xs">Tú</p>
+            </div>
+          </div>
+          {/* Recording badge */}
+          <div className="absolute top-4 left-4 flex items-center gap-1.5 bg-black/40 backdrop-blur rounded-lg px-2.5 py-1.5">
+            <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse"/>
+            <span className="text-white text-xs font-medium">REC</span>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center justify-center gap-4 py-2">
+          {[
+            { icon:'M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 016 0v6a3 3 0 01-3 3z', label:'Mic',    bg:'bg-white border border-slate-200 text-slate-600' },
+            { icon:'M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', label:'Cám', bg:'bg-white border border-slate-200 text-slate-600' },
+            { icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', label:'Docs', bg:'bg-white border border-slate-200 text-slate-600' },
+          ].map(c => (
+            <button key={c.label} className={`flex flex-col items-center gap-1 w-16 h-16 rounded-2xl ${c.bg} hover:shadow-md transition-all`}>
+              <Icon d={c.icon} className="w-5 h-5 mt-3"/>
+              <span className="text-[10px] font-medium">{c.label}</span>
+            </button>
+          ))}
+          <button onClick={() => setInCall(false)}
+            className="flex flex-col items-center gap-1 w-16 h-16 rounded-2xl bg-rose-500 text-white hover:bg-rose-600 transition-colors shadow-lg">
+            <Icon d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" className="w-5 h-5 mt-3"/>
+            <span className="text-[10px] font-medium">Colgar</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold text-slate-800 text-lg" style={{fontFamily:'Outfit'}}>Teleodontología</h2>
+        <button onClick={onRequestAppt}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl transition-colors"
+          style={{ backgroundColor:'#1E8C82' }}>
+          <Icon d="M12 4v16m8-8H4" className="w-4 h-4"/>
+          Solicitar videoconsulta
+        </button>
+      </div>
+
+      {/* Waiting room */}
+      <div className="rounded-2xl border-2 border-dashed border-cyan-200 bg-cyan-50 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center">
+            <Icon d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" className="w-5 h-5 text-cyan-600"/>
+          </div>
+          <div>
+            <p className="font-bold text-slate-800 text-sm" style={{fontFamily:'Outfit'}}>Sala de espera — Dr. Andrés Herrera</p>
+            <p className="text-xs text-slate-500">Hoy, 15 Sep · 09:00</p>
+          </div>
+        </div>
+
+        {/* Pre-call checklist */}
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3" style={{fontFamily:'Outfit'}}>Verifica antes de entrar</p>
+        <div className="space-y-2 mb-5">
+          {[
+            { key:'cam'   as const, label:'Cámara funcionando y con buena iluminación'    },
+            { key:'mic'   as const, label:'Micrófono activo — prueba diciendo "hola"'     },
+            { key:'conn'  as const, label:'Conexión estable (WiFi recomendado)'            },
+            { key:'quiet' as const, label:'Entorno tranquilo y privado'                    },
+          ].map(c => (
+            <label key={c.key} className="flex items-center gap-3 cursor-pointer group">
+              <div onClick={() => setChecks(ch => ({...ch, [c.key]: !ch[c.key]}))}
+                className={`w-5 h-5 rounded flex items-center justify-center shrink-0 border-2 transition-all cursor-pointer ${checks[c.key] ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300 group-hover:border-emerald-400'}`}>
+                {checks[c.key] && <Icon d="M5 13l4 4L19 7" className="w-3 h-3 text-white"/>}
+              </div>
+              <span className={`text-sm transition-colors ${checks[c.key] ? 'text-emerald-700 line-through opacity-60' : 'text-slate-700'}`}>{c.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <button onClick={() => allChecked && setInCall(true)}
+          className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${allChecked ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-200' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+          {allChecked ? '📹 Ingresar a la videoconsulta' : `Completa el checklist (${Object.values(checks).filter(Boolean).length}/4)`}
+        </button>
+      </div>
+
+      {/* Past telconsults */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3" style={{fontFamily:'Outfit'}}>Videoconsultas anteriores</p>
+        {[
+          { date:'2026-07-10', dr:'Dra. Laura Suárez', duration:'18 min', topic:'Control ortodoncia' },
+          { date:'2026-05-30', dr:'Dr. Andrés Herrera', duration:'12 min', topic:'Seguimiento extracción' },
+        ].map((v, i) => (
+          <div key={i} className="flex items-center justify-between py-3 border-b last:border-0 border-slate-50">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">{v.topic}</p>
+              <p className="text-xs text-slate-400">{fmtDate(v.date)} · {v.dr} · {v.duration}</p>
+            </div>
+            <button className="text-xs text-cyan-600 hover:text-cyan-700 font-semibold transition-colors">Ver grabación</button>
           </div>
         ))}
       </div>
@@ -216,101 +658,60 @@ function PaAgenda({
   )
 }
 
-function PaPagos() {
-  const [tab, setTab] = useState<'pendientes' | 'historial'>('pendientes')
-
-  const pendientes = [
-    { id: 1, concepto: 'Ortodoncia — cuota 6 de 18', monto: '$120.000', vence: '31 ago 2026', estado: 'Pendiente' },
-    { id: 2, concepto: 'Limpieza dental (próxima cita)', monto: '$85.000', vence: '10 sep 2026', estado: 'Por vencer' },
-  ]
-  const historial = [
-    { id: 3, concepto: 'Ortodoncia — cuota 5 de 18', monto: '$120.000', fecha: '31 jul 2026', metodo: 'Tarjeta débito' },
-    { id: 4, concepto: 'Radiografías panorámicas', monto: '$95.000', fecha: '15 jun 2026', metodo: 'Transferencia' },
-    { id: 5, concepto: 'Primera consulta y valoración', monto: '$80.000', fecha: '01 may 2026', metodo: 'Efectivo' },
-  ]
+function TabDocumentos() {
+  const [filter, setFilter] = useState('Todos')
+  const cats = ['Todos', 'Consentimiento', 'Presupuesto', 'Radiografía']
+  const visible = filter === 'Todos' ? DOCUMENTS : DOCUMENTS.filter(d => d.category === filter)
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Pagos y Facturación</h2>
-        <p className="text-slate-400 text-sm">Estado de tus cuotas, tratamientos y comprobantes de pago</p>
-      </div>
-
-      {/* Resumen layout 2 cols */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-2xl p-5 text-white shadow-md">
-          <p className="text-teal-200 text-xs font-semibold uppercase tracking-wide mb-1">Total pendiente</p>
-          <p className="text-3xl font-bold" style={{ fontFamily: 'Outfit' }}>$205.000</p>
-          <p className="text-teal-200 text-sm mt-1">2 cuotas pendientes de pago</p>
-          <button className="mt-4 w-full py-2.5 bg-white text-teal-800 rounded-xl text-sm font-bold hover:bg-teal-50 transition-colors shadow-sm">
-            Pagar ahora en línea (PSE / Tarjeta)
-          </button>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-1">Plan de pagos activo</p>
-          <p className="text-slate-800 font-semibold text-sm mt-2">Ortodoncia — Plan 18 meses</p>
-          <div className="mt-3 space-y-1.5">
-            <div className="flex justify-between text-xs text-slate-500">
-              <span>Progreso</span><span className="font-semibold">6 de 18 cuotas</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: '33%', background: 'linear-gradient(90deg, #1E8C82, #5FC9BE)' }}/>
-            </div>
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>Pagado: $720.000</span><span>Restante: $1.440.000</span>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold text-slate-800 text-lg" style={{fontFamily:'Outfit'}}>Mis documentos</h2>
+        <div className="flex gap-1.5">
+          {cats.map(c => (
+            <button key={c} onClick={() => setFilter(c)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${filter === c ? 'bg-cyan-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+              {c}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-        {[{ v: 'pendientes', l: 'Pendientes' }, { v: 'historial', l: 'Historial de pagos' }].map(t => (
-          <button key={t.v} onClick={() => setTab(t.v as typeof tab)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === t.v ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'}`}>
-            {t.l}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
-              {tab === 'pendientes'
-                ? ['Concepto', 'Monto', 'Vence', 'Estado', 'Acción'].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">{h}</th>)
-                : ['Concepto', 'Monto', 'Fecha', 'Método'].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">{h}</th>)
-              }
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {tab === 'pendientes'
-              ? pendientes.map(p => (
-                <tr key={p.id} className="hover:bg-slate-50/50">
-                  <td className="px-5 py-4 text-slate-700 font-medium text-[13px]">{p.concepto}</td>
-                  <td className="px-5 py-4 font-bold text-teal-700 text-[13px]">{p.monto}</td>
-                  <td className="px-5 py-4 text-slate-400 text-[12px]">{p.vence}</td>
-                  <td className="px-5 py-4">
-                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${p.estado === 'Pendiente' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{p.estado}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <button className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-                      Pagar
-                    </button>
-                  </td>
-                </tr>
-              ))
-              : historial.map(h => (
-                <tr key={h.id} className="hover:bg-slate-50/50">
-                  <td className="px-5 py-4 text-slate-700 font-medium text-[13px]">{h.concepto}</td>
-                  <td className="px-5 py-4 font-bold text-teal-700 text-[13px]">{h.monto}</td>
-                  <td className="px-5 py-4 text-slate-400 text-[12px]">{h.fecha}</td>
-                  <td className="px-5 py-4">
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">✓ {h.metodo}</span>
-                  </td>
-                </tr>
-              ))
-            }
+          <thead><tr className="border-b border-slate-100">
+            {['Documento','Tipo','Tamaño','Fecha',''].map(h => (
+              <th key={h} className="text-left text-xs text-slate-400 font-medium px-4 py-3">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {visible.map(d => (
+              <tr key={d.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${d.type === 'PDF' ? 'bg-rose-100 text-rose-600' : 'bg-violet-100 text-violet-600'}`}>
+                      {d.type}
+                    </div>
+                    <span className="text-sm font-medium text-slate-700">{d.name}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    d.category === 'Consentimiento' ? 'bg-emerald-100 text-emerald-600' :
+                    d.category === 'Presupuesto'    ? 'bg-amber-100 text-amber-600' :
+                    'bg-violet-100 text-violet-600'
+                  }`}>{d.category}</span>
+                </td>
+                <td className="px-4 py-3 text-xs text-slate-400 font-mono">{d.size}</td>
+                <td className="px-4 py-3 text-xs text-slate-400">{fmtDate(d.date)}</td>
+                <td className="px-4 py-3">
+                  <button className="flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-700 font-semibold transition-colors">
+                    <Icon d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" className="w-3.5 h-3.5"/>
+                    Descargar
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -318,561 +719,165 @@ function PaPagos() {
   )
 }
 
-function PaTratamientos() {
-  const tratamientos = [
-    {
-      id: 1, nombre: 'Ortodoncia metálica', inicio: 'may 2026', estimadoFin: 'nov 2027', progreso: 33,
-      estado: 'En curso', descripcion: 'Corrección del alineamiento dental y corrección de mordida.',
-      pasos: ['Instalación de brackets ✓', 'Ajuste mensual (6/18 completados)', 'Retención final'],
-    },
-    {
-      id: 2, nombre: 'Profilaxis dental', inicio: 'ago 2026', estimadoFin: 'sep 2026', progreso: 0,
-      estado: 'Próximamente', descripcion: 'Limpieza profunda y pulido coronal.',
-      pasos: ['Evaluación inicial', 'Limpieza ultrasónica', 'Flúor protector'],
-    },
-  ]
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Mis tratamientos</h2>
-        <p className="text-slate-400 text-sm">Seguimiento simplificado del avance de tus tratamientos</p>
-      </div>
-
-      {/* 2-column layout on desktop */}
-      <div className="grid md:grid-cols-2 gap-5">
-        {tratamientos.map(t => (
-          <div key={t.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>{t.nombre}</h3>
-                <p className="text-teal-600 text-xs mt-0.5">Inicio: {t.inicio} · Fin estimado: {t.estimadoFin}</p>
-              </div>
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${t.estado === 'En curso' ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                {t.estado}
-              </span>
-            </div>
-
-            <p className="text-slate-500 text-sm leading-relaxed mb-4">{t.descripcion}</p>
-
-            {/* Progress */}
-            <div className="mb-4">
-              <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-                <span>Progreso general</span>
-                <span className="font-semibold" style={{ color: '#1E8C82' }}>{t.progreso}%</span>
-              </div>
-              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${t.progreso}%`, background: 'linear-gradient(90deg, #1E8C82, #5FC9BE)' }}/>
-              </div>
-            </div>
-
-            {/* Pasos */}
-            <div className="space-y-2">
-              {t.pasos.map((p, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${p.includes('✓') ? 'bg-emerald-100 text-emerald-600' : i === 1 && t.estado === 'En curso' ? 'bg-teal-100 text-teal-600' : 'bg-slate-100 text-slate-400'}`}>
-                    {p.includes('✓') ? '✓' : i + 1}
-                  </div>
-                  <span className={p.includes('✓') ? 'text-slate-400 line-through' : 'text-slate-600'}>{p.replace(' ✓', '')}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Info card */}
-      <div className="bg-teal-50 border border-teal-100 rounded-2xl p-5 flex gap-4 items-start">
-        <span className="text-2xl">💡</span>
-        <div>
-          <p className="text-teal-800 font-semibold text-sm">¿Tienes dudas sobre tu tratamiento?</p>
-          <p className="text-teal-600 text-xs mt-1">Puedes solicitar una consulta virtual con tu odontólogo o escribir al chat de soporte de la clínica.</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PaTeleodontologia({
-  onOpenModal,
-}: {
-  onOpenModal: (virtual?: boolean) => void
-}) {
-  const [sala, setSala] = useState<'espera' | 'activa'>('espera')
-
-  if (sala === 'activa') {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Videollamada activa</h2>
-          <button onClick={() => setSala('espera')}
-            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-semibold transition-colors">
-            <SvgIcon d="M6 18L18 6M6 6l12 12"/>
-            Finalizar llamada
-          </button>
-        </div>
-
-        {/* Video room mockup */}
-        <div className="bg-slate-900 rounded-2xl aspect-video relative overflow-hidden max-h-[500px]">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center text-white">
-              <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl"
-                style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>👩‍⚕️</div>
-              <p className="font-semibold text-lg" style={{ fontFamily: 'Outfit' }}>Dra. María Herrera</p>
-              <p className="text-slate-400 text-sm">Conectando cámara y micrófono...</p>
-            </div>
-          </div>
-          {/* Self view */}
-          <div className="absolute bottom-4 right-4 w-28 h-20 bg-slate-700 rounded-xl border-2 border-white/20 flex items-center justify-center text-slate-400 text-xs">
-            Tu cámara
-          </div>
-          {/* Controls */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3">
-            {[
-              { icon: '🎤', label: 'Mic' },
-              { icon: '📹', label: 'Cámara' },
-              { icon: '💬', label: 'Chat' },
-            ].map(c => (
-              <button key={c.label} className="w-12 h-12 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-lg transition-colors" title={c.label}>
-                {c.icon}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Teleodontología</h2>
-        <p className="text-slate-400 text-sm">Consultas virtuales con tu odontólogo tratante</p>
-      </div>
-
-      {/* Sala de espera */}
-      <div className="grid lg:grid-cols-2 gap-5">
-        <div className="bg-white rounded-2xl border border-teal-200 shadow-sm p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/>
-            <span className="text-emerald-700 text-xs font-semibold">Sala de espera activa</span>
-          </div>
-          <h3 className="font-bold text-slate-800 mb-1" style={{ fontFamily: 'Outfit' }}>Consulta virtual · 22 sep 2026</h3>
-          <p className="text-slate-400 text-sm mb-4">Dra. María Herrera · 03:00 PM</p>
-          <div className="bg-teal-50 rounded-xl p-3 mb-4 text-xs text-teal-700">
-            📢 La doctora se conectará en breve. Por favor, verifica tu cámara y micrófono antes de ingresar.
-          </div>
-          <button onClick={() => setSala('activa')}
-            className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90"
-            style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-            <span className="text-lg">📹</span>
-            Ingresar a la videollamada
-          </button>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-          <h3 className="font-bold text-slate-700 text-sm" style={{ fontFamily: 'Outfit' }}>Verificación técnica previa</h3>
-          {[
-            { label: 'Cámara HD detectada', ok: true },
-            { label: 'Micrófono con cancelación detectado', ok: true },
-            { label: 'Conexión a internet estable', ok: true },
-            { label: 'Sala de espera activa', ok: true },
-          ].map(v => (
-            <div key={v.label} className="flex items-center gap-3">
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${v.ok ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                {v.ok ? '✓' : '!'}
-              </div>
-              <span className="text-sm text-slate-600">{v.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-800 mb-1">¿Necesitas una consulta virtual adicional?</p>
-          <p className="text-xs text-slate-500">Programa una sesión de orientación o revisión con tu odontólogo sin salir de casa.</p>
-        </div>
-        <button
-          onClick={() => onOpenModal(true)}
-          className="flex items-center gap-2 text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl text-white shadow-sm hover:opacity-90 transition-colors"
-          style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-          <SvgIcon d="M12 4v16m8-8H4"/>
-          Solicitar consulta virtual
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function PaDocumentos() {
-  const docs = [
-    { nombre: 'Consentimiento informado — Ortodoncia.pdf', tipo: 'PDF', fecha: '01 may 2026', size: '245 KB' },
-    { nombre: 'Radiografía panorámica inicial.jpg', tipo: 'Imagen', fecha: '15 jun 2026', size: '1.2 MB' },
-    { nombre: 'Presupuesto tratamiento ortodoncia.pdf', tipo: 'PDF', fecha: '01 may 2026', size: '98 KB' },
-  ]
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Documentos y Radiografías</h2>
-        <p className="text-slate-400 text-sm">Archivos, consentimientos y radiografías compartidos por tu clínica</p>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <p className="text-xs text-slate-400 font-medium">{docs.length} documentos disponibles</p>
-        </div>
-        <div className="divide-y divide-slate-50">
-          {docs.map(d => (
-            <div key={d.nombre} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                style={{ background: d.tipo === 'PDF' ? '#fef2f215' : '#eff6ff15', border: '1px solid', borderColor: d.tipo === 'PDF' ? '#fecaca' : '#bfdbfe' }}>
-                {d.tipo === 'PDF' ? '📄' : '🖼️'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-700 font-medium text-sm truncate">{d.nombre}</p>
-                <p className="text-slate-400 text-xs mt-0.5">{d.tipo} · {d.size} · Subido {d.fecha}</p>
-              </div>
-              <button className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-teal-200 text-teal-700 hover:bg-teal-50 transition-colors shrink-0">
-                <SvgIcon d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-3.5 h-3.5"/>
-                Descargar
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PaPerfil() {
-  const [form, setForm] = useState({
-    nombre: 'Carlos Rivas', email: 'carlos.rivas@gmail.com', telefono: '+57 300 123 4567',
-    fechaNac: '1990-03-15', ciudad: 'Medellín', eps: 'Sura EPS',
-  })
+function TabPerfil() {
+  const [form, setForm] = useState(PATIENT)
   const [saved, setSaved] = useState(false)
 
+  function save() {
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const field = (label: string, key: keyof typeof PATIENT) => (
+    <div key={key}>
+      <label className="text-xs font-semibold text-slate-500 block mb-1.5">{label}</label>
+      <input value={form[key]} onChange={e => setForm(f => ({...f, [key]:e.target.value}))}
+        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition-all"/>
+    </div>
+  )
+
   return (
-    <div className="max-w-2xl space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Mi perfil de paciente</h2>
-        <p className="text-slate-400 text-sm">Datos personales y configuración de tu cuenta</p>
+    <div className="space-y-6 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <h2 className="font-bold text-slate-800 text-lg" style={{fontFamily:'Outfit'}}>Mi perfil</h2>
+        <button onClick={save}
+          className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl transition-all ${saved ? 'bg-emerald-500 text-white' : 'bg-cyan-600 text-white hover:bg-cyan-500'}`}>
+          {saved ? <><Icon d="M5 13l4 4L19 7" className="w-4 h-4"/>Guardado</> : 'Guardar cambios'}
+        </button>
       </div>
 
       {/* Avatar */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex items-center gap-5">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold shrink-0"
-          style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-          CR
+      <div className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-2xl font-bold shrink-0">
+          {PATIENT.name.split(' ').map(n=>n[0]).join('')}
         </div>
         <div>
-          <p className="font-bold text-slate-800 text-lg" style={{ fontFamily: 'Outfit' }}>{form.nombre}</p>
-          <p className="text-teal-600 text-sm">Paciente · Clínica Herrera &amp; Asociados</p>
-          <p className="text-slate-400 text-xs mt-1">Desde mayo 2026</p>
+          <p className="font-bold text-slate-800 text-base">{form.name}</p>
+          <p className="text-sm text-slate-500">{form.email}</p>
+          <button className="text-xs text-cyan-600 hover:text-cyan-700 font-medium mt-1 transition-colors">Cambiar foto</button>
         </div>
       </div>
 
-      {/* Form */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-slate-700 border-b border-slate-100 pb-3" style={{ fontFamily: 'Outfit' }}>Información personal</h3>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {[
-            { k: 'nombre', l: 'Nombre completo' },
-            { k: 'email', l: 'Correo electrónico' },
-            { k: 'telefono', l: 'Teléfono' },
-            { k: 'fechaNac', l: 'Fecha de nacimiento' },
-            { k: 'ciudad', l: 'Ciudad' },
-            { k: 'eps', l: 'EPS / Aseguradora' },
-          ].map(f => (
-            <div key={f.k}>
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">{f.l}</label>
-              <input value={form[f.k as keyof typeof form]} onChange={e => setForm({ ...form, [f.k]: e.target.value })}
-                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"/>
-            </div>
-          ))}
+      {/* Personal data */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4" style={{fontFamily:'Outfit'}}>Datos personales</p>
+        <div className="grid grid-cols-2 gap-4">
+          {field('Nombre completo', 'name')}
+          {field('Correo electrónico', 'email')}
+          {field('Teléfono', 'phone')}
+          {field('Fecha de nacimiento', 'dob')}
+          {field('Ciudad', 'city')}
+          {field('Dirección', 'address')}
         </div>
-        <button onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 1800) }}
-          className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
-          style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-          {saved ? '✓ Guardado exitosamente' : 'Guardar cambios'}
-        </button>
+      </div>
+
+      {/* Health data */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4" style={{fontFamily:'Outfit'}}>Datos de salud y seguro</p>
+        <div className="grid grid-cols-2 gap-4">
+          {field('Tipo de sangre', 'blood')}
+          {field('EPS / Seguro', 'eps')}
+          {field('N° Identificación', 'doc')}
+        </div>
       </div>
     </div>
   )
 }
 
-// ─── Root PatientApp ──────────────────────────────────────────────────────────
-interface Props { onLogout: () => void }
-
-export default function PatientApp({ onLogout }: Props) {
-  const [active, setActive] = useState<PatientView>('inicio')
+// ── Shell ─────────────────────────────────────────────────────────────────────
+export default function PatientApp({ onLogout }: { onLogout?: () => void }) {
+  const [tab, setTab] = useState<Tab>('inicio')
   const [collapsed, setCollapsed] = useState(false)
-  const [citasList, setCitasList] = useState<CitaItem[]>(initialProximas)
-  const [showSolicitarModal, setShowSolicitarModal] = useState(false)
-  const [modalIsVirtual, setModalIsVirtual] = useState(false)
-  const [toastMsg, setToastMsg] = useState('')
+  const [showModal, setShowModal] = useState(false)
 
-  // Solicitar cita form state
-  const [scDr, setScDr] = useState('Dra. María Herrera (Ortodoncia)')
-  const [scType, setScType] = useState('Control de ortodoncia')
-  const [scDate, setScDate] = useState('2026-08-30')
-  const [scTime, setScTime] = useState('10:00 AM')
-  const [scNotes, setScNotes] = useState('')
-
-  function openSolicitarModal(isVirtual = false) {
-    setModalIsVirtual(isVirtual)
-    if (isVirtual) {
-      setScType('Consulta virtual de seguimiento')
-    } else {
-      setScType('Control de ortodoncia')
-    }
-    setShowSolicitarModal(true)
+  const SECTION_TITLES: Record<Tab, string> = {
+    inicio:'Inicio', agenda:'Mi agenda', pagos:'Pagos', tratamientos:'Mis tratamientos',
+    tele:'Teleodontología', documentos:'Documentos', perfil:'Mi perfil',
   }
-
-  function handleConfirmarSolicitud() {
-    const newCita: CitaItem = {
-      id: Date.now(),
-      fecha: scDate,
-      hora: scTime,
-      tipo: scType,
-      dr: scDr.split(' (')[0],
-      virtual: modalIsVirtual,
-      estado: 'pendiente',
-    }
-
-    setCitasList([newCita, ...citasList])
-    setShowSolicitarModal(false)
-    setScNotes('')
-    setToastMsg(`¡Solicitud enviada! Tu cita de ${scType} para el ${scDate} está registrada.`)
-    setTimeout(() => setToastMsg(''), 4500)
-  }
-
-  function renderContent() {
-    switch (active) {
-      case 'inicio': return <PaInicio onNav={v => setActive(v)} onOpenModal={openSolicitarModal} />
-      case 'agenda': return <PaAgenda citasList={citasList} onOpenModal={openSolicitarModal} />
-      case 'pagos': return <PaPagos/>
-      case 'tratamientos': return <PaTratamientos/>
-      case 'teleodontologia': return <PaTeleodontologia onOpenModal={openSolicitarModal} />
-      case 'documentos': return <PaDocumentos/>
-      case 'perfil': return <PaPerfil/>
-    }
-  }
-
-  const currentNav = PAT_NAV.find(n => n.id === active)
 
   return (
-    <div className="flex h-screen overflow-hidden relative">
-      {/* Toast */}
-      {toastMsg && (
-        <div className="fixed top-5 right-5 z-50 bg-[#0B3D3A] text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-400/40 fade-in">
-          <span className="text-emerald-400 font-bold text-xl">✓</span>
-          <div>
-            <p className="font-semibold text-sm text-white" style={{ fontFamily: 'Outfit' }}>Cita Solicitada</p>
-            <p className="text-xs text-emerald-100">{toastMsg}</p>
-          </div>
-        </div>
-      )}
+    <div className="flex h-screen overflow-hidden bg-slate-50">
+      {showModal && <ModalCita onClose={() => setShowModal(false)} />}
 
-      {/* Sidebar paciente */}
-      <aside className={`${collapsed ? 'w-14' : 'w-56'} shrink-0 flex flex-col h-full transition-all duration-200`}
-        style={{ backgroundColor: '#0B3D3A' }}>
-
+      {/* Sidebar */}
+      <aside className={`${collapsed ? 'w-14' : 'w-56'} shrink-0 flex flex-col h-full transition-all duration-200 bg-white border-r border-slate-100`}>
         {/* Logo */}
-        <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/8 ${collapsed ? 'justify-center' : ''}`}>
-          <CoroNyxLogo size={48}/>
+        <div className={`flex items-center gap-3 px-4 py-5 border-b border-slate-100 ${collapsed ? 'justify-center' : ''}`}>
+          <CxLogo size={26} />
           {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-bold leading-tight tracking-wide" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
-              <p className="text-xs font-medium text-emerald-400">Portal del Paciente</p>
+            <div>
+              <p className="font-bold text-sm leading-tight tracking-wide" style={{ fontFamily:'Outfit', color:'#0B3D3A' }}>CORONYX</p>
+              <p className="text-[10px] font-medium" style={{ color:'#1E8C82' }}>Portal del Paciente</p>
             </div>
           )}
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-0.5">
-          {PAT_NAV.map(item => {
-            const isActive = active === item.id
+        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+          {NAV.map(item => {
+            const active = tab === item.id
             return (
-              <button key={item.id} onClick={() => setActive(item.id)}
-                title={collapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-sm transition-all relative ${isActive ? 'bg-emerald-500/15 text-emerald-400' : 'text-white/45 hover:text-white/80 hover:bg-white/5'} ${collapsed ? 'justify-center' : ''}`}>
-                <SvgIcon d={item.icon} className="w-4 h-4 shrink-0"/>
-                {!collapsed && <span className="flex-1 text-left font-medium text-[13px]">{item.label}</span>}
-                {isActive && !collapsed && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-emerald-400 rounded-r"/>}
+              <button key={item.id} onClick={() => setTab(item.id)} title={collapsed ? item.label : undefined}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition-all relative ${collapsed ? 'justify-center' : ''} ${active ? 'bg-cyan-50 text-cyan-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}>
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d={item.iconPath}/>
+                </svg>
+                {!collapsed && <span className="font-medium text-[13px]">{item.label}</span>}
+                {active && !collapsed && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r bg-cyan-500"/>}
               </button>
             )
           })}
         </nav>
 
         {/* User row */}
-        <div className={`p-3 border-t border-white/5 flex ${collapsed ? 'justify-center' : 'items-center gap-2'}`}>
+        <div className={`p-3 border-t border-slate-100 flex ${collapsed ? 'justify-center' : 'items-center gap-2'}`}>
           {!collapsed && (
             <>
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                style={{ background: 'linear-gradient(135deg, #10b981, #047857)' }}>
-                CR
-              </div>
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs font-bold shrink-0">CR</div>
               <div className="flex-1 min-w-0">
-                <p className="text-white/80 text-xs font-medium truncate">Carlos Rivas</p>
-                <p className="text-emerald-400/60 text-[10px] truncate">Paciente</p>
+                <p className="text-xs font-semibold text-slate-700 truncate">Carlos Rivas</p>
+                <p className="text-[10px] text-slate-400 truncate">Paciente</p>
               </div>
-              <button onClick={onLogout} className="text-white/25 hover:text-white/60 transition-colors text-xs" title="Cerrar sesión">⏏</button>
+              {onLogout && (
+                <button onClick={onLogout} className="text-slate-300 hover:text-slate-500 transition-colors text-xs" title="Cerrar sesión">⏏</button>
+              )}
             </>
           )}
           <button onClick={() => setCollapsed(!collapsed)}
-            className="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 transition-colors flex items-center justify-center text-white/40 hover:text-white/70 shrink-0">
-            <svg className={`w-3 h-3 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
+            className="w-6 h-6 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors flex items-center justify-center text-slate-400 shrink-0">
+            <svg className={`w-3 h-3 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+            </svg>
           </button>
         </div>
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-12 bg-white border-b border-slate-100 flex items-center px-5 gap-4 shrink-0">
-          <h2 className="text-sm font-semibold text-slate-700" style={{ fontFamily: 'Outfit' }}>{currentNav?.label}</h2>
-          <div className="flex-1"/>
-          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">Paciente</span>
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-            style={{ background: 'linear-gradient(135deg, #10b981, #047857)' }}>
-            CR
-          </div>
+        {/* Top bar */}
+        <header className="h-12 bg-white border-b border-slate-100 flex items-center px-6 gap-4 shrink-0">
+          <h2 className="text-sm font-semibold text-slate-700" style={{fontFamily:'Outfit'}}>{SECTION_TITLES[tab]}</h2>
+          <div className="flex-1" />
+          <button onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white rounded-lg transition-colors"
+            style={{ backgroundColor:'#1E8C82' }}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Solicitar cita
+          </button>
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xs font-bold cursor-pointer">CR</div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
-          {renderContent()}
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto p-6">
+          {tab === 'inicio'       && <TabInicio       onRequestAppt={() => setShowModal(true)} />}
+          {tab === 'agenda'       && <TabAgenda       onRequestAppt={() => setShowModal(true)} />}
+          {tab === 'pagos'        && <TabPagos />}
+          {tab === 'tratamientos' && <TabTratamientos />}
+          {tab === 'tele'         && <TabTele         onRequestAppt={() => setShowModal(true)} />}
+          {tab === 'documentos'   && <TabDocumentos />}
+          {tab === 'perfil'       && <TabPerfil />}
         </main>
       </div>
-
-      {/* ── Modal: Solicitar Cita Odontológica ── */}
-      {showSolicitarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden fade-in flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>
-                  Solicitar Cita Odontológica
-                </h2>
-                <p className="text-xs text-slate-400">Elige la modalidad, doctor y fecha preferida</p>
-              </div>
-              <button
-                onClick={() => setShowSolicitarModal(false)}
-                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center text-xl leading-none transition-colors">
-                ×
-              </button>
-            </div>
-
-            <div className="overflow-y-auto p-6 space-y-4 flex-1">
-              {/* Modalidad Selector */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Modalidad de atención</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setModalIsVirtual(false)}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-                      !modalIsVirtual ? 'border-teal-600 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}>
-                    <span>🏥</span> Presencial en clínica
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModalIsVirtual(true)}
-                    className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-                      modalIsVirtual ? 'border-violet-600 bg-violet-50 text-violet-800 shadow-sm' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}>
-                    <span>📹</span> Teleodontología virtual
-                  </button>
-                </div>
-              </div>
-
-              {/* Profesional */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Odontólogo / Especialista</label>
-                <select
-                  value={scDr}
-                  onChange={e => setScDr(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-white">
-                  <option value="Dra. María Herrera (Ortodoncia)">Dra. María Herrera — Ortodoncia & Estética</option>
-                  <option value="Dr. Carlos Morales (General)">Dr. Carlos Morales — Odontología General & Profilaxis</option>
-                  <option value="Dr. Roberto Patiño (Endodoncia)">Dr. Roberto Patiño — Endodoncia & Cirugía</option>
-                </select>
-              </div>
-
-              {/* Motivo */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Motivo de la consulta</label>
-                <select
-                  value={scType}
-                  onChange={e => setScType(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-white">
-                  <option value="Control de ortodoncia">Control mensual de ortodoncia</option>
-                  <option value="Limpieza dental">Limpieza dental / Profilaxis</option>
-                  <option value="Consulta virtual de seguimiento">Consulta virtual de seguimiento</option>
-                  <option value="Dolor o molestia aguda">Dolor, sensibilidad o molestia aguda</option>
-                  <option value="Valoración estética">Valoración estética / Blanqueamiento</option>
-                  <option value="Otro motivo">Otro procedimiento</option>
-                </select>
-              </div>
-
-              {/* Fecha y Hora preferida */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Fecha deseada</label>
-                  <input
-                    type="date"
-                    value={scDate}
-                    onChange={e => setScDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Horario preferido</label>
-                  <select
-                    value={scTime}
-                    onChange={e => setScTime(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 bg-white">
-                    <option value="08:30 AM">08:30 AM</option>
-                    <option value="10:00 AM">10:00 AM</option>
-                    <option value="11:30 AM">11:30 AM</option>
-                    <option value="02:30 PM">02:30 PM</option>
-                    <option value="04:00 PM">04:00 PM</option>
-                    <option value="05:30 PM">05:30 PM</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Notas para el doctor */}
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1.5">Describe brevemente tus síntomas o comentarios</label>
-                <textarea
-                  rows={3}
-                  value={scNotes}
-                  onChange={e => setScNotes(e.target.value)}
-                  placeholder="Ej: Siento molestia en el alambre del bracket superior derecho..."
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
-              <button
-                onClick={() => setShowSolicitarModal(false)}
-                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm hover:bg-slate-100 transition-colors font-medium">
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmarSolicitud}
-                className="flex-1 py-2.5 text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-                Confirmar solicitud de cita
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

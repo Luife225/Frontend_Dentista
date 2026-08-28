@@ -1,423 +1,591 @@
 import { useState, useEffect } from 'react'
-import CoroNyxLogo from './CoroNyxLogo'
 
-interface Props {
-  onLogin: () => void
+interface Props { onNavigate: (path: string) => void }
+
+// ── Logo ──────────────────────────────────────────────────────────────────────
+function CxLogo({ size = 36 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none">
+      <defs>
+        <linearGradient id="lpG" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#5FC9BE"/>
+          <stop offset="100%" stopColor="#0B3D3A"/>
+        </linearGradient>
+      </defs>
+      <path d="M48 10 A24 24 0 1 0 48 54" stroke="url(#lpG)" strokeWidth="5.5" strokeLinecap="round" fill="none"/>
+      <circle cx="50.5" cy="8.5" r="3" fill="#5FC9BE"/>
+      <circle cx="55.5" cy="13.5" r="1.8" fill="#5FC9BE" opacity="0.55"/>
+      <path d="M32 19 C27 19 24 22 24 27.5 L25 40 C25.2 41.6 26.4 42.5 27.8 42.5 C29.2 42.5 30 41.2 32 41.2 C34 41.2 34.8 42.5 36.2 42.5 C37.6 42.5 38.8 41.6 39 40 L40 27.5 C40 22 37 19 32 19 Z" fill="url(#lpG)" opacity="0.9"/>
+      <polyline points="26,20.5 28.5,14.5 32,19 35.5,14.5 38,20.5" stroke="#5FC9BE" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" fill="none"/>
+    </svg>
+  )
 }
 
-const FEATURES = [
+// ── Dashboard mockup ──────────────────────────────────────────────────────────
+function DashboardMockup() {
+  return (
+    <div className="relative w-full" style={{ aspectRatio: '16/10' }}>
+      {/* Glow behind */}
+      <div className="absolute inset-0 rounded-2xl blur-3xl opacity-30"
+        style={{ background: 'radial-gradient(ellipse at 60% 40%, #1E8C82, transparent 70%)' }} />
+
+      {/* Browser chrome */}
+      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
+        style={{ background: '#0d1a18' }}>
+
+        {/* URL bar */}
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/8" style={{ background: '#0a1513' }}>
+          <div className="flex gap-1.5">
+            {['#FF5F56','#FFBD2E','#27C93F'].map(c => (
+              <div key={c} className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c }} />
+            ))}
+          </div>
+          <div className="flex-1 mx-3 px-3 py-0.5 rounded text-[10px] text-white/30 border border-white/8"
+            style={{ background: '#0d1a18', maxWidth: 220 }}>
+            app.coronyx.io
+          </div>
+        </div>
+
+        {/* App layout */}
+        <div className="flex h-full" style={{ height: 'calc(100% - 36px)' }}>
+
+          {/* Sidebar */}
+          <div className="w-12 shrink-0 flex flex-col items-center py-3 gap-3 border-r border-white/5"
+            style={{ background: '#0B3D3A' }}>
+            <CxLogo size={22} />
+            {[
+              'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+              'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+              'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857',
+              'M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
+            ].map((d, i) => (
+              <div key={i} className={`w-7 h-7 rounded-lg flex items-center justify-center ${i === 0 ? 'bg-cyan-500/25' : ''}`}>
+                <svg className={`w-3.5 h-3.5 ${i === 0 ? 'text-cyan-400' : 'text-white/25'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d={d}/>
+                </svg>
+              </div>
+            ))}
+          </div>
+
+          {/* Main content */}
+          <div className="flex-1 overflow-hidden p-3" style={{ background: '#0d1f1c' }}>
+            {/* Stats row */}
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              {[
+                { label: 'Citas hoy', val: '14', color: '#1E8C82' },
+                { label: 'Pacientes', val: '287', color: '#7C3AED' },
+                { label: 'Pendientes', val: '3', color: '#D97706' },
+                { label: 'Ingresos', val: '$4.2M', color: '#059669' },
+              ].map((s, i) => (
+                <div key={i} className="rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
+                  <p className="text-[8px] text-white/40 mb-0.5">{s.label}</p>
+                  <p className="text-sm font-bold" style={{ color: s.color, fontFamily: 'Outfit' }}>{s.val}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Content row */}
+            <div className="grid grid-cols-3 gap-2">
+              {/* Calendar */}
+              <div className="col-span-2 rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
+                <p className="text-[8px] text-white/50 mb-2 font-medium">Agenda · Hoy</p>
+                {[
+                  { time: '09:00', patient: 'Ana Torres', type: 'Revisión', color: '#1E8C82' },
+                  { time: '10:30', patient: 'Luis Mora', type: 'Extracción', color: '#D97706' },
+                  { time: '11:00', patient: 'María Gil', type: 'Ortodoncia', color: '#7C3AED' },
+                  { time: '14:30', patient: 'Carlos V.', type: 'Blanqueamiento', color: '#1E8C82' },
+                ].map((a, i) => (
+                  <div key={i} className="flex items-center gap-1.5 py-1 border-b border-white/4">
+                    <span className="text-[7px] text-white/30 w-8 shrink-0 font-mono">{a.time}</span>
+                    <div className="w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: a.color }}/>
+                    <span className="text-[7px] text-white/70 truncate flex-1">{a.patient}</span>
+                    <span className="text-[6px] px-1 py-0.5 rounded-full shrink-0"
+                      style={{ backgroundColor: a.color+'20', color: a.color }}>{a.type}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Odontogram preview */}
+              <div className="rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
+                <p className="text-[8px] text-white/50 mb-2 font-medium">Odontograma</p>
+                <div className="grid grid-cols-8 gap-0.5 mb-1.5">
+                  {Array.from({length: 16}).map((_, i) => (
+                    <div key={i} className="w-3 h-3 rounded-sm"
+                      style={{ backgroundColor: [2,5,9].includes(i) ? '#1E8C82' : [7,11].includes(i) ? '#D97706' : '#ffffff12' }}/>
+                  ))}
+                </div>
+                <div className="grid grid-cols-8 gap-0.5">
+                  {Array.from({length: 16}).map((_, i) => (
+                    <div key={i} className="w-3 h-3 rounded-sm"
+                      style={{ backgroundColor: [3,6,13].includes(i) ? '#7C3AED' : '#ffffff12' }}/>
+                  ))}
+                </div>
+                {/* AI badge */}
+                <div className="mt-2 flex items-center gap-1 bg-rose-500/15 rounded-md px-1.5 py-1">
+                  <div className="w-1 h-1 bg-rose-400 rounded-full animate-pulse"/>
+                  <span className="text-[7px] text-rose-300 font-medium">IA activa · dictando</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Plans ─────────────────────────────────────────────────────────────────────
+const PLANS = [
   {
-    icon: '🦷',
-    title: 'Historia clínica unificada',
-    desc: 'Expediente digital completo del paciente: odontograma interactivo, radiografías, evoluciones y documentos en un solo lugar.',
+    id: 'individual',
+    name: 'Individual',
+    subtitle: 'Para el odontólogo independiente',
+    price: 149000,
+    priceNote: '/mes',
+    badge: null,
+    color: '#5FC9BE',
+    highlight: false,
+    cta: 'Comenzar gratis',
+    features: [
+      '1 consultorio · 1 usuario clínico',
+      'Agenda con recordatorios WhatsApp',
+      'Historia clínica ilimitada',
+      'Odontograma digital',
+      'Portal del paciente incluido',
+      '10 GB almacenamiento DICOM',
+      'Soporte por email',
+    ],
+    missing: ['Asistente IA por voz', 'Análisis ML de radiografías', 'Teleodontología', 'Multi-sede'],
+  },
+  {
+    id: 'pro',
+    name: 'Clínicas Pro',
+    subtitle: 'Para clínicas en crecimiento',
+    price: 490000,
+    priceNote: '/mes',
+    badge: 'Más popular',
     color: '#1E8C82',
+    highlight: true,
+    cta: 'Solicitar plan Pro',
+    features: [
+      'Hasta 5 consultorios · 15 usuarios',
+      'Todo lo de Individual',
+      'Asistente IA por voz 🎙',
+      'Análisis ML de radiografías 🔬',
+      'Teleodontología integrada 📹',
+      '100 GB DICOM + backups diarios',
+      'Notificaciones multicanal (WA, SMS, Email)',
+      'Reportes financieros avanzados',
+      'Soporte prioritario',
+    ],
+    missing: [],
   },
   {
-    icon: '📅',
-    title: 'Agenda inteligente',
-    desc: 'Gestión de citas presenciales y virtuales con confirmaciones automáticas, recordatorios y vista semanal/mensual.',
-    color: '#2BA89D',
-  },
-  {
-    icon: '🗺️',
-    title: 'Odontograma digital',
-    desc: 'Odontograma SVG interactivo por pieza dental. Registra diagnósticos, tratamientos y evolución con un clic.',
-    color: '#1E8C82',
-  },
-  {
-    icon: '🎙️',
-    title: 'Asistente IA por voz',
-    desc: 'Dicta notas clínicas durante la atención. La IA las estructura automáticamente y las guarda en la historia del paciente.',
-    color: '#2BA89D',
-  },
-  {
-    icon: '🔬',
-    title: 'Análisis ML de radiografías',
-    desc: 'Inteligencia artificial asiste en la detección de hallazgos en radiografías, marcando regiones de interés para el odontólogo.',
-    color: '#1E8C82',
-  },
-  {
-    icon: '📹',
-    title: 'Teleodontología integrada',
-    desc: 'Consultas virtuales por videollamada directamente dentro de la plataforma, con sala de espera digital y chat.',
-    color: '#2BA89D',
-  },
-  {
-    icon: '📊',
-    title: 'Dashboard y reportes',
-    desc: 'Indicadores en tiempo real: ingresos, ocupación, pacientes atendidos, inventario y rendimiento del equipo.',
-    color: '#1E8C82',
+    id: 'enterprise',
+    name: 'Red / Enterprise',
+    subtitle: 'Multi-sede y grandes redes',
+    price: 0,
+    priceNote: 'A medida',
+    badge: 'Enterprise',
+    color: '#7C3AED',
+    highlight: false,
+    cta: 'Solicitar cotización',
+    features: [
+      'Consultorios y usuarios ilimitados',
+      'Todo lo de Clínicas Pro',
+      'Multi-sede con dashboard unificado',
+      '1 TB DICOM + almacenamiento escalable',
+      'IA prioritaria y modelos personalizados',
+      'SLA 99.9% garantizado',
+      'Integración con sistemas existentes (API)',
+      'Onboarding dedicado + capacitación',
+      'Soporte 24/7 con ejecutivo de cuenta',
+    ],
+    missing: [],
   },
 ]
 
+// ── Feature card data ─────────────────────────────────────────────────────────
+const FEATURES = [
+  { icon: '🗓', title: 'Agenda inteligente',      desc: 'Calendario con detección de conflictos, recordatorios automáticos por WhatsApp y sincronización multi-sede.',      tag: 'Core' },
+  { icon: '🦷', title: 'Odontograma digital',     desc: 'Registro por cara del diente con SVG interactivo, historial por diente y resaltado en tiempo real por dictado IA.', tag: 'Clínico' },
+  { icon: '🎙', title: 'Asistente IA por voz',    desc: 'Dicta la historia clínica mientras atiendes al paciente. La IA estructura y genera el borrador en segundos.',        tag: 'IA' },
+  { icon: '📹', title: 'Teleodontología',         desc: 'Videoconsultas integradas con chat, adjuntos de radiografías en tiempo real y registro automático en el historial.', tag: 'Teleconsulta' },
+  { icon: '🔬', title: 'Análisis ML de RX',       desc: 'Carga imágenes DICOM y obtén detección asistida de caries, reabsorciones y lesiones óseas por machine learning.',   tag: 'IA' },
+  { icon: '📋', title: 'Historia clínica unif.',  desc: 'Paciente, historial, odontograma y radiografías en una sola vista. Diseñado para el flujo clínico real.',            tag: 'Clínico' },
+  { icon: '💳', title: 'Caja y facturación',      desc: 'Control de ingresos, múltiples métodos de pago y reportes mensuales. Cobro pendiente con un clic desde la agenda.', tag: 'Gestión' },
+  { icon: '📦', title: 'Inventario',              desc: 'Control de stock con alertas de mínimos, historial de consumo por procedimiento y órdenes de compra integradas.',    tag: 'Gestión' },
+  { icon: '👥', title: 'Multi-rol y multi-sede',  desc: 'Acceso diferenciado por rol. SUPER_ADMIN gestiona todas las clínicas; cada sede tiene su propia configuración.',      tag: 'Enterprise' },
+]
+
+// ── Role data (public — SUPER_ADMIN is internal only) ─────────────────────────
 const ROLES = [
   {
-    role: 'Administrador de clínica',
-    icon: '⚙️',
-    desc: 'Controla usuarios, configuración de la clínica, reportes financieros, inventario y planes del equipo.',
-    color: 'from-slate-600 to-slate-700',
-    tag: 'ADMIN_CLINICA',
-  },
-  {
-    role: 'Odontólogo',
+    key: 'ODONTOLOGO',
     icon: '🦷',
-    desc: 'Accede a la historia clínica completa, agenda sus citas, usa el asistente IA y atiende consultas virtuales.',
-    color: 'from-cyan-600 to-cyan-700',
-    tag: 'ODONTOLOGO',
+    title: 'Odontólogo',
+    badge: 'Clínico',
+    badgeColor: '#1E8C82',
+    desc: 'Acceso completo a la historia clínica, odontograma digital, asistente IA, análisis de radiografías y teleodontología.',
+    modules: ['Historia clínica', 'Odontograma IA', 'Radiografías + ML', 'Teleodontología', 'Agenda propia'],
+    bg: 'from-cyan-500/10 to-teal-500/5',
+    accent: '#1E8C82',
   },
   {
-    role: 'Recepcionista',
+    key: 'RECEPCIONISTA',
     icon: '📋',
-    desc: 'Gestiona la agenda, confirma citas, administra el inventario y registra datos básicos de pacientes.',
-    color: 'from-violet-600 to-violet-700',
-    tag: 'RECEPCIONISTA',
+    title: 'Recepcionista',
+    badge: 'Operativo',
+    badgeColor: '#7C3AED',
+    desc: 'Gestión de agenda, citas, pacientes e inventario. Sin acceso a datos clínicos sensibles — privacidad garantizada.',
+    modules: ['Agenda completa', 'Pacientes (sin clínica)', 'Inventario', 'Notificaciones', 'Caja básica'],
+    bg: 'from-violet-500/10 to-purple-500/5',
+    accent: '#7C3AED',
   },
   {
-    role: 'Paciente',
-    icon: '👤',
-    desc: 'Accede a su portal web personal: ve sus citas, paga tratamientos, revisa su historial y se une a videollamadas.',
-    color: 'from-emerald-600 to-emerald-700',
-    tag: 'PACIENTE',
+    key: 'ADMIN_CLINICA',
+    icon: '⚙️',
+    title: 'Administrador',
+    badge: 'Config.',
+    badgeColor: '#475569',
+    desc: 'Configuración del consultorio, gestión del equipo médico, horarios, facturación avanzada y reportes gerenciales.',
+    modules: ['Configuración sede', 'Usuarios y roles', 'Reportes financieros', 'Inventario', 'Suscripción'],
+    bg: 'from-slate-500/10 to-gray-500/5',
+    accent: '#64748B',
+  },
+  {
+    key: 'PACIENTE',
+    icon: '📱',
+    title: 'Paciente',
+    badge: 'App móvil',
+    badgeColor: '#059669',
+    desc: 'Portal web responsive exclusivo. Consulta tus citas, realiza pagos, sigue el avance de tu tratamiento y accede a teleconsultas.',
+    modules: ['Mis citas', 'Pagos en línea', 'Avances del tratamiento', 'Teleconsulta', 'Mis documentos'],
+    bg: 'from-emerald-500/10 to-green-500/5',
+    accent: '#059669',
   },
 ]
 
-const TRUST = [
-  {
-    icon: '🔒',
-    title: 'Datos clínicos seguros',
-    desc: 'Cifrado de extremo a extremo. Cumplimiento de normativas de salud digital y protección de datos de pacientes.',
-  },
-  {
-    icon: '⚡',
-    title: 'Ahorra tiempo administrativo',
-    desc: 'Reduce hasta 70% el tiempo en registros manuales gracias al asistente de voz y la automatización de agendas.',
-  },
-  {
-    icon: '😊',
-    title: 'Mejor experiencia del paciente',
-    desc: 'El paciente ve su historial, paga en línea y accede a videollamadas desde su computador o celular.',
-  },
-  {
-    icon: '☁️',
-    title: '100% en la nube',
-    desc: 'Sin instalaciones. Accede desde cualquier dispositivo. Actualizaciones automáticas sin interrupciones.',
-  },
+const SECURITY = [
+  { icon: '🔒', title: 'Cifrado end-to-end',    desc: 'Datos en tránsito con TLS 1.3 y en reposo con AES-256. Las radiografías y documentos se almacenan cifrados.' },
+  { icon: '🛡', title: 'HIPAA Compliant',        desc: 'Arquitectura diseñada para cumplir con HIPAA, Ley 1581 de Protección de Datos (Colombia) y GDPR.' },
+  { icon: '☁️', title: 'Infraestructura cloud', desc: 'Desplegado en AWS con auto-scaling, backups automáticos diarios y recuperación ante desastres en < 4 h.' },
+  { icon: '📊', title: '99.9% uptime SLA',       desc: 'Acuerdo de nivel de servicio garantizado. Monitoreo 24/7 con alertas proactivas y soporte prioritario.' },
+  { icon: '🔑', title: 'Control de acceso',      desc: 'Roles granulares, autenticación multifactor y auditoría de cada acción sobre datos clínicos.' },
+  { icon: '📜', title: 'ISO 27001',              desc: 'Gestión de seguridad de la información certificada. Revisiones de vulnerabilidades cada trimestre.' },
 ]
 
-export default function LandingPage({ onLogin }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false)
+// ── Contact form component ────────────────────────────────────────────────────
+function ContactForm() {
+  const [form, setForm] = useState({ name: '', clinic: '', phone: '', email: '', message: '' })
+  const [sent, setSent] = useState(false)
+  const [sending, setSending] = useState(false)
+
+  function submit(e: { preventDefault: () => void }) {
+    e.preventDefault()
+    setSending(true)
+    setTimeout(() => { setSending(false); setSent(true) }, 1200)
+  }
+
+  if (sent) {
+    return (
+      <div className="rounded-3xl border border-white/8 p-10 text-center"
+        style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 flex items-center justify-center mx-auto mb-5">
+          <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h3 className="text-white font-bold text-xl mb-2" style={{ fontFamily: 'Outfit' }}>¡Mensaje enviado!</h3>
+        <p className="text-white/45 text-sm">Un especialista CORONYX se pondrá en contacto contigo en menos de 24 horas hábiles.</p>
+        <button onClick={() => { setSent(false); setForm({ name:'', clinic:'', phone:'', email:'', message:'' }) }}
+          className="mt-6 text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
+          Enviar otro mensaje
+        </button>
+      </div>
+    )
+  }
+
+  const inputCls = "w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 transition-all"
+  const inputStyle = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }
+
+  return (
+    <form onSubmit={submit}
+      className="rounded-3xl border border-white/8 p-8 space-y-4"
+      style={{ background: 'rgba(255,255,255,0.02)' }}>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Nombre completo *</label>
+          <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            required placeholder="Tu nombre"
+            className={inputCls} style={inputStyle} />
+        </div>
+        <div>
+          <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Nombre de la clínica</label>
+          <input value={form.clinic} onChange={e => setForm(f => ({ ...f, clinic: e.target.value }))}
+            placeholder="Clínica Dental..."
+            className={inputCls} style={inputStyle} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Teléfono / WhatsApp</label>
+          <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+            placeholder="+57..."
+            className={inputCls} style={inputStyle} />
+        </div>
+        <div>
+          <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Correo electrónico *</label>
+          <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+            required placeholder="tu@correo.co"
+            className={inputCls} style={inputStyle} />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Mensaje *</label>
+        <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+          required rows={5} placeholder="Cuéntanos sobre tu clínica, número de usuarios estimado, consultas sobre planes, integraciones..."
+          className={`${inputCls} resize-none`} style={inputStyle} />
+      </div>
+
+      {/* Plan interest quick select */}
+      <div>
+        <p className="text-xs text-white/40 mb-2" style={{ fontFamily: 'Outfit' }}>¿Qué plan te interesa? (opcional)</p>
+        <div className="flex gap-2">
+          {['Individual', 'Clínicas Pro', 'Enterprise', 'Aún no lo sé'].map(p => {
+            const isActive = form.message.startsWith(`[Plan: ${p}]`)
+            return (
+              <button type="button" key={p}
+                onClick={() => setForm(f => ({ ...f, message: isActive ? f.message.replace(`[Plan: ${p}] `, '') : `[Plan: ${p}] ${f.message}` }))}
+                className="px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all"
+                style={{
+                  fontFamily: 'Outfit',
+                  backgroundColor: isActive ? 'rgba(30,140,130,0.2)' : 'transparent',
+                  borderColor: isActive ? '#1E8C82' : 'rgba(255,255,255,0.12)',
+                  color: isActive ? '#5FC9BE' : 'rgba(255,255,255,0.4)',
+                }}>
+                {p}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <button type="submit" disabled={sending}
+        className="w-full py-3.5 text-white text-sm font-semibold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+        style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
+        onMouseEnter={e => !sending && (e.currentTarget.style.backgroundColor = '#15635d')}
+        onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#1E8C82')}>
+        {sending ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+            Enviando...
+          </>
+        ) : 'Enviar mensaje →'}
+      </button>
+      <p className="text-center text-white/20 text-[11px]">Respuesta garantizada en menos de 24 h hábiles.</p>
+    </form>
+  )
+}
+
+export default function LandingPage({ onNavigate }: Props) {
   const [scrolled, setScrolled] = useState(false)
+  const [activeRole, setActiveRole] = useState(0)
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    const handler = () => setScrolled(window.scrollY > 20)
+    try {
+      window.addEventListener('scroll', handler, { passive: true })
+      return () => window.removeEventListener('scroll', handler)
+    } catch (_) { return undefined }
   }, [])
 
   return (
-    <div className="min-h-screen bg-white font-sans" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen" style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#080f0e', color: '#e2e8f0' }}>
 
-      {/* ── Navbar ── */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/95 backdrop-blur-sm shadow-sm border-b border-slate-100' : 'bg-transparent'}`}>
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center gap-8">
+      {/* ── Floating Navbar ──────────────────────────────────────────────────── */}
+      <nav className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+        scrolled ? 'border-b border-white/8' : ''
+      }`} style={{ backdropFilter: scrolled ? 'blur(16px)' : 'none', backgroundColor: scrolled ? 'rgba(8,15,14,0.88)' : 'transparent' }}>
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center gap-8">
           {/* Logo */}
-          <a href="#hero" className="flex items-center gap-2.5 shrink-0">
-            <CoroNyxLogo size={38} />
+          <button onClick={() => onNavigate('/')} className="flex items-center gap-2.5 shrink-0">
+            <CxLogo size={32} />
             <div>
-              <p className="text-[#0B3D3A] text-base font-bold tracking-wide leading-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>CORONYX</p>
-              <p className="text-[#1E8C82] text-[10px] leading-tight">Sistema Dental</p>
+              <p className="text-white font-bold text-sm leading-tight tracking-widest" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
+              <p className="text-[10px] leading-none" style={{ color: '#5FC9BE' }}>Sistema Dental</p>
             </div>
-          </a>
+          </button>
 
-          {/* Desktop nav links */}
+          {/* Anchor links */}
           <div className="hidden md:flex items-center gap-6 flex-1">
-            <a href="#funcionalidades" className="text-sm text-slate-600 hover:text-[#1E8C82] transition-colors font-medium">Funcionalidades</a>
-            <a href="#roles" className="text-sm text-slate-600 hover:text-[#1E8C82] transition-colors font-medium">Para tu clínica</a>
-            <a href="#beneficios" className="text-sm text-slate-600 hover:text-[#1E8C82] transition-colors font-medium">Beneficios</a>
-            <a href="#contacto" className="text-sm text-slate-600 hover:text-[#1E8C82] transition-colors font-medium">Contacto</a>
-          </div>
-
-          <div className="flex-1 md:flex-none" />
-
-          {/* CTA button */}
-          <button
-            onClick={onLogin}
-            className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:shadow-lg hover:shadow-teal-700/20"
-            style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
-            Ingresar
-          </button>
-
-          {/* Mobile hamburger */}
-          <button className="md:hidden p-2 text-slate-600" onClick={() => setMenuOpen(!menuOpen)}>
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {menuOpen
-                ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-                : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
-              }
-            </svg>
-          </button>
-        </div>
-
-        {/* Mobile menu */}
-        {menuOpen && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-6 pb-4 space-y-3">
-            {['#funcionalidades', '#roles', '#beneficios', '#contacto'].map((href, i) => (
-              <a key={href} href={href} onClick={() => setMenuOpen(false)}
-                className="block text-sm text-slate-700 font-medium py-1.5">
-                {['Funcionalidades', 'Para tu clínica', 'Beneficios', 'Contacto'][i]}
+            {[['#funcionalidades','Funcionalidades'],['#roles','Por rol'],['#planes','Precios'],['#contacto','Contacto']].map(([href, label]) => (
+              <a key={href} href={href}
+                className="text-sm text-white/45 hover:text-white/90 transition-colors"
+                style={{ fontFamily: 'Outfit' }}>
+                {label}
               </a>
             ))}
-            <button onClick={onLogin}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white"
-              style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-              Ingresar al sistema
-            </button>
           </div>
-        )}
+
+          <div className="flex-1 hidden md:block" />
+
+          <button
+            onClick={() => onNavigate('/login')}
+            className="px-5 py-2 text-sm font-semibold text-white rounded-xl transition-all shrink-0"
+            style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#0B3D3A')}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#1E8C82')}>
+            Ingresar →
+          </button>
+        </div>
       </nav>
 
-      {/* ── Hero ── */}
-      <section id="hero" className="relative min-h-screen flex items-center overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #062422 0%, #0B3D3A 40%, #115952 100%)' }}>
+      {/* ── Hero ─────────────────────────────────────────────────────────────── */}
+      <section className="relative min-h-screen flex items-center pt-16 overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #0B3D3A 0%, #072b28 55%, #040e0d 100%)' }}>
 
-        {/* Background decorations */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full opacity-10"
-            style={{ background: 'radial-gradient(circle, #5FC9BE, transparent)' }}/>
-          <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full opacity-8"
-            style={{ background: 'radial-gradient(circle, #1E8C82, transparent)' }}/>
-          {/* Grid pattern */}
-          <svg className="absolute inset-0 w-full h-full opacity-5" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#5FC9BE" strokeWidth="0.5"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)"/>
-          </svg>
-        </div>
+        {/* Dot grid */}
+        <div className="absolute inset-0 opacity-[0.07]"
+          style={{ backgroundImage: 'radial-gradient(circle, #5FC9BE 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
-        <div className="max-w-7xl mx-auto px-6 pt-24 pb-16 w-full">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+        {/* Radial glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] opacity-20 blur-3xl rounded-full"
+          style={{ background: 'radial-gradient(ellipse, #1E8C82, transparent 70%)' }} />
+
+        <div className="relative max-w-6xl mx-auto px-6 py-24 w-full">
+          <div className="grid grid-cols-2 gap-16 items-center">
+
             {/* Left — copy */}
-            <div className="fade-in">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6 border"
-                style={{ background: 'rgba(95,201,190,0.12)', borderColor: 'rgba(95,201,190,0.3)', color: '#5FC9BE' }}>
+            <div>
+              <div className="inline-flex items-center gap-2 border border-white/15 text-xs font-medium px-3 py-1.5 rounded-full mb-8"
+                style={{ backgroundColor: 'rgba(94,201,190,0.08)', color: '#5FC9BE', fontFamily: 'Outfit' }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>
-                Plataforma SaaS · Odontología Inteligente
+                Plataforma SaaS · Versión 2.0 · Enterprise
               </div>
 
-              <h1 className="text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight mb-6"
-                style={{ fontFamily: 'Outfit, sans-serif' }}>
-                La gestión dental{' '}
-                <span style={{ background: 'linear-gradient(90deg, #5FC9BE, #2BA89D)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                  impulsada por IA
-                </span>{' '}
-                que tu clínica necesita
+              <h1 className="text-white font-bold leading-[1.08] mb-6"
+                style={{ fontFamily: 'Outfit', fontSize: 'clamp(2.2rem, 4vw, 3.4rem)' }}>
+                La clínica dental<br />
+                <span style={{ color: '#5FC9BE' }}>del futuro</span>,<br />
+                disponible hoy.
               </h1>
 
-              <p className="text-lg text-white/60 leading-relaxed mb-8 max-w-xl">
-                Asistente de voz clínico, odontograma digital, análisis de radiografías con Machine Learning, teleodontología y gestión integral — todo en una sola plataforma.
+              <p className="text-white/55 leading-relaxed mb-8 max-w-md"
+                style={{ fontSize: '1.0625rem' }}>
+                CORONYX unifica agenda, historia clínica, odontograma interactivo, asistente IA por voz y teleodontología en un solo sistema — diseñado para el consultorio real.
               </p>
 
-              <div className="flex flex-wrap gap-3">
-                <button onClick={onLogin}
-                  className="flex items-center gap-2 px-6 py-3.5 rounded-xl text-base font-semibold text-white transition-all hover:opacity-90 hover:shadow-xl hover:shadow-teal-900/40 hover:-translate-y-0.5"
-                  style={{ background: 'linear-gradient(135deg, #2BA89D, #1E8C82)' }}>
-                  Ingresar al sistema
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                </button>
-                <a href="#funcionalidades"
-                  className="flex items-center gap-2 px-6 py-3.5 rounded-xl text-base font-semibold transition-all hover:bg-white/10"
-                  style={{ border: '1px solid rgba(95,201,190,0.3)', color: '#5FC9BE' }}>
-                  Conocer más
-                </a>
-              </div>
-
               {/* Trust badges */}
-              <div className="flex flex-wrap gap-4 mt-8 text-white/40 text-xs">
-                {['🔒 Datos cifrados', '☁️ 100% en la nube', '⚡ Sin instalaciones'].map(b => (
-                  <span key={b} className="flex items-center gap-1">{b}</span>
+              <div className="flex flex-wrap gap-2 mb-9">
+                {['HIPAA Compliant','ISO 27001','SOC 2','AES-256','99.9% SLA'].map(b => (
+                  <span key={b} className="text-xs font-medium px-2.5 py-1 rounded-lg border border-white/10"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', fontFamily: 'Outfit' }}>
+                    {b}
+                  </span>
                 ))}
               </div>
+
+              <div className="flex items-center gap-3">
+                <button onClick={() => onNavigate('/login')}
+                  className="px-7 py-3.5 text-white text-sm font-semibold rounded-xl transition-all shadow-lg"
+                  style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#15635d')}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#1E8C82')}>
+                  Comenzar gratis →
+                </button>
+                <a href="#funcionalidades"
+                  className="px-7 py-3.5 text-sm font-medium rounded-xl border border-white/15 text-white/70 hover:text-white hover:border-white/25 transition-all"
+                  style={{ fontFamily: 'Outfit' }}>
+                  Ver funcionalidades
+                </a>
+              </div>
             </div>
 
-            {/* Right — Dashboard mockup */}
-            <div className="relative hidden lg:block">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10"
-                style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)' }}>
-                {/* Mock top bar */}
-                <div className="bg-white/8 px-4 py-2.5 flex items-center gap-2 border-b border-white/8">
-                  <div className="flex gap-1.5">
-                    {['#ef4444','#f59e0b','#22c55e'].map(c => <div key={c} className="w-2.5 h-2.5 rounded-full" style={{background:c}}/>)}
-                  </div>
-                  <div className="flex-1 mx-4 h-5 rounded-md bg-white/10 flex items-center px-2">
-                    <span className="text-white/30 text-[10px]">coronyx.clinica.co · dashboard</span>
-                  </div>
-                </div>
-
-                {/* Mock dashboard content */}
-                <div className="p-5 space-y-4">
-                  {/* KPI cards */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: 'Pacientes hoy', val: '24', icon: '👤', color: '#5FC9BE' },
-                      { label: 'Ingresos', val: '$4.2M', icon: '💰', color: '#34d399' },
-                      { label: 'Citas pendientes', val: '8', icon: '📅', color: '#f59e0b' },
-                    ].map(k => (
-                      <div key={k.label} className="rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <p className="text-[10px] text-white/40 mb-1">{k.label}</p>
-                        <p className="text-lg font-bold" style={{ color: k.color, fontFamily: 'Outfit' }}>{k.val}</p>
-                        <p className="text-[10px] text-white/30 mt-0.5">{k.icon}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Odontograma preview mini */}
-                  <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(95,201,190,0.15)' }}>
-                    <p className="text-[10px] text-white/40 mb-3">Odontograma · Carlos Rivas</p>
-                    <div className="flex gap-1 flex-wrap">
-                      {Array.from({length: 16}).map((_, i) => (
-                        <div key={i} className="w-5 h-6 rounded-md flex items-center justify-center text-[8px]"
-                          style={{
-                            background: [2,5,11].includes(i) ? 'rgba(239,68,68,0.7)' : [7,13].includes(i) ? 'rgba(95,201,190,0.5)' : 'rgba(255,255,255,0.08)',
-                            border: '1px solid rgba(255,255,255,0.1)'
-                          }}>
-                          {[2,5,11].includes(i) ? '⚠' : ''}
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[9px] text-white/25 mt-2">16 piezas · 3 diagnósticos activos</p>
-                  </div>
-
-                  {/* Next appointments */}
-                  <div className="space-y-2">
-                    {[
-                      { name: 'María García', time: '09:00', proc: 'Exodoncia' },
-                      { name: 'Juan López', time: '10:30', proc: 'Ortodoncia control' },
-                      { name: 'Ana Torres', time: '11:00', proc: 'Teleodontología 📹' },
-                    ].map(a => (
-                      <div key={a.name} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                          style={{ background: 'linear-gradient(135deg,#5FC9BE,#1E8C82)' }}>
-                          {a.name[0]}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white/80 text-[11px] font-medium">{a.name}</p>
-                          <p className="text-white/35 text-[10px]">{a.proc}</p>
-                        </div>
-                        <span className="text-[10px] font-semibold" style={{ color: '#5FC9BE' }}>{a.time}</span>
-                      </div>
-                    ))}
-                  </div>
+            {/* Right — dashboard mockup */}
+            <div className="relative">
+              <DashboardMockup />
+              {/* Floating badges */}
+              <div className="absolute -left-6 bottom-12 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/10 shadow-xl"
+                style={{ background: 'rgba(11,61,58,0.95)', backdropFilter: 'blur(12px)' }}>
+                <div className="w-2 h-2 rounded-full bg-rose-400 animate-pulse shrink-0"/>
+                <div>
+                  <p className="text-white text-xs font-semibold" style={{ fontFamily: 'Outfit' }}>IA dictando</p>
+                  <p className="text-white/40 text-[10px]">Historia clínica · Molar #36</p>
                 </div>
               </div>
-
-              {/* Floating AI badge */}
-              <div className="absolute -top-4 -right-4 rounded-xl px-3 py-2 shadow-lg border border-white/10 flex items-center gap-2"
-                style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/>
-                <span className="text-white text-[11px] font-semibold">Asistente IA · Activo</span>
+              <div className="absolute -right-4 top-10 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/10 shadow-xl"
+                style={{ background: 'rgba(11,61,58,0.95)', backdropFilter: 'blur(12px)' }}>
+                <span className="text-base">🦷</span>
+                <div>
+                  <p className="text-white text-xs font-semibold" style={{ fontFamily: 'Outfit' }}>+14 citas hoy</p>
+                  <p className="text-white/40 text-[10px]">Ocupación 92%</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Wave separator */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 60" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" className="w-full h-12 lg:h-16">
-            <path d="M0 60 L0 30 Q360 0 720 30 Q1080 60 1440 30 L1440 60 Z" fill="white"/>
-          </svg>
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 inset-x-0 h-32"
+          style={{ background: 'linear-gradient(to bottom, transparent, #080f0e)' }} />
+      </section>
+
+      {/* ── Stats strip ──────────────────────────────────────────────────────── */}
+      <section className="border-y border-white/6" style={{ background: '#0d1a18' }}>
+        <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-4 divide-x divide-white/8">
+          {[
+            { val: '2 400+', label: 'Pacientes gestionados',   sub: 'en clínicas activas' },
+            { val: '11',     label: 'Módulos clínicos',        sub: 'integrados en 1 plataforma' },
+            { val: '5',      label: 'Roles de usuario',        sub: 'control granular de acceso' },
+            { val: '99.9%',  label: 'Uptime garantizado',      sub: 'SLA Enterprise' },
+          ].map((s, i) => (
+            <div key={i} className="px-8 first:pl-0 last:pr-0">
+              <p className="font-bold text-3xl text-white mb-1" style={{ fontFamily: 'Outfit' }}>{s.val}</p>
+              <p className="text-white/70 text-sm font-medium">{s.label}</p>
+              <p className="text-white/30 text-xs mt-0.5">{s.sub}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* ── Qué hace CORONYX ── */}
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold mb-4 border"
-            style={{ background: '#ecfaf9', borderColor: '#b3e8e5', color: '#1E8C82' }}>
-            ¿Qué es CORONYX?
-          </span>
-          <h2 className="text-3xl lg:text-4xl font-bold mb-6" style={{ fontFamily: 'Outfit, sans-serif', color: '#0B3D3A' }}>
-            La plataforma que digitaliza tu clínica de punta a punta
-          </h2>
-          <p className="text-slate-500 text-lg leading-relaxed max-w-3xl mx-auto">
-            CORONYX es un sistema de gestión odontológica en la nube diseñado para clínicas que quieren dejar atrás el papel, los cuadernos y los Excel. Desde el primer contacto del paciente hasta el seguimiento post-tratamiento, todo queda registrado, organizado y accesible para tu equipo en segundos.
-          </p>
-          <div className="mt-10 grid sm:grid-cols-3 gap-6 text-left">
-            {[
-              { n: '+40%', label: 'más productividad clínica', sub: 'con el asistente de voz IA' },
-              { n: '-70%', label: 'tiempo en papeleo', sub: 'gracias a la automatización' },
-              { n: '100%', label: 'datos en la nube', sub: 'seguros y siempre disponibles' },
-            ].map(s => (
-              <div key={s.n} className="rounded-2xl p-6 text-center border" style={{ borderColor: '#d9f4f2', background: '#ecfaf9' }}>
-                <p className="text-3xl font-bold mb-1" style={{ fontFamily: 'Outfit', color: '#1E8C82' }}>{s.n}</p>
-                <p className="text-sm font-semibold text-slate-700">{s.label}</p>
-                <p className="text-xs text-slate-400 mt-1">{s.sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Funcionalidades ── */}
-      <section id="funcionalidades" className="py-20 px-6" style={{ background: '#FAFAFA' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold mb-4 border"
-              style={{ background: '#ecfaf9', borderColor: '#b3e8e5', color: '#1E8C82' }}>
+      {/* ── Funcionalidades ───────────────────────────────────────────────────── */}
+      <section id="funcionalidades" className="py-28 max-w-6xl mx-auto px-6">
+        <div className="grid grid-cols-2 gap-16 items-start">
+          {/* Left label col */}
+          <div className="sticky top-24">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] mb-4"
+              style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>
               Funcionalidades
-            </span>
-            <h2 className="text-3xl lg:text-4xl font-bold" style={{ fontFamily: 'Outfit, sans-serif', color: '#0B3D3A' }}>
-              Todo lo que tu clínica necesita, integrado
+            </p>
+            <h2 className="text-white font-bold leading-tight mb-5"
+              style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)' }}>
+              Todo lo que necesita<br />tu clínica — en uno.
             </h2>
-            <p className="text-slate-500 mt-3 max-w-xl mx-auto">Un ecosistema completo para la gestión clínica moderna, sin módulos externos ni integraciones complicadas.</p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {FEATURES.map(f => (
-              <div key={f.title}
-                className="bg-white rounded-2xl p-6 border border-slate-100 hover:border-teal-200 hover:shadow-lg hover:shadow-teal-50 transition-all duration-300 group cursor-default">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 transition-transform group-hover:scale-110"
-                  style={{ background: 'linear-gradient(135deg, #ecfaf9, #d9f4f2)' }}>
-                  {f.icon}
-                </div>
-                <h3 className="font-semibold text-slate-800 mb-2 text-sm" style={{ fontFamily: 'Outfit' }}>{f.title}</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Para cada rol ── */}
-      <section id="roles" className="py-20 px-6 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold mb-4 border"
-              style={{ background: '#ecfaf9', borderColor: '#b3e8e5', color: '#1E8C82' }}>
-              Para tu equipo
-            </span>
-            <h2 className="text-3xl lg:text-4xl font-bold" style={{ fontFamily: 'Outfit, sans-serif', color: '#0B3D3A' }}>
-              Cada persona, con lo que necesita
-            </h2>
-            <p className="text-slate-500 mt-3 max-w-xl mx-auto">
-              CORONYX adapta la experiencia según el rol. Cada usuario ve solo lo que le corresponde, con su propio dashboard personalizado.
+            <p className="text-white/45 text-sm leading-relaxed max-w-sm">
+              Cada módulo fue diseñado desde flujos clínicos reales, probado con odontólogos en ejercicio y construido para usarse con el paciente presente.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {ROLES.map(r => (
-              <div key={r.role} className="rounded-2xl overflow-hidden border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className={`bg-gradient-to-br ${r.color} p-5`}>
-                  <div className="text-3xl mb-2">{r.icon}</div>
-                  <h3 className="text-white font-bold text-base" style={{ fontFamily: 'Outfit' }}>{r.role}</h3>
-                  <span className="text-white/60 text-[10px] font-mono">{r.tag}</span>
+          {/* Right feature grid */}
+          <div className="grid grid-cols-1 gap-3">
+            {FEATURES.map((f, i) => (
+              <div key={i}
+                className="flex items-start gap-4 p-4 rounded-2xl border border-white/6 hover:border-white/12 transition-all group"
+                style={{ background: 'rgba(255,255,255,0.02)' }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+                  style={{ background: 'rgba(30,140,130,0.12)' }}>
+                  {f.icon}
                 </div>
-                <div className="p-5 bg-white">
-                  <p className="text-slate-500 text-sm leading-relaxed">{r.desc}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-white text-sm font-semibold" style={{ fontFamily: 'Outfit' }}>{f.title}</p>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                      style={{ background: 'rgba(30,140,130,0.15)', color: '#5FC9BE', fontFamily: 'Outfit' }}>
+                      {f.tag}
+                    </span>
+                  </div>
+                  <p className="text-white/40 text-xs leading-relaxed">{f.desc}</p>
                 </div>
               </div>
             ))}
@@ -425,101 +593,369 @@ export default function LandingPage({ onLogin }: Props) {
         </div>
       </section>
 
-      {/* ── Confianza / Beneficios ── */}
-      <section id="beneficios" className="py-20 px-6" style={{ background: 'linear-gradient(135deg, #0B3D3A 0%, #115952 100%)' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-14">
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold mb-4 border"
-              style={{ background: 'rgba(95,201,190,0.15)', borderColor: 'rgba(95,201,190,0.3)', color: '#5FC9BE' }}>
-              Por qué CORONYX
-            </span>
-            <h2 className="text-3xl lg:text-4xl font-bold text-white" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              Confianza en cada clic
+      {/* ── Soluciones por rol ────────────────────────────────────────────────── */}
+      <section id="roles" className="py-28" style={{ background: '#0a1715' }}>
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
+              style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>
+              Soluciones por rol
+            </p>
+            <h2 className="text-white font-bold mb-4"
+              style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)' }}>
+              Una plataforma,<br />cuatro experiencias.
             </h2>
+            <p className="text-white/40 text-sm max-w-md mx-auto leading-relaxed">
+              Cada usuario ve exactamente lo que necesita. Datos clínicos protegidos por rol y auditoría completa de accesos.
+            </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {TRUST.map(t => (
-              <div key={t.title} className="rounded-2xl p-6 border" style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(95,201,190,0.15)' }}>
-                <div className="text-3xl mb-4">{t.icon}</div>
-                <h3 className="text-white font-semibold mb-2 text-sm" style={{ fontFamily: 'Outfit' }}>{t.title}</h3>
-                <p className="text-white/50 text-xs leading-relaxed">{t.desc}</p>
-              </div>
+          {/* Role tabs */}
+          <div className="flex gap-2 justify-center mb-10 flex-wrap">
+            {ROLES.map((r, i) => (
+              <button key={r.key} onClick={() => setActiveRole(i)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  fontFamily: 'Outfit',
+                  backgroundColor: activeRole === i ? r.accent + '20' : 'rgba(255,255,255,0.04)',
+                  color: activeRole === i ? r.accent : 'rgba(255,255,255,0.45)',
+                  border: `1px solid ${activeRole === i ? r.accent + '40' : 'rgba(255,255,255,0.07)'}`,
+                }}>
+                <span>{r.icon}</span>
+                {r.title}
+              </button>
             ))}
           </div>
+
+          {/* Role detail panel */}
+          {(() => {
+            const r = ROLES[activeRole]
+            return (
+              <div className="rounded-3xl border border-white/8 p-8 grid grid-cols-2 gap-10 items-center"
+                style={{ background: `linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))` }}>
+                <div>
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+                      style={{ background: r.accent + '20' }}>
+                      {r.icon}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <h3 className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit' }}>{r.title}</h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          style={{ backgroundColor: r.accent + '25', color: r.accent, fontFamily: 'Outfit' }}>
+                          {r.badge}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-white/55 text-sm leading-relaxed mb-6">{r.desc}</p>
+                  <button onClick={() => onNavigate('/login')}
+                    className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all"
+                    style={{ backgroundColor: r.accent, color: '#fff', fontFamily: 'Outfit' }}>
+                    Probar como {r.title} →
+                  </button>
+                </div>
+
+                <div>
+                  <p className="text-white/30 text-xs uppercase tracking-widest mb-4" style={{ fontFamily: 'Outfit' }}>Módulos disponibles</p>
+                  <div className="space-y-2.5">
+                    {r.modules.map(m => (
+                      <div key={m} className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: r.accent + '20' }}>
+                          <svg className="w-2.5 h-2.5" fill="none" stroke={r.accent} viewBox="0 0 24 24" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                          </svg>
+                        </div>
+                        <span className="text-white/70 text-sm">{m}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </section>
 
-      {/* ── CTA Final ── */}
-      <section className="py-24 px-6 bg-white text-center">
-        <div className="max-w-2xl mx-auto">
-          <CoroNyxLogo size={56} />
-          <h2 className="text-3xl lg:text-4xl font-bold mt-6 mb-4" style={{ fontFamily: 'Outfit, sans-serif', color: '#0B3D3A' }}>
-            ¿Listo para transformar tu clínica?
-          </h2>
-          <p className="text-slate-500 mb-8 text-lg">
-            Ingresa ahora y explora todas las funcionalidades de CORONYX. Gestión inteligente, desde hoy.
+      {/* ── Seguridad y Beneficios ────────────────────────────────────────────── */}
+      <section id="seguridad" className="py-28 max-w-6xl mx-auto px-6">
+        <div className="text-center mb-16">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
+            style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>
+            Seguridad y cumplimiento
           </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <button onClick={onLogin}
-              className="flex items-center gap-2 px-8 py-4 rounded-xl text-base font-semibold text-white transition-all hover:opacity-90 hover:shadow-xl hover:shadow-teal-700/20 hover:-translate-y-0.5"
-              style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}>
-              Ingresar al sistema
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+          <h2 className="text-white font-bold mb-4"
+            style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)' }}>
+            Datos clínicos protegidos<br />al más alto nivel.
+          </h2>
+          <p className="text-white/40 text-sm max-w-md mx-auto leading-relaxed">
+            La información de tus pacientes es confidencial y sensible. Diseñamos cada capa de CORONYX con seguridad de primera clase.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          {SECURITY.map((s, i) => (
+            <div key={i}
+              className="p-6 rounded-2xl border border-white/6 hover:border-white/12 transition-all"
+              style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-4"
+                style={{ background: 'rgba(30,140,130,0.12)' }}>
+                {s.icon}
+              </div>
+              <h3 className="text-white font-semibold text-sm mb-2" style={{ fontFamily: 'Outfit' }}>{s.title}</h3>
+              <p className="text-white/40 text-xs leading-relaxed">{s.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Compliance strip */}
+        <div className="mt-10 flex items-center justify-center gap-8 py-6 border-y border-white/6">
+          {['HIPAA', 'ISO 27001', 'SOC 2 Type II', 'Ley 1581 CO', 'GDPR Ready'].map(c => (
+            <div key={c} className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+              </svg>
+              <span className="text-white/50 text-xs font-medium" style={{ fontFamily: 'Outfit' }}>{c}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Planes y Precios ─────────────────────────────────────────────────── */}
+      <section id="planes" className="py-28" style={{ background: '#0a1715' }}>
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
+              style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>Planes y precios</p>
+            <h2 className="text-white font-bold mb-4"
+              style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)' }}>
+              El plan adecuado<br />para tu consultorio.
+            </h2>
+            <p className="text-white/40 text-sm max-w-md mx-auto leading-relaxed">
+              Sin contratos de permanencia. Cambia o cancela cuando quieras. 14 días gratis en todos los planes.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-6 items-start">
+            {PLANS.map(plan => (
+              <div key={plan.id}
+                className={`relative rounded-3xl p-7 flex flex-col transition-all ${plan.highlight ? 'shadow-2xl ring-2' : 'border border-white/8'}`}
+                style={{
+                  background: plan.highlight
+                    ? `linear-gradient(135deg, ${plan.color}18, ${plan.color}08)`
+                    : 'rgba(255,255,255,0.02)',
+                  ...(plan.highlight ? { ringColor: plan.color } : {}),
+                  ...(plan.highlight ? { border: `2px solid ${plan.color}50` } : {}),
+                }}>
+                {plan.badge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="text-xs font-bold px-3 py-1 rounded-full text-white"
+                      style={{ backgroundColor: plan.color, fontFamily: 'Outfit' }}>
+                      {plan.badge}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mb-5">
+                  <p className="text-white font-bold text-xl mb-0.5" style={{ fontFamily: 'Outfit' }}>{plan.name}</p>
+                  <p className="text-white/40 text-xs">{plan.subtitle}</p>
+                </div>
+
+                <div className="mb-6">
+                  {plan.price > 0 ? (
+                    <>
+                      <span className="text-white font-bold text-3xl" style={{ fontFamily: 'Outfit' }}>
+                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(plan.price)}
+                      </span>
+                      <span className="text-white/40 text-sm">{plan.priceNote}</span>
+                    </>
+                  ) : (
+                    <span className="text-white font-bold text-2xl" style={{ fontFamily: 'Outfit', color: plan.color }}>
+                      {plan.priceNote}
+                    </span>
+                  )}
+                </div>
+
+                <ul className="space-y-2.5 mb-6 flex-1">
+                  {plan.features.map(f => (
+                    <li key={f} className="flex items-start gap-2.5 text-xs">
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                        style={{ backgroundColor: plan.color + '25' }}>
+                        <svg className="w-2.5 h-2.5" fill="none" stroke={plan.color} viewBox="0 0 24 24" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                      </div>
+                      <span className="text-white/70 leading-relaxed">{f}</span>
+                    </li>
+                  ))}
+                  {plan.missing.map(f => (
+                    <li key={f} className="flex items-start gap-2.5 text-xs opacity-30">
+                      <div className="w-4 h-4 flex items-center justify-center shrink-0 mt-0.5">
+                        <svg className="w-3 h-3 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </div>
+                      <span className="text-white/30">{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    fontFamily: 'Outfit',
+                    backgroundColor: plan.highlight ? plan.color : 'transparent',
+                    color: plan.highlight ? '#fff' : plan.color,
+                    border: plan.highlight ? 'none' : `1.5px solid ${plan.color}50`,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}>
+                  {plan.cta} →
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-white/25 text-xs mt-8" style={{ fontFamily: 'Outfit' }}>
+            Todos los precios en COP + IVA. Sin tarjeta de crédito para el período de prueba.
+          </p>
+        </div>
+      </section>
+
+      {/* ── Contacto ──────────────────────────────────────────────────────────── */}
+      <section id="contacto" className="py-28 max-w-6xl mx-auto px-6">
+        <div className="grid grid-cols-2 gap-16 items-start">
+          {/* Left — info */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
+              style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>Contacto</p>
+            <h2 className="text-white font-bold mb-5 leading-tight"
+              style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.4rem)' }}>
+              Hablemos sobre<br />tu clínica.
+            </h2>
+            <p className="text-white/45 text-sm leading-relaxed mb-10">
+              Nuestro equipo de especialistas en tecnología dental está disponible para acompañarte en la implementación, resolver dudas y personalizar el plan adecuado para ti.
+            </p>
+
+            <div className="space-y-5">
+              {[
+                { icon: '📧', label: 'Email institucional', value: 'hola@coronyx.io', sub: 'Respuesta en menos de 24 h' },
+                { icon: '💬', label: 'WhatsApp soporte',    value: '+57 601 456 7890',  sub: 'L-V de 8:00 a 18:00' },
+                { icon: '📍', label: 'Oficina',             value: 'Bogotá, Colombia',  sub: 'Cra. 15 # 93-47 Of. 301' },
+                { icon: '🌐', label: 'Plataforma web',      value: 'app.coronyx.io',    sub: 'Acceso 24/7' },
+              ].map(item => (
+                <div key={item.label} className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
+                    style={{ background: 'rgba(30,140,130,0.12)' }}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <p className="text-white/40 text-xs font-medium mb-0.5">{item.label}</p>
+                    <p className="text-white text-sm font-semibold">{item.value}</p>
+                    <p className="text-white/30 text-xs">{item.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Trust strip */}
+            <div className="mt-10 flex items-center gap-4 pt-8 border-t border-white/6">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <p className="text-white/40 text-xs leading-relaxed">
+                Tus datos están protegidos bajo la <span className="text-white/60">Ley 1581 de Colombia</span> y nuestras políticas de privacidad HIPAA-compliant.
+              </p>
+            </div>
+          </div>
+
+          {/* Right — form */}
+          <ContactForm />
+        </div>
+      </section>
+
+      {/* ── CTA Final ────────────────────────────────────────────────────────── */}
+      <section className="py-28 relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #0B3D3A 0%, #0d2e2b 60%, #051a18 100%)' }}>
+        <div className="absolute inset-0 opacity-[0.06]"
+          style={{ backgroundImage: 'radial-gradient(circle, #5FC9BE 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
+        <div className="relative max-w-2xl mx-auto px-6 text-center">
+          <div className="inline-flex items-center gap-2 border border-white/15 text-xs font-medium px-3 py-1.5 rounded-full mb-8"
+            style={{ backgroundColor: 'rgba(94,201,190,0.08)', color: '#5FC9BE', fontFamily: 'Outfit' }}>
+            Sin tarjeta de crédito · Plan Starter gratis por 14 días
+          </div>
+          <h2 className="text-white font-bold mb-5"
+            style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', lineHeight: 1.1 }}>
+            Moderniza tu clínica<br />con inteligencia artificial.
+          </h2>
+          <p className="text-white/50 text-sm mb-10 leading-relaxed">
+            Más de 6 clínicas en Colombia ya gestionan su agenda, historia clínica y facturación en CORONYX. Únete hoy.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => onNavigate('/login')}
+              className="px-8 py-4 text-white font-semibold text-sm rounded-xl shadow-xl transition-all"
+              style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#15635d')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#1E8C82')}>
+              Ingresar a la plataforma →
             </button>
             <a href="#funcionalidades"
-              className="flex items-center gap-2 px-8 py-4 rounded-xl text-base font-semibold transition-all border hover:bg-slate-50"
-              style={{ borderColor: '#b3e8e5', color: '#1E8C82' }}>
-              Ver funcionalidades
+              className="px-8 py-4 text-sm font-medium rounded-xl border border-white/20 text-white/60 hover:text-white hover:border-white/30 transition-all"
+              style={{ fontFamily: 'Outfit' }}>
+              Ver demo
             </a>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer id="contacto" className="py-12 px-6 border-t border-slate-100" style={{ background: '#FAFAFA' }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-            {/* Brand */}
-            <div className="lg:col-span-2">
-              <div className="flex items-center gap-3 mb-4">
-                <CoroNyxLogo size={36} />
-                <div>
-                  <p className="font-bold text-base" style={{ fontFamily: 'Outfit', color: '#0B3D3A' }}>CORONYX</p>
-                  <p className="text-xs" style={{ color: '#1E8C82' }}>Sistema Dental</p>
-                </div>
+      {/* ── Footer ───────────────────────────────────────────────────────────── */}
+      <footer className="border-t border-white/6" style={{ background: '#040e0d' }}>
+        <div className="max-w-6xl mx-auto px-6 py-14 grid grid-cols-4 gap-10">
+          {/* Brand */}
+          <div>
+            <div className="flex items-center gap-2.5 mb-4">
+              <CxLogo size={28} />
+              <div>
+                <p className="text-white font-bold text-sm tracking-wide" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
+                <p className="text-[10px]" style={{ color: '#5FC9BE' }}>Sistema Dental</p>
               </div>
-              <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
-                Plataforma SaaS de gestión odontológica con inteligencia artificial, teleodontología y odontograma digital.
-              </p>
             </div>
-
-            {/* Links */}
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-3" style={{ fontFamily: 'Outfit' }}>Plataforma</h4>
-              <ul className="space-y-2">
-                {['Funcionalidades', 'Para tu clínica', 'Precios', 'Integraciones'].map(l => (
-                  <li key={l}><a href="#" className="text-sm text-slate-400 hover:text-teal-600 transition-colors">{l}</a></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-700 mb-3" style={{ fontFamily: 'Outfit' }}>Contacto</h4>
-              <ul className="space-y-2 text-sm text-slate-400">
-                <li>📧 soporte@coronyx.co</li>
-                <li>📞 +57 310 000 0000</li>
-                <li>🕐 Lunes a viernes 8am – 6pm</li>
-              </ul>
-            </div>
+            <p className="text-white/30 text-xs leading-relaxed">
+              Plataforma SaaS de gestión odontológica con inteligencia artificial para clínicas modernas.
+            </p>
           </div>
 
-          <div className="border-t border-slate-100 pt-6 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-slate-400 text-xs">© 2026 CORONYX — Sistema Dental. Todos los derechos reservados.</p>
-            <div className="flex gap-4">
-              {['Privacidad', 'Términos', 'HABEAS DATA'].map(l => (
-                <a key={l} href="#" className="text-slate-400 text-xs hover:text-teal-600 transition-colors">{l}</a>
-              ))}
-            </div>
+          {/* Plataforma */}
+          <div>
+            <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-4" style={{ fontFamily: 'Outfit' }}>Plataforma</p>
+            {['Funcionalidades', 'Precios', 'Seguridad', 'Integraciones', 'API'].map(l => (
+              <p key={l} className="text-white/30 text-xs mb-2 hover:text-white/60 transition-colors cursor-pointer">{l}</p>
+            ))}
+          </div>
+
+          {/* Soluciones */}
+          <div>
+            <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-4" style={{ fontFamily: 'Outfit' }}>Soluciones</p>
+            {['Para odontólogos', 'Para clínicas', 'Multi-sede', 'Pacientes', 'Telemedicina'].map(l => (
+              <p key={l} className="text-white/30 text-xs mb-2 hover:text-white/60 transition-colors cursor-pointer">{l}</p>
+            ))}
+          </div>
+
+          {/* Soporte */}
+          <div>
+            <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-4" style={{ fontFamily: 'Outfit' }}>Soporte</p>
+            {['Documentación', 'Estado del sistema', 'Contacto', 'Política de privacidad', 'Términos'].map(l => (
+              <p key={l} className="text-white/30 text-xs mb-2 hover:text-white/60 transition-colors cursor-pointer">{l}</p>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-white/5 py-5">
+          <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
+            <p className="text-white/20 text-xs">© 2026 CORONYX · Todos los derechos reservados</p>
+            <p className="text-white/15 text-xs">Colombia · Bogotá · v2.0 Enterprise</p>
           </div>
         </div>
       </footer>

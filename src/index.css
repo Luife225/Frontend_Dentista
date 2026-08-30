@@ -134,3 +134,46 @@ body {
   50% { opacity: 0; }
 }
 .cursor-blink { animation: cursor-blink 0.9s step-end infinite; }
+
+/* Step complete checkmark pop */
+@keyframes step-complete {
+  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+  50% { transform: scale(1.2) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.step-complete { animation: step-complete 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+/* Question enter transition */
+@keyframes question-enter {
+  0% { transform: translateX(20px); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+.question-enter { animation: question-enter 0.3s ease-out forwards; }
+
+/* Question exit transition */
+@keyframes question-exit {
+  0% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(-20px); opacity: 0; }
+}
+.question-exit { animation: question-exit 0.2s ease-in forwards; }
+
+/* Progress bar fill */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+.progress-fill { animation: progress-fill 0.5s ease-out forwards; }
+
+/* Gentle pulse for active step */
+@keyframes step-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(95, 201, 190, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(95, 201, 190, 0); }
+}
+.step-pulse { animation: step-pulse 2s ease-in-out infinite; }
+
+/* Field highlight glow */
+@keyframes field-glow {
+  0%, 100% { border-color: rgba(95, 201, 190, 0.3); }
+  50% { border-color: rgba(95, 201, 190, 0.6); }
+}
+.field-glow { animation: field-glow 2s ease-in-out infinite; }

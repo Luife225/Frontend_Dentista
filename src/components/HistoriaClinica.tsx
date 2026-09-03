@@ -192,16 +192,14 @@ function ModalImprimir({ consulta, patient, onClose }: { consulta: Consulta; pat
 
 export default function HistoriaClinica({ initialPatientId }: { initialPatientId?: number }) {
   const [patients, setPatients] = useState(MOCK_HC)
-  const [selId, setSelId] = useState(initialPatientId ?? MOCK_HC[0].id)
-  const [search, setSearch] = useState('')
+  const selId = initialPatientId ?? MOCK_HC[0].id
   const [selConsultaId, setSelConsultaId] = useState<number|null>(null)
   const [modal, setModal] = useState<'new'|'edit'|'print'|null>(null)
   const [editTarget, setEditTarget] = useState<Consulta|undefined>()
   const [printTarget, setPrintTarget] = useState<Consulta|null>(null)
 
   const patient = patients.find(p=>p.id===selId)!
-  const filtered = patients.filter(p=>p.name.toLowerCase().includes(search.toLowerCase()))
-  const activeC = selConsultaId ? patient.consultas.find(c=>c.id===selConsultaId) ?? patient.consultas[0] : patient.consultas[0]
+  const activeC = selConsultaId ? patient?.consultas.find(c=>c.id===selConsultaId) ?? patient?.consultas[0] : patient?.consultas[0]
 
   function save(data: Omit<Consulta,'id'>) {
     setPatients(ps=>ps.map(p=>{
@@ -212,49 +210,49 @@ export default function HistoriaClinica({ initialPatientId }: { initialPatientId
     setModal(null); setEditTarget(undefined)
   }
 
+  if (!patient) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-slate-400 h-full">
+        <div className="text-center">
+          <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-10 h-10 mx-auto mb-3 opacity-30"/>
+          <p className="text-sm">Paciente no encontrado</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full">
       {(modal==='new'||modal==='edit')&&<ModalConsulta consulta={editTarget} patientName={patient.name} onSave={save} onClose={()=>{setModal(null);setEditTarget(undefined)}}/>}
       {modal==='print'&&printTarget&&<ModalImprimir consulta={printTarget} patient={patient} onClose={()=>{setModal(null);setPrintTarget(null)}}/>}
 
-      {/* Patient list */}
-      <aside className="w-52 shrink-0 flex flex-col border-r border-slate-200 bg-white">
-        <div className="p-2.5 border-b border-slate-100">
-          <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar..." className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {filtered.map(p=>(
-            <button key={p.id} onClick={()=>{setSelId(p.id);setSelConsultaId(null)}}
-              className={`w-full text-left px-3 py-2.5 border-b border-slate-50 transition-all flex items-center gap-2 ${selId===p.id?'bg-cyan-50 border-l-2 border-l-cyan-500':'hover:bg-slate-50'}`}>
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                {p.name.split(' ').map(n=>n[0]).join('').slice(0,2)}
-              </div>
-              <div className="min-w-0">
-                <p className={`text-xs font-semibold truncate ${selId===p.id?'text-cyan-700':'text-slate-700'}`}>{p.name}</p>
-                <p className="text-[10px] text-slate-400">{p.consultas.length} consulta{p.consultas.length!==1?'s':''}</p>
-              </div>
+      {/* Consulta list — only consultations for the current patient */}
+      <div className="w-56 shrink-0 flex flex-col border-r border-slate-200 bg-white">
+        <div className="px-4 py-3 border-b border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-slate-800 uppercase tracking-widest" style={{fontFamily:'Outfit'}}>Consultas</p>
+            <button onClick={()=>setModal('new')} className="w-7 h-7 bg-cyan-600 text-white rounded-lg flex items-center justify-center hover:bg-cyan-500 transition-colors" title="Nueva consulta">
+              <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5"/>
             </button>
-          ))}
-        </div>
-      </aside>
-
-      {/* Consulta list */}
-      <div className="w-52 shrink-0 flex flex-col border-r border-slate-200 bg-white">
-        <div className="px-3 py-2.5 border-b border-slate-100 flex items-center justify-between">
-          <p className="text-xs font-semibold text-slate-700">Consultas</p>
-          <button onClick={()=>setModal('new')} className="w-6 h-6 bg-cyan-600 text-white rounded-lg flex items-center justify-center hover:bg-cyan-500 transition-colors">
-            <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5"/>
-          </button>
+          </div>
+          <p className="text-[10px] text-slate-400">{patient.consultas.length} registro{patient.consultas.length!==1?'s':''} encontrado{patient.consultas.length!==1?'s':''}</p>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {patient.consultas.map(c=>(
+          {patient.consultas.length === 0 ? (
+            <div className="px-4 py-8 text-center">
+              <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-8 h-8 mx-auto mb-2 text-slate-300"/>
+              <p className="text-xs text-slate-400 mb-2">Sin consultas</p>
+              <button onClick={()=>setModal('new')} className="text-xs text-cyan-600 hover:text-cyan-700 font-semibold">+ Primera consulta</button>
+            </div>
+          ) : patient.consultas.map(c=>(
             <button key={c.id} onClick={()=>setSelConsultaId(c.id)}
-              className={`w-full text-left px-3 py-2.5 border-b border-slate-50 transition-all ${activeC?.id===c.id?'bg-cyan-50 border-l-2 border-l-cyan-500':'hover:bg-slate-50'}`}>
-              <p className={`text-xs font-semibold ${activeC?.id===c.id?'text-cyan-700':'text-slate-700'}`}>{fmtDate(c.date)}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{c.motivo}</p>
+              className={`w-full text-left px-4 py-3 border-b border-slate-50 transition-all ${activeC?.id===c.id?'bg-cyan-50 border-l-2 border-l-cyan-500':'hover:bg-slate-50'}`}>
+              <div className="flex items-center gap-2 mb-0.5">
+                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeC?.id===c.id?'bg-cyan-500':'bg-slate-300'}`}/>
+                <p className={`text-xs font-semibold ${activeC?.id===c.id?'text-cyan-700':'text-slate-700'}`}>{fmtDate(c.date)}</p>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2 pl-3.5">{c.motivo}</p>
+              <p className="text-[10px] text-slate-300 mt-0.5 pl-3.5">{c.doctor}</p>
             </button>
           ))}
         </div>

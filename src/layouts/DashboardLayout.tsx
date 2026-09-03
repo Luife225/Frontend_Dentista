@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, type Role } from '../contexts/AuthContext'
 import AIAssistant from '../components/features/AIAssistant'
+import coronixLogo from '../imports/coronixlogo.png'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -124,13 +125,17 @@ export default function DashboardLayout() {
         style={{backgroundColor:'#0B3D3A'}}>
 
         {/* Logo + role badge */}
-        <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/8 ${collapsed?'justify-center':''}`}>
-          <CoroNyxIsotope size={28} />
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-bold leading-tight tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
-              <p className={`text-xs font-medium ${accentText}`}>{ROLE_LABELS[role]}</p>
-            </div>
+        <div className={`flex items-center gap-3 px-4 py-4 border-b border-white/8 ${collapsed?'justify-center':''}`}>
+          {collapsed ? (
+            <img src={coronixLogo} alt="CORONYX" className="w-9 h-9 object-contain shrink-0"/>
+          ) : (
+            <>
+              <img src={coronixLogo} alt="CORONYX" className="w-10 h-10 object-contain shrink-0"/>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-bold leading-tight tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
+                <p className={`text-xs font-medium ${accentText}`}>{ROLE_LABELS[role]}</p>
+              </div>
+            </>
           )}
         </div>
 

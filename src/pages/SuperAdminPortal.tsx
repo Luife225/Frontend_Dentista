@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import coronixLogo from '../imports/coronixlogo.png'
 
 
 type Section = 'overview' | 'clinicas' | 'solicitudes' | 'ingresos' | 'logs'
@@ -872,7 +873,7 @@ export default function SuperAdminPortal() {
         {/* Brand */}
         <div className="px-4 py-5 border-b border-white/8">
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold" style={{fontFamily:'Outfit'}}>S</div>
+            <img src={coronixLogo} alt="CORONYX" className="w-9 h-9 object-contain shrink-0"/>
             <div>
               <p className="text-white text-xs font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
               <p className="text-amber-400/80 text-[10px] font-semibold">SUPER ADMIN</p>

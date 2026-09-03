@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import coronixLogo from '../imports/coronixlogo.png'
 
 type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
 
@@ -85,9 +86,9 @@ export default function Login() {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="w-full max-w-sm fade-in">
           <div className="flex items-center gap-3 mb-8">
-            <CoroNyxIsotope size={36} />
+            <img src={coronixLogo} alt="CORONYX" className="w-12 h-12 object-contain shrink-0"/>
             <div>
-              <span className="text-white text-xl font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</span>
+              <p className="text-white text-xl font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
               <p className="text-xs" style={{color:'#5FC9BE'}}>Sistema Dental</p>
             </div>
           </div>
@@ -144,7 +145,7 @@ export default function Login() {
         style={{background:'linear-gradient(to bottom, #0B3D3A, #062422)'}}>
         <div>
           <div className="flex items-center gap-3 mb-12">
-            <CoroNyxIsotope size={40} />
+            <img src={coronixLogo} alt="CORONYX" className="w-14 h-14 object-contain shrink-0"/>
             <div>
               <p className="text-white text-xl font-bold tracking-wide leading-tight" style={{fontFamily:'Outfit'}}>CORONYX</p>
               <p className="text-xs" style={{color:'#5FC9BE'}}>Sistema Dental</p>
@@ -179,9 +180,9 @@ export default function Login() {
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <CoroNyxIsotope size={32} />
+            <img src={coronixLogo} alt="CORONYX" className="w-10 h-10 object-contain shrink-0"/>
             <div>
-              <span className="text-white text-lg font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</span>
+              <p className="text-white text-lg font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
               <p className="text-xs" style={{color:'#5FC9BE'}}>Sistema Dental</p>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import coronixLogo from '../imports/coronixlogo.png'
 
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
@@ -52,7 +53,7 @@ function DashboardMockup() {
           {/* Sidebar */}
           <div className="w-12 shrink-0 flex flex-col items-center py-3 gap-3 border-r border-white/5"
             style={{ background: '#0B3D3A' }}>
-            <CxLogo size={22} />
+            <img src={coronixLogo} alt="CORONYX" className="w-7 h-7 object-contain" />
             {[
               'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
               'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
@@ -412,7 +413,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center gap-8">
           {/* Logo */}
           <button onClick={() => onNavigate('/')} className="flex items-center gap-2.5 shrink-0">
-            <CxLogo size={32} />
+            <img src={coronixLogo} alt="CORONYX" className="w-10 h-10 object-contain shrink-0"/>
             <div>
               <p className="text-white font-bold text-sm leading-tight tracking-widest" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
               <p className="text-[10px] leading-none" style={{ color: '#5FC9BE' }}>Sistema Dental</p>
@@ -918,7 +919,7 @@ export default function LandingPage() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2.5 mb-4">
-              <CxLogo size={28} />
+              <img src={coronixLogo} alt="CORONYX" className="w-10 h-10 object-contain shrink-0"/>
               <div>
                 <p className="text-white font-bold text-sm tracking-wide" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
                 <p className="text-[10px]" style={{ color: '#5FC9BE' }}>Sistema Dental</p>

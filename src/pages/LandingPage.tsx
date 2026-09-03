@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-interface Props { onNavigate: (path: string) => void }
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 function CxLogo({ size = 36 }: { size?: number }) {
@@ -388,7 +388,9 @@ function ContactForm() {
   )
 }
 
-export default function LandingPage({ onNavigate }: Props) {
+export default function LandingPage() {
+  const navigate = useNavigate()
+  const onNavigate = (path: string) => navigate(path)
   const [scrolled, setScrolled] = useState(false)
   const [activeRole, setActiveRole] = useState(0)
 

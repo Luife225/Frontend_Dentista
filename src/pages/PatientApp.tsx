@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 
 type Tab = 'inicio' | 'agenda' | 'pagos' | 'tratamientos' | 'tele' | 'documentos' | 'perfil'
 
@@ -785,7 +786,8 @@ function TabPerfil() {
 }
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
-export default function PatientApp({ onLogout }: { onLogout?: () => void }) {
+export default function PatientApp() {
+  const { logout: onLogout } = useAuth()
   const [tab, setTab] = useState<Tab>('inicio')
   const [collapsed, setCollapsed] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -838,9 +840,7 @@ export default function PatientApp({ onLogout }: { onLogout?: () => void }) {
                 <p className="text-xs font-semibold text-slate-700 truncate">Carlos Rivas</p>
                 <p className="text-[10px] text-slate-400 truncate">Paciente</p>
               </div>
-              {onLogout && (
-                <button onClick={onLogout} className="text-slate-300 hover:text-slate-500 transition-colors text-xs" title="Cerrar sesión">⏏</button>
-              )}
+              <button onClick={onLogout} className="text-slate-300 hover:text-slate-500 transition-colors text-xs" title="Cerrar sesión">⏏</button>
             </>
           )}
           <button onClick={() => setCollapsed(!collapsed)}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 
 type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
 
@@ -20,9 +21,7 @@ function CoroNyxIsotope({ size = 36 }: { size?: number }) {
   )
 }
 
-interface Props {
-  onLogin: (role: Role) => void
-}
+// Login uses useAuth() context for authentication
 
 const ROLE_META: Record<Role, { label: string; desc: string; icon: string; color: string; badge?: string }> = {
   SUPER_ADMIN:   { label: 'Super Admin',   desc: 'Gestión global SaaS, clínicas y planes',    icon: '🌐', color: 'from-amber-500 to-orange-600',  badge: 'SaaS' },
@@ -50,7 +49,8 @@ const EMAIL_HINTS: Array<{ pattern: string; role: Role }> = [
 // Public-facing roles only — SUPER_ADMIN is internal CORONYX access
 const PUBLIC_ROLES: Role[] = ['ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA', 'PACIENTE']
 
-export default function Login({ onLogin }: Props) {
+export default function Login() {
+  const { login: onLogin } = useAuth()
   const [email, setEmail] = useState('dr.herrera@clinica.co')
   const [password, setPassword] = useState('••••••••')
   const [loading, setLoading] = useState(false)

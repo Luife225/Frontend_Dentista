@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 
-interface Props { onLogout: () => void }
 
 type Section = 'overview' | 'clinicas' | 'solicitudes' | 'ingresos' | 'logs'
 
@@ -850,7 +850,8 @@ function SectionLogs() {
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 
-export default function SuperAdminPortal({ onLogout }: Props) {
+export default function SuperAdminPortal() {
+  const { logout: onLogout } = useAuth()
   const [active, setActive] = useState<Section>('overview')
 
   const pendingCount = SOLICITUDES_INIT.filter(s => s.status === 'pending').length

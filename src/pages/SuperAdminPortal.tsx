@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react'
-
-interface Props { onLogout: () => void }
-
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 type Section = 'overview' | 'clinicas' | 'solicitudes' | 'ingresos' | 'logs'
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
@@ -22,7 +21,7 @@ const CLINICAS_INIT: Clinica[] = [
     adminName: 'Dr. Jorge Herrera', adminEmail: 'jorge.herrera@clinica.co', adminPhone: '+57 310 555 0101',
     admins: [
       { name: 'Dr. Jorge Herrera', email: 'jorge.herrera@clinica.co', since: '2024-03' },
-      { name: 'Valentina Mora',    email: 'vmora@clinica.co',          since: '2024-05' },
+      { name: 'Valentina Mora', email: 'vmora@clinica.co', since: '2024-05' },
     ],
   },
   {
@@ -38,8 +37,8 @@ const CLINICAS_INIT: Clinica[] = [
     status: 'active', mrr: 320_000, joined: '2024-07', logo: '🏥',
     adminName: 'Dr. Hernán Castro', adminEmail: 'hcastro@odontoplaza.co', adminPhone: '+57 315 555 0303',
     admins: [
-      { name: 'Dr. Hernán Castro', email: 'hcastro@odontoplaza.co',  since: '2024-07' },
-      { name: 'Sandra Jiménez',    email: 'sjimenez@odontoplaza.co', since: '2024-09' },
+      { name: 'Dr. Hernán Castro', email: 'hcastro@odontoplaza.co', since: '2024-07' },
+      { name: 'Sandra Jiménez', email: 'sjimenez@odontoplaza.co', since: '2024-09' },
     ],
   },
   {
@@ -79,9 +78,9 @@ const SOLICITUDES_INIT: Solicitud[] = [
 ]
 
 const PLANS = [
-  { name: 'Starter',    price: 149_000, seats: '1–3',  features: ['Agenda', 'Pacientes', 'Caja básica'],                         clinics: 2,  color: '#64748B' },
-  { name: 'Pro',        price: 320_000, seats: '1–10', features: ['Todo Starter', 'Odontograma', 'Radiografías', 'Inventario'],   clinics: 3,  color: '#1E8C82' },
-  { name: 'Enterprise', price: 890_000, seats: 'Ilim.', features: ['Todo Pro', 'IA por voz', 'Teleodontología', 'Multi-sede', 'API'],clinics: 1, color: '#D97706' },
+  { name: 'Starter', price: 149_000, seats: '1–3', features: ['Agenda', 'Pacientes', 'Caja básica'], clinics: 2, color: '#64748B' },
+  { name: 'Pro', price: 320_000, seats: '1–10', features: ['Todo Starter', 'Odontograma', 'Radiografías', 'Inventario'], clinics: 3, color: '#1E8C82' },
+  { name: 'Enterprise', price: 890_000, seats: 'Ilim.', features: ['Todo Pro', 'IA por voz', 'Teleodontología', 'Multi-sede', 'API'], clinics: 1, color: '#D97706' },
 ]
 
 const MONTHLY_MRR = [
@@ -96,14 +95,14 @@ const MONTHLY_MRR = [
 ]
 
 const LOGS = [
-  { ts: '2025-03-23 14:32', level: 'info',  clinic: 'Herrera & Asoc.',   event: 'Login exitoso',            user: 'dr.herrera@clinica.co' },
-  { ts: '2025-03-23 14:28', level: 'warn',  clinic: 'DentalTech Bquilla', event: 'Intento de login fallido', user: 'demo@dentaltech.co' },
-  { ts: '2025-03-23 13:55', level: 'info',  clinic: 'Sonrisas del Norte', event: 'Nuevo paciente registrado', user: 'recepc@sonrisas.co' },
-  { ts: '2025-03-23 13:40', level: 'info',  clinic: 'OdontoPlaza Cali',  event: 'Factura generada $320.000', user: 'caja@odontoplaza.co' },
-  { ts: '2025-03-23 13:12', level: 'error', clinic: 'OralCare Express',   event: 'Pago rechazado — plan pausado', user: 'admin@oralcare.co' },
-  { ts: '2025-03-23 12:50', level: 'info',  clinic: 'Clínica Peñaloza',  event: 'Teleconsulta iniciada',    user: 'dr.penaloza@clinica.co' },
-  { ts: '2025-03-23 12:30', level: 'info',  clinic: 'Herrera & Asoc.',   event: 'Radiografía subida y analizada', user: 'dr.herrera@clinica.co' },
-  { ts: '2025-03-23 11:58', level: 'warn',  clinic: 'Sonrisas del Norte', event: 'Stock de material bajo (< mínimo)', user: 'sistema' },
+  { ts: '2025-03-23 14:32', level: 'info', clinic: 'Herrera & Asoc.', event: 'Login exitoso', user: 'dr.herrera@clinica.co' },
+  { ts: '2025-03-23 14:28', level: 'warn', clinic: 'DentalTech Bquilla', event: 'Intento de login fallido', user: 'demo@dentaltech.co' },
+  { ts: '2025-03-23 13:55', level: 'info', clinic: 'Sonrisas del Norte', event: 'Nuevo paciente registrado', user: 'recepc@sonrisas.co' },
+  { ts: '2025-03-23 13:40', level: 'info', clinic: 'OdontoPlaza Cali', event: 'Factura generada $320.000', user: 'caja@odontoplaza.co' },
+  { ts: '2025-03-23 13:12', level: 'error', clinic: 'OralCare Express', event: 'Pago rechazado — plan pausado', user: 'admin@oralcare.co' },
+  { ts: '2025-03-23 12:50', level: 'info', clinic: 'Clínica Peñaloza', event: 'Teleconsulta iniciada', user: 'dr.penaloza@clinica.co' },
+  { ts: '2025-03-23 12:30', level: 'info', clinic: 'Herrera & Asoc.', event: 'Radiografía subida y analizada', user: 'dr.herrera@clinica.co' },
+  { ts: '2025-03-23 11:58', level: 'warn', clinic: 'Sonrisas del Norte', event: 'Stock de material bajo (< mínimo)', user: 'sistema' },
 ]
 
 function fmt(n: number) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n) }
@@ -268,8 +267,8 @@ function ModalDetalleClinica({ clinica, onClose, onSave }: { clinica: Clinica; o
   const storagePercent = Math.round((clinica.usedStorage / clinica.maxStorage) * 100)
 
   const statusLabel: Record<string, { text: string; cls: string }> = {
-    active: { text: 'Activa',  cls: 'bg-emerald-500/15 text-emerald-400' },
-    trial:  { text: 'Trial',   cls: 'bg-amber-500/15 text-amber-400' },
+    active: { text: 'Activa', cls: 'bg-emerald-500/15 text-emerald-400' },
+    trial: { text: 'Trial', cls: 'bg-amber-500/15 text-amber-400' },
     paused: { text: 'Pausada', cls: 'bg-rose-500/15 text-rose-400' },
   }
 
@@ -449,26 +448,26 @@ function MiniBarChart({ data }: { data: typeof MONTHLY_MRR }) {
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 const NAV: Array<{ id: Section; label: string; icon: string }> = [
-  { id: 'overview',    label: 'Resumen',      icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-  { id: 'clinicas',    label: 'Clínicas',     icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-  { id: 'solicitudes', label: 'Solicitudes',  icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-  { id: 'ingresos',    label: 'Ingresos',     icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { id: 'logs',        label: 'Actividad',    icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
+  { id: 'overview', label: 'Resumen', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+  { id: 'clinicas', label: 'Clínicas', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+  { id: 'solicitudes', label: 'Solicitudes', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+  { id: 'ingresos', label: 'Ingresos', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { id: 'logs', label: 'Actividad', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
 ]
 
 // ── SECTIONS ──────────────────────────────────────────────────────────────────
 
 function SectionOverview() {
-  const activeCount  = CLINICAS_INIT.filter(c => c.status === 'active').length
-  const totalMRR     = CLINICAS_INIT.filter(c => c.status === 'active').reduce((s, c) => s + c.mrr, 0)
-  const trialCount   = CLINICAS_INIT.filter(c => c.status === 'trial').length
-  const totalSeats   = CLINICAS_INIT.reduce((s, c) => s + c.seats, 0)
+  const activeCount = CLINICAS_INIT.filter(c => c.status === 'active').length
+  const totalMRR = CLINICAS_INIT.filter(c => c.status === 'active').reduce((s, c) => s + c.mrr, 0)
+  const trialCount = CLINICAS_INIT.filter(c => c.status === 'trial').length
+  const totalSeats = CLINICAS_INIT.reduce((s, c) => s + c.seats, 0)
 
   const kpis = [
-    { label: 'MRR Total',          value: fmt(totalMRR),      sub: '+8.4% vs. mes anterior', accent: '#D97706' },
-    { label: 'Clínicas activas',   value: String(activeCount), sub: `${trialCount} en período trial`, accent: '#1E8C82' },
-    { label: 'Sillas / usuarios',  value: String(totalSeats),  sub: 'Usuarios con acceso activo',  accent: '#7C3AED' },
-    { label: 'ARR estimado',       value: fmt(totalMRR * 12),  sub: 'Proyección anual',            accent: '#059669' },
+    { label: 'MRR Total', value: fmt(totalMRR), sub: '+8.4% vs. mes anterior', accent: '#D97706' },
+    { label: 'Clínicas activas', value: String(activeCount), sub: `${trialCount} en período trial`, accent: '#1E8C82' },
+    { label: 'Sillas / usuarios', value: String(totalSeats), sub: 'Usuarios con acceso activo', accent: '#7C3AED' },
+    { label: 'ARR estimado', value: fmt(totalMRR * 12), sub: 'Proyección anual', accent: '#059669' },
   ]
 
   return (
@@ -478,8 +477,8 @@ function SectionOverview() {
         {kpis.map((k, i) => (
           <div key={i} className="bg-slate-800/60 border border-white/8 rounded-2xl p-5">
             <p className="text-white/40 text-xs mb-1">{k.label}</p>
-            <p className="text-white text-2xl font-bold" style={{fontFamily:'Outfit'}}>{k.value}</p>
-            <p className="text-xs mt-1" style={{color: k.accent}}>{k.sub}</p>
+            <p className="text-white text-2xl font-bold" style={{ fontFamily: 'Outfit' }}>{k.value}</p>
+            <p className="text-xs mt-1" style={{ color: k.accent }}>{k.sub}</p>
           </div>
         ))}
       </div>
@@ -487,12 +486,12 @@ function SectionOverview() {
       {/* MRR chart + recent activity */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-slate-800/60 border border-white/8 rounded-2xl p-5">
-          <p className="text-white/70 text-sm font-semibold mb-4" style={{fontFamily:'Outfit'}}>MRR mensual</p>
+          <p className="text-white/70 text-sm font-semibold mb-4" style={{ fontFamily: 'Outfit' }}>MRR mensual</p>
           <MiniBarChart data={MONTHLY_MRR} />
         </div>
 
         <div className="bg-slate-800/60 border border-white/8 rounded-2xl p-5">
-          <p className="text-white/70 text-sm font-semibold mb-4" style={{fontFamily:'Outfit'}}>Distribución de planes</p>
+          <p className="text-white/70 text-sm font-semibold mb-4" style={{ fontFamily: 'Outfit' }}>Distribución de planes</p>
           <div className="space-y-3">
             {PLANS.map(p => {
               const share = Math.round((p.clinics / CLINICAS_INIT.length) * 100)
@@ -503,7 +502,7 @@ function SectionOverview() {
                     <span className="text-white/40">{p.clinics} clínica{p.clinics !== 1 ? 's' : ''} · {share}%</span>
                   </div>
                   <div className="h-1.5 bg-white/8 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{width:`${share}%`, backgroundColor: p.color}} />
+                    <div className="h-full rounded-full" style={{ width: `${share}%`, backgroundColor: p.color }} />
                   </div>
                 </div>
               )
@@ -514,9 +513,9 @@ function SectionOverview() {
 
       {/* Recent log preview */}
       <div className="bg-slate-800/60 border border-white/8 rounded-2xl p-5">
-        <p className="text-white/70 text-sm font-semibold mb-4" style={{fontFamily:'Outfit'}}>Actividad reciente</p>
+        <p className="text-white/70 text-sm font-semibold mb-4" style={{ fontFamily: 'Outfit' }}>Actividad reciente</p>
         <div className="space-y-2">
-          {LOGS.slice(0,4).map((l, i) => (
+          {LOGS.slice(0, 4).map((l, i) => (
             <div key={i} className="flex items-center gap-3 text-xs">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.level === 'error' ? 'bg-rose-500' : l.level === 'warn' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
               <span className="text-white/25 shrink-0 font-mono">{l.ts.split(' ')[1]}</span>
@@ -539,8 +538,8 @@ function SectionClinicas() {
   const visible = filter === 'all' ? clinicas : clinicas.filter(c => c.status === filter)
 
   const statusLabel: Record<string, { text: string; cls: string }> = {
-    active: { text: 'Activa',  cls: 'bg-emerald-500/15 text-emerald-400' },
-    trial:  { text: 'Trial',   cls: 'bg-amber-500/15 text-amber-400' },
+    active: { text: 'Activa', cls: 'bg-emerald-500/15 text-emerald-400' },
+    trial: { text: 'Trial', cls: 'bg-amber-500/15 text-amber-400' },
     paused: { text: 'Pausada', cls: 'bg-rose-500/15 text-rose-400' },
   }
 
@@ -635,8 +634,8 @@ function SectionSolicitudes() {
   }
 
   const statusMeta: Record<SolicitudStatus, { text: string; cls: string }> = {
-    pending:  { text: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400' },
-    approved: { text: 'Aprobada',  cls: 'bg-emerald-500/15 text-emerald-400' },
+    pending: { text: 'Pendiente', cls: 'bg-amber-500/15 text-amber-400' },
+    approved: { text: 'Aprobada', cls: 'bg-emerald-500/15 text-emerald-400' },
     rejected: { text: 'Rechazada', cls: 'bg-rose-500/15 text-rose-400' },
   }
 
@@ -728,44 +727,44 @@ function SectionSolicitudes() {
 }
 
 function SectionIngresos() {
-  const totalMRR   = CLINICAS_INIT.filter(c => c.status === 'active').reduce((s, c) => s + c.mrr, 0)
-  const lastMonth  = MONTHLY_MRR[MONTHLY_MRR.length - 2].mrr
-  const thisMrr    = MONTHLY_MRR[MONTHLY_MRR.length - 1].mrr
-  const growth     = (((thisMrr - lastMonth) / lastMonth) * 100).toFixed(1)
+  const totalMRR = CLINICAS_INIT.filter(c => c.status === 'active').reduce((s, c) => s + c.mrr, 0)
+  const lastMonth = MONTHLY_MRR[MONTHLY_MRR.length - 2].mrr
+  const thisMrr = MONTHLY_MRR[MONTHLY_MRR.length - 1].mrr
+  const growth = (((thisMrr - lastMonth) / lastMonth) * 100).toFixed(1)
 
   return (
     <div className="space-y-5">
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'MRR actual',     value: fmt(totalMRR),       sub: `+${growth}% vs. mes anterior`, accent: '#D97706' },
-          { label: 'ARR proyectado', value: fmt(totalMRR * 12),  sub: 'Sin churns',                   accent: '#1E8C82' },
-          { label: 'Ingreso acum.',  value: fmt(MONTHLY_MRR.reduce((s,m)=>s+m.mrr,0)), sub: 'Desde Ago 2024', accent: '#7C3AED' },
+          { label: 'MRR actual', value: fmt(totalMRR), sub: `+${growth}% vs. mes anterior`, accent: '#D97706' },
+          { label: 'ARR proyectado', value: fmt(totalMRR * 12), sub: 'Sin churns', accent: '#1E8C82' },
+          { label: 'Ingreso acum.', value: fmt(MONTHLY_MRR.reduce((s, m) => s + m.mrr, 0)), sub: 'Desde Ago 2024', accent: '#7C3AED' },
         ].map((k, i) => (
           <div key={i} className="bg-slate-800/60 border border-white/8 rounded-2xl p-5">
             <p className="text-white/40 text-xs mb-1">{k.label}</p>
-            <p className="text-white text-2xl font-bold" style={{fontFamily:'Outfit'}}>{k.value}</p>
-            <p className="text-xs mt-1" style={{color: k.accent}}>{k.sub}</p>
+            <p className="text-white text-2xl font-bold" style={{ fontFamily: 'Outfit' }}>{k.value}</p>
+            <p className="text-xs mt-1" style={{ color: k.accent }}>{k.sub}</p>
           </div>
         ))}
       </div>
 
       {/* Monthly breakdown */}
       <div className="bg-slate-800/60 border border-white/8 rounded-2xl p-6">
-        <p className="text-white/70 text-sm font-semibold mb-5" style={{fontFamily:'Outfit'}}>Historial mensual</p>
+        <p className="text-white/70 text-sm font-semibold mb-5" style={{ fontFamily: 'Outfit' }}>Historial mensual</p>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/8">
-              {['Período','MRR','Variación','Acumulado'].map(h=>(
+              {['Período', 'MRR', 'Variación', 'Acumulado'].map(h => (
                 <th key={h} className="text-left text-xs text-white/30 font-medium pb-3">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {MONTHLY_MRR.map((m, i) => {
-              const prev = i > 0 ? MONTHLY_MRR[i-1].mrr : m.mrr
+              const prev = i > 0 ? MONTHLY_MRR[i - 1].mrr : m.mrr
               const delta = ((m.mrr - prev) / prev * 100).toFixed(1)
-              const acum = MONTHLY_MRR.slice(0, i+1).reduce((s,x)=>s+x.mrr,0)
+              const acum = MONTHLY_MRR.slice(0, i + 1).reduce((s, x) => s + x.mrr, 0)
               return (
                 <tr key={i} className="border-b border-white/5">
                   <td className="py-3 text-white/70 text-xs">{m.month}</td>
@@ -787,16 +786,16 @@ function SectionIngresos() {
 
       {/* Breakdown by plan */}
       <div className="bg-slate-800/60 border border-white/8 rounded-2xl p-6">
-        <p className="text-white/70 text-sm font-semibold mb-4" style={{fontFamily:'Outfit'}}>Ingresos por plan</p>
+        <p className="text-white/70 text-sm font-semibold mb-4" style={{ fontFamily: 'Outfit' }}>Ingresos por plan</p>
         <div className="space-y-4">
           {PLANS.map(p => {
             const planMRR = p.price * p.clinics
-            const share   = Math.round((planMRR / totalMRR) * 100)
+            const share = Math.round((planMRR / totalMRR) * 100)
             return (
               <div key={p.name} className="flex items-center gap-4">
                 <span className="w-20 text-xs text-white/60 shrink-0">{p.name}</span>
                 <div className="flex-1 h-2 bg-white/8 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{width:`${share}%`, backgroundColor: p.color}} />
+                  <div className="h-full rounded-full" style={{ width: `${share}%`, backgroundColor: p.color }} />
                 </div>
                 <span className="w-28 text-right text-xs font-mono text-white/60 shrink-0">{fmt(planMRR)}</span>
                 <span className="w-8 text-right text-xs text-white/30 shrink-0">{share}%</span>
@@ -811,17 +810,17 @@ function SectionIngresos() {
 
 function SectionLogs() {
   const levelStyle: Record<string, string> = {
-    info:  'bg-emerald-500/10 text-emerald-400',
-    warn:  'bg-amber-500/10  text-amber-400',
+    info: 'bg-emerald-500/10 text-emerald-400',
+    warn: 'bg-amber-500/10  text-amber-400',
     error: 'bg-rose-500/10   text-rose-400',
   }
 
   return (
     <div className="bg-slate-800/60 border border-white/8 rounded-2xl overflow-hidden">
       <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between">
-        <p className="text-white/70 text-sm font-semibold" style={{fontFamily:'Outfit'}}>Log de actividad global</p>
+        <p className="text-white/70 text-sm font-semibold" style={{ fontFamily: 'Outfit' }}>Log de actividad global</p>
         <div className="flex gap-2">
-          {['info','warn','error'].map(l => (
+          {['info', 'warn', 'error'].map(l => (
             <span key={l} className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${levelStyle[l]}`}>{l.toUpperCase()}</span>
           ))}
         </div>
@@ -850,30 +849,38 @@ function SectionLogs() {
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 
-export default function SuperAdminPortal({ onLogout }: Props) {
+export default function SuperAdminPortal() {
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
   const [active, setActive] = useState<Section>('overview')
 
   const pendingCount = SOLICITUDES_INIT.filter(s => s.status === 'pending').length
 
   const TITLE: Record<Section, string> = {
-    overview:    'Resumen global',
-    clinicas:    'Gestión de clínicas',
+    overview: 'Resumen global',
+    clinicas: 'Gestión de clínicas',
     solicitudes: 'Solicitudes de cambio de plan',
-    ingresos:    'Ingresos y MRR',
-    logs:        'Log de actividad',
+    ingresos: 'Ingresos y MRR',
+    logs: 'Log de actividad',
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">
       {/* Sidebar */}
-      <aside className="w-52 shrink-0 flex flex-col border-r border-white/8" style={{background:'linear-gradient(to bottom, #1C1917, #0C0A09)'}}>
+      <aside className="w-52 shrink-0 flex flex-col border-r border-white/8" style={{ background: 'linear-gradient(to bottom, #1C1917, #0C0A09)' }}>
 
         {/* Brand */}
         <div className="px-4 py-5 border-b border-white/8">
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold" style={{fontFamily:'Outfit'}}>S</div>
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold" style={{ fontFamily: 'Outfit' }}>S</div>
             <div>
-              <p className="text-white text-xs font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
+              <p className="text-white text-xs font-bold tracking-wide" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
               <p className="text-amber-400/80 text-[10px] font-semibold">SUPER ADMIN</p>
             </div>
           </div>
@@ -881,14 +888,13 @@ export default function SuperAdminPortal({ onLogout }: Props) {
 
         {/* Nav */}
         <nav className="flex-1 p-2 space-y-0.5 py-4">
-          <p className="text-white/20 text-[10px] font-semibold uppercase tracking-widest px-2 mb-2" style={{fontFamily:'Outfit'}}>Plataforma</p>
+          <p className="text-white/20 text-[10px] font-semibold uppercase tracking-widest px-2 mb-2" style={{ fontFamily: 'Outfit' }}>Plataforma</p>
           {NAV.map(item => {
             const isActive = active === item.id
             return (
               <button key={item.id} onClick={() => setActive(item.id)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-all relative text-left ${
-                  isActive ? 'bg-amber-500/15 text-amber-400' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
-                }`}>
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs transition-all relative text-left ${isActive ? 'bg-amber-500/15 text-amber-400' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                  }`}>
                 <SvgIcon d={item.icon} />
                 <span className="font-medium flex-1">{item.label}</span>
                 {item.id === 'solicitudes' && pendingCount > 0 && (
@@ -907,7 +913,7 @@ export default function SuperAdminPortal({ onLogout }: Props) {
             <p className="text-white/70 text-xs font-medium truncate">Super Admin</p>
             <p className="text-white/25 text-xs truncate">admin@coronyx.io</p>
           </div>
-          <button onClick={onLogout} className="text-white/20 hover:text-white/60 transition-colors text-xs" title="Cerrar sesión">⏏</button>
+          <button onClick={handleLogout} className="text-white/20 hover:text-white/60 transition-colors text-xs" title="Cerrar sesión">⏏</button>
         </div>
       </aside>
 
@@ -915,7 +921,7 @@ export default function SuperAdminPortal({ onLogout }: Props) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
         <header className="h-12 border-b border-white/8 bg-slate-900/50 flex items-center px-5 gap-4 shrink-0">
-          <h2 className="text-white/80 text-sm font-semibold" style={{fontFamily:'Outfit'}}>{TITLE[active]}</h2>
+          <h2 className="text-white/80 text-sm font-semibold" style={{ fontFamily: 'Outfit' }}>{TITLE[active]}</h2>
           <div className="flex-1" />
           <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5">
             <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse shrink-0" />
@@ -925,11 +931,11 @@ export default function SuperAdminPortal({ onLogout }: Props) {
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-6">
-          {active === 'overview'    && <SectionOverview />}
-          {active === 'clinicas'    && <SectionClinicas />}
+          {active === 'overview' && <SectionOverview />}
+          {active === 'clinicas' && <SectionClinicas />}
           {active === 'solicitudes' && <SectionSolicitudes />}
-          {active === 'ingresos'    && <SectionIngresos />}
-          {active === 'logs'        && <SectionLogs />}
+          {active === 'ingresos' && <SectionIngresos />}
+          {active === 'logs' && <SectionLogs />}
         </main>
       </div>
     </div>

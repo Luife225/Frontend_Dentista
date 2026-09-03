@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-interface Props { onNavigate: (path: string) => void }
+import { useNavigate } from 'react-router-dom'
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 function CxLogo({ size = 36 }: { size?: number }) {
@@ -388,7 +388,8 @@ function ContactForm() {
   )
 }
 
-export default function LandingPage({ onNavigate }: Props) {
+export default function LandingPage() {
+  const navigate = useNavigate()
   const [scrolled, setScrolled] = useState(false)
   const [activeRole, setActiveRole] = useState(0)
 
@@ -409,7 +410,7 @@ export default function LandingPage({ onNavigate }: Props) {
       }`} style={{ backdropFilter: scrolled ? 'blur(16px)' : 'none', backgroundColor: scrolled ? 'rgba(8,15,14,0.88)' : 'transparent' }}>
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center gap-8">
           {/* Logo */}
-          <button onClick={() => onNavigate('/')} className="flex items-center gap-2.5 shrink-0">
+          <button onClick={() => navigate('/')} className="flex items-center gap-2.5 shrink-0">
             <CxLogo size={32} />
             <div>
               <p className="text-white font-bold text-sm leading-tight tracking-widest" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
@@ -431,7 +432,7 @@ export default function LandingPage({ onNavigate }: Props) {
           <div className="flex-1 hidden md:block" />
 
           <button
-            onClick={() => onNavigate('/login')}
+            onClick={() => navigate('/login')}
             className="px-5 py-2 text-sm font-semibold text-white rounded-xl transition-all shrink-0"
             style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#0B3D3A')}
@@ -487,7 +488,7 @@ export default function LandingPage({ onNavigate }: Props) {
               </div>
 
               <div className="flex items-center gap-3">
-                <button onClick={() => onNavigate('/login')}
+                <button onClick={() => navigate('/login')}
                   className="px-7 py-3.5 text-white text-sm font-semibold rounded-xl transition-all shadow-lg"
                   style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#15635d')}
@@ -650,7 +651,7 @@ export default function LandingPage({ onNavigate }: Props) {
                     </div>
                   </div>
                   <p className="text-white/55 text-sm leading-relaxed mb-6">{r.desc}</p>
-                  <button onClick={() => onNavigate('/login')}
+                  <button onClick={() => navigate('/login')}
                     className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all"
                     style={{ backgroundColor: r.accent, color: '#fff', fontFamily: 'Outfit' }}>
                     Probar como {r.title} →
@@ -894,7 +895,7 @@ export default function LandingPage({ onNavigate }: Props) {
             Más de 6 clínicas en Colombia ya gestionan su agenda, historia clínica y facturación en CORONYX. Únete hoy.
           </p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => onNavigate('/login')}
+            <button onClick={() => navigate('/login')}
               className="px-8 py-4 text-white font-semibold text-sm rounded-xl shadow-xl transition-all"
               style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#15635d')}

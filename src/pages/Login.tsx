@@ -1,9 +1,13 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { gsap } from 'gsap'
+import { useGSAP } from '@gsap/react'
 import { useAuth } from '../contexts/AuthContext'
 import coronixLogo from '../imports/coronixlogo.png'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
 
+// ─── Isotope SVG ──────────────────────────────────────────────────────────────
 function CoroNyxIsotope({ size = 36 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
@@ -22,14 +26,22 @@ function CoroNyxIsotope({ size = 36 }: { size?: number }) {
   )
 }
 
-// Login uses useAuth() context for authentication
-
+// ─── Constants ────────────────────────────────────────────────────────────────
 const ROLE_META: Record<Role, { label: string; desc: string; icon: string; color: string; badge?: string }> = {
   SUPER_ADMIN:   { label: 'Super Admin',   desc: 'Gestión global SaaS, clínicas y planes',    icon: '🌐', color: 'from-amber-500 to-orange-600',  badge: 'SaaS' },
   ODONTOLOGO:    { label: 'Odontólogo',    desc: 'Historia clínica, pacientes, IA',            icon: '🦷', color: 'from-cyan-600 to-cyan-700' },
   RECEPCIONISTA: { label: 'Recepcionista', desc: 'Agenda, citas, inventario',                  icon: '📋', color: 'from-violet-600 to-violet-700' },
   ADMIN_CLINICA: { label: 'Administrador', desc: 'Configuración, usuarios, reportes',          icon: '⚙️', color: 'from-slate-600 to-slate-700' },
   PACIENTE:      { label: 'Paciente',      desc: 'App móvil — mis citas y avances',            icon: '👤', color: 'from-emerald-600 to-emerald-700' },
+}
+
+// Solid hex colors for GSAP pill (can't animate Tailwind gradients directly)
+const ROLE_PILL_COLORS: Record<Role, string> = {
+  ODONTOLOGO:    '#0e7490', // cyan-700
+  RECEPCIONISTA: '#6d28d9', // violet-700
+  ADMIN_CLINICA: '#475569', // slate-600
+  PACIENTE:      '#047857', // emerald-700
+  SUPER_ADMIN:   '#d97706', // amber-500
 }
 
 const EMAIL_HINTS: Array<{ pattern: string; role: Role }> = [
@@ -47,19 +59,172 @@ const EMAIL_HINTS: Array<{ pattern: string; role: Role }> = [
   { pattern: 'odon',       role: 'ODONTOLOGO' },
 ]
 
-// Public-facing roles only — SUPER_ADMIN is internal CORONYX access
+// Public-facing roles — SUPER_ADMIN is internal CORONYX access
 const PUBLIC_ROLES: Role[] = ['ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA', 'PACIENTE']
 
+// Role selector grid layout (order for pill positioning)
+const SELECTOR_ROWS: Role[][] = [
+  ['ODONTOLOGO', 'RECEPCIONISTA'],
+  ['ADMIN_CLINICA', 'PACIENTE'],
+]
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function Login() {
   const { login: onLogin } = useAuth()
-  const [email, setEmail] = useState('dr.herrera@clinica.co')
-  const [password, setPassword] = useState('••••••••')
-  const [loading, setLoading] = useState(false)
-  const [forgot, setForgot] = useState(false)
-  const [forgotSent, setForgotSent] = useState(false)
-  const [detectedRole, setDetectedRole] = useState<Role | null>(null)
-  const [demoRole, setDemoRole] = useState<Role>('ODONTOLOGO')
 
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [email, setEmail]               = useState('dr.herrera@clinica.co')
+  const [password, setPassword]         = useState('••••••••')
+  const [loading, setLoading]           = useState(false)
+  const [forgot, setForgot]             = useState(false)
+  const [forgotSent, setForgotSent]     = useState(false)
+  const [detectedRole, setDetectedRole] = useState<Role | null>(null)
+  const [demoRole, setDemoRole]         = useState<Role>('ODONTOLOGO')
+
+  // ── Refs — layout ──────────────────────────────────────────────────────────
+  const containerRef      = useRef<HTMLDivElement>(null)
+  const logoRef           = useRef<HTMLDivElement>(null)
+  const titleRef          = useRef<HTMLHeadingElement>(null)
+  const paraRef           = useRef<HTMLParagraphElement>(null)
+  const cardRef           = useRef<HTMLDivElement>(null)
+
+  // ── Refs — inputs ──────────────────────────────────────────────────────────
+  const emailInputRef     = useRef<HTMLInputElement>(null)
+  const passwordInputRef  = useRef<HTMLInputElement>(null)
+
+  // ── Refs — button ──────────────────────────────────────────────────────────
+  const loginBtnRef       = useRef<HTMLButtonElement>(null)
+  const spinnerRef        = useRef<HTMLDivElement>(null)
+
+  // ── Refs — role pill ───────────────────────────────────────────────────────
+  const selectorRef       = useRef<HTMLDivElement>(null)   // the relative container
+  const pillRef           = useRef<HTMLDivElement>(null)
+  const pillTweenRef      = useRef<gsap.core.Tween | null>(null)
+  // Map role → button element for pill positioning
+  const roleBtnRefs       = useRef<Partial<Record<Role, HTMLButtonElement>>>({})
+  const saasIconRef       = useRef<HTMLSpanElement>(null)
+  const shimmerTlRef      = useRef<gsap.core.Timeline | null>(null)
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // UTIL: check reduced motion preference
+  // ─────────────────────────────────────────────────────────────────────────
+  const prefersReducedMotion = () =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // LAYOUT EFFECT: initialise pill position BEFORE first paint
+  // ─────────────────────────────────────────────────────────────────────────
+  useLayoutEffect(() => {
+    const btnEl = roleBtnRefs.current['ODONTOLOGO']
+    const parent = selectorRef.current
+    if (!btnEl || !parent || !pillRef.current) return
+
+    const btnRect    = btnEl.getBoundingClientRect()
+    const parentRect = parent.getBoundingClientRect()
+
+    gsap.set(pillRef.current, {
+      x: btnRect.left - parentRect.left,
+      y: btnRect.top - parentRect.top,
+      width: btnRect.width,
+      height: btnRect.height,
+      backgroundColor: ROLE_PILL_COLORS['ODONTOLOGO'],
+      borderRadius: 8,
+      opacity: 1,
+    })
+  }, [])
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ENTRY ANIMATION (useGSAP — runs once on mount, auto-cleanup on unmount)
+  // ─────────────────────────────────────────────────────────────────────────
+  useGSAP(() => {
+    const mm = gsap.matchMedia()
+
+    // ── Full motion ──────────────────────────────────────────────────────
+    mm.add('(prefers-reduced-motion: no-preference)', () => {
+      const tl = gsap.timeline({
+        defaults: { ease: 'power3.out', force3D: true },
+      })
+
+      // Left panel — logo scale-in
+      tl.from(logoRef.current, {
+          scale: 0,
+          opacity: 0,
+          duration: 0.5,
+          ease: 'back.out(1.4)',
+        })
+        // Title slide up
+        .from(titleRef.current, { y: 30, opacity: 0, duration: 0.6 }, '+=0.05')
+        // Paragraph
+        .from(paraRef.current,  { y: 20, opacity: 0, duration: 0.5 }, '-=0.3')
+        // Role list — stagger
+        .from('[data-role-item]', {
+          y: 15,
+          opacity: 0,
+          duration: 0.4,
+          stagger: 0.08,
+        }, '-=0.2')
+        // Right card — starts 0.15s after the previous tween began (depth feel)
+        .from(cardRef.current, { y: 40, opacity: 0, duration: 0.7 }, '<0.15')
+
+      // SaaS badge shimmer — subtle loop, only in no-preference branch
+      if (saasIconRef.current) {
+        shimmerTlRef.current = gsap.timeline({ repeat: -1, yoyo: true })
+          .to(saasIconRef.current, {
+            opacity: 0.45,
+            duration: 1.4,
+            ease: 'sine.inOut',
+          })
+      }
+    })
+
+    // ── Reduced motion: skip animations, set final state immediately ──────
+    mm.add('(prefers-reduced-motion: reduce)', () => {
+      gsap.set(
+        [
+          logoRef.current,
+          titleRef.current,
+          paraRef.current,
+          '[data-role-item]',
+          cardRef.current,
+        ],
+        { opacity: 1, y: 0, scale: 1, clearProps: 'transform' }
+      )
+      // Ensure shimmer never starts
+      shimmerTlRef.current?.pause()
+    })
+
+    // Cleanup returned automatically by useGSAP scope — mm also cleaned up
+    return () => mm.revert()
+  }, { scope: containerRef })
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // SPINNER animation — driven by `loading` state
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!spinnerRef.current) return
+
+    if (loading) {
+      gsap.to(spinnerRef.current, {
+        rotation: 360,
+        duration: 0.8,
+        repeat: -1,
+        ease: 'none',
+      })
+    } else {
+      gsap.killTweensOf(spinnerRef.current)
+      gsap.set(spinnerRef.current, { rotation: 0 })
+    }
+
+    // Cleanup: kill tween if component unmounts while loading=true
+    return () => {
+      gsap.killTweensOf(spinnerRef.current)
+    }
+  }, [loading])
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // HANDLERS — email / role detection
+  // ─────────────────────────────────────────────────────────────────────────
   function handleEmailChange(v: string) {
     setEmail(v)
     const lower = v.toLowerCase()
@@ -67,7 +232,21 @@ export default function Login() {
     setDetectedRole(match ? match.role : null)
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // HANDLERS — login / forgot
+  // ─────────────────────────────────────────────────────────────────────────
   function handleLogin() {
+    // Shake validation for empty fields
+    if (!email.trim()) {
+      shakeInput(emailInputRef.current)
+      if (!password.trim()) shakeInput(passwordInputRef.current)
+      return
+    }
+    if (!password.trim()) {
+      shakeInput(passwordInputRef.current)
+      return
+    }
+
     setLoading(true)
     setTimeout(() => {
       setLoading(false)
@@ -80,7 +259,105 @@ export default function Login() {
     setTimeout(() => { setLoading(false); setForgotSent(true) }, 800)
   }
 
-  // ── Forgot password screen ───────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // ANIMATION HELPERS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Shake an input horizontally — uses sequential timeline, safe alongside entry tl */
+  function shakeInput(el: HTMLElement | null) {
+    if (!el) return
+    gsap.timeline()
+      .to(el, { x: -8, duration: 0.06, ease: 'none' })
+      .to(el, { x: 8,  duration: 0.06 })
+      .to(el, { x: -6, duration: 0.06 })
+      .to(el, { x: 6,  duration: 0.06 })
+      .to(el, { x: -3, duration: 0.06 })
+      .to(el, { x: 3,  duration: 0.06 })
+      .to(el, { x: 0,  duration: 0.1,  ease: 'power2.out' })
+  }
+
+  /** Animate focus glow on an input */
+  function handleInputFocus(el: HTMLInputElement | null) {
+    if (!el || prefersReducedMotion()) return
+    gsap.to(el, {
+      boxShadow: '0 0 0 2px rgba(95,201,190,0.45), 0 0 16px rgba(95,201,190,0.2)',
+      duration: 0.25,
+      ease: 'power2.out',
+    })
+  }
+
+  /** Revert focus glow on blur */
+  function handleInputBlur(el: HTMLInputElement | null) {
+    if (!el) return
+    gsap.to(el, {
+      boxShadow: '0 0 0 0px transparent',
+      duration: 0.3,
+      ease: 'power2.out',
+    })
+  }
+
+  /** Slide the pill to a role button + bounce its icon */
+  function selectDemoRole(role: Role, btnEl: HTMLButtonElement) {
+    setDemoRole(role)
+
+    const parent = selectorRef.current
+    if (!parent || !pillRef.current) return
+
+    const btnRect    = btnEl.getBoundingClientRect()
+    const parentRect = parent.getBoundingClientRect()
+
+    // Kill any in-flight pill tween before starting new one
+    pillTweenRef.current?.kill()
+    pillTweenRef.current = gsap.to(pillRef.current, {
+      x: btnRect.left - parentRect.left,
+      y: btnRect.top - parentRect.top,
+      width: btnRect.width,
+      height: btnRect.height,
+      backgroundColor: ROLE_PILL_COLORS[role],
+      duration: 0.38,
+      ease: 'power3.out',
+      overwrite: 'auto',
+      force3D: true,
+    })
+
+    // Bounce icon of newly selected role
+    const iconEl = btnEl.querySelector<HTMLElement>('[data-role-icon]')
+    if (iconEl && !prefersReducedMotion()) {
+      gsap.fromTo(
+        iconEl,
+        { scale: 0.7 },
+        { scale: 1, ease: 'back.out(1.6)', duration: 0.4, force3D: true }
+      )
+    }
+  }
+
+  /** Button hover — scale + glow */
+  function handleBtnEnter() {
+    if (prefersReducedMotion() || loading) return
+    gsap.to(loginBtnRef.current, {
+      scale: 1.02,
+      boxShadow: '0 0 24px rgba(95,201,190,0.35)',
+      duration: 0.2,
+      ease: 'power2.out',
+      overwrite: 'auto',
+      force3D: true,
+    })
+  }
+
+  function handleBtnLeave() {
+    gsap.to(loginBtnRef.current, {
+      scale: 1,
+      boxShadow: '0 0 0px transparent',
+      duration: 0.25,
+      ease: 'power2.out',
+      overwrite: 'auto',
+      force3D: true,
+    })
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FORGOT PASSWORD SCREEN (no GSAP needed — separate route-like view)
+  // ─────────────────────────────────────────────────────────────────────────
   if (forgot) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -136,15 +413,20 @@ export default function Login() {
     )
   }
 
-  // ── Main login screen ────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // MAIN LOGIN SCREEN
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-950 flex">
+    <div ref={containerRef} className="min-h-screen bg-slate-950 flex">
 
-      {/* Left branding panel */}
-      <div className="hidden lg:flex flex-col justify-between w-80 border-r border-white/5 p-10 shrink-0"
-        style={{background:'linear-gradient(to bottom, #0B3D3A, #062422)'}}>
+      {/* ── Left branding panel ──────────────────────────────────────────── */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-80 border-r border-white/5 p-10 shrink-0"
+        style={{ background: 'linear-gradient(to bottom, #0B3D3A, #062422)' }}
+      >
         <div>
-          <div className="flex items-center gap-3 mb-12">
+          {/* Logo — animated with back.out scale-in */}
+          <div ref={logoRef} className="flex items-center gap-3 mb-12">
             <img src={coronixLogo} alt="CORONYX" className="w-14 h-14 object-contain shrink-0"/>
             <div>
               <p className="text-white text-xl font-bold tracking-wide leading-tight" style={{fontFamily:'Outfit'}}>CORONYX</p>
@@ -152,16 +434,20 @@ export default function Login() {
             </div>
           </div>
 
-          <h1 className="text-white text-3xl font-bold leading-tight mb-4" style={{fontFamily:'Outfit'}}>
+          {/* Title — animated slide from below */}
+          <h1 ref={titleRef} className="text-white text-3xl font-bold leading-tight mb-4" style={{fontFamily:'Outfit'}}>
             Gestión clínica inteligente
           </h1>
-          <p className="text-white/40 text-sm leading-relaxed mb-8">
+
+          {/* Paragraph — fade in */}
+          <p ref={paraRef} className="text-white/40 text-sm leading-relaxed mb-8">
             Plataforma SaaS para clínicas odontológicas con asistente IA, análisis ML de radiografías y teleodontología integrada.
           </p>
 
+          {/* Role list — stagger per item */}
           <div className="space-y-3">
             {PUBLIC_ROLES.map(r => (
-              <div key={r} className="flex items-center gap-3 text-sm text-white/40">
+              <div key={r} data-role-item className="flex items-center gap-3 text-sm text-white/40">
                 <span className="text-base">{ROLE_META[r].icon}</span>
                 <div className="flex-1 min-w-0">
                   <span className="text-white/60">{ROLE_META[r].label}</span>
@@ -171,12 +457,14 @@ export default function Login() {
             ))}
           </div>
         </div>
+
         <p className="text-white/20 text-xs">CORONYX v2.0 · Multi-sede Enterprise</p>
       </div>
 
-      {/* Right form */}
+      {/* ── Right form panel ─────────────────────────────────────────────── */}
       <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md fade-in">
+        {/* Card — ref for entry animation */}
+        <div ref={cardRef} className="w-full max-w-md">
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
@@ -192,12 +480,19 @@ export default function Login() {
             <p className="text-white/40 text-sm mb-7">Ingresa con tu cuenta institucional</p>
 
             <div className="space-y-4">
-              {/* Email */}
+
+              {/* ── Email input ─────────────────────────────────────────── */}
               <div>
                 <label className="text-xs text-white/50 font-medium block mb-1.5">Correo electrónico</label>
-                <input value={email} onChange={e => handleEmailChange(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
-                  placeholder="usuario@clinica.co" />
+                <input
+                  ref={emailInputRef}
+                  value={email}
+                  onChange={e => handleEmailChange(e.target.value)}
+                  onFocus={() => handleInputFocus(emailInputRef.current)}
+                  onBlur={() => handleInputBlur(emailInputRef.current)}
+                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none transition-colors"
+                  placeholder="usuario@clinica.co"
+                />
                 {detectedRole && (
                   <p className="text-xs text-cyan-400 mt-1.5 flex items-center gap-1.5">
                     <span>{ROLE_META[detectedRole].icon}</span>
@@ -211,12 +506,19 @@ export default function Login() {
                 )}
               </div>
 
-              {/* Password */}
+              {/* ── Password input ──────────────────────────────────────── */}
               <div>
                 <label className="text-xs text-white/50 font-medium block mb-1.5">Contraseña</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
-                  placeholder="••••••••" />
+                <input
+                  ref={passwordInputRef}
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onFocus={() => handleInputFocus(passwordInputRef.current)}
+                  onBlur={() => handleInputBlur(passwordInputRef.current)}
+                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none transition-colors"
+                  placeholder="••••••••"
+                />
               </div>
 
               <div className="flex justify-end">
@@ -225,51 +527,87 @@ export default function Login() {
                 </button>
               </div>
 
-              {/* Demo role selector — all 5 roles */}
+              {/* ── Demo role selector ──────────────────────────────────── */}
               <div className="bg-white/3 border border-white/8 rounded-xl p-3">
                 <p className="text-xs text-white/30 mb-2 font-medium">Demo — selecciona rol a simular:</p>
-                <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-                  {(['ODONTOLOGO','RECEPCIONISTA'] as Role[]).map(r => (
-                    <button key={r} onClick={() => setDemoRole(r)}
-                      className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                        demoRole === r ? `bg-gradient-to-r ${ROLE_META[r].color} text-white shadow-sm` : 'text-white/40 hover:bg-white/5'
-                      }`}>
-                      <span>{ROLE_META[r].icon}</span>
-                      <span className="truncate">{ROLE_META[r].label}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-                  {(['ADMIN_CLINICA','PACIENTE'] as Role[]).map(r => (
-                    <button key={r} onClick={() => setDemoRole(r)}
-                      className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all text-left ${
-                        demoRole === r ? `bg-gradient-to-r ${ROLE_META[r].color} text-white shadow-sm` : 'text-white/40 hover:bg-white/5'
-                      }`}>
-                      <span>{ROLE_META[r].icon}</span>
-                      {ROLE_META[r].label}
-                    </button>
-                  ))}
-                </div>
-                {/* Super Admin — always visible */}
-                <div className="border-t border-white/8 pt-1.5 mt-0.5">
-                  <button onClick={() => setDemoRole('SUPER_ADMIN')}
-                    className={`w-full flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-all ${
-                      demoRole === 'SUPER_ADMIN' ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-sm' : 'text-amber-400/50 hover:bg-amber-500/10 hover:text-amber-400'
-                    }`}>
-                    <span>🌐</span>
-                    <span>Super Admin</span>
-                    <span className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">SaaS</span>
-                  </button>
+
+                {/* Pill container — position:relative, pill is absolute child */}
+                <div ref={selectorRef} className="relative">
+
+                  {/* The sliding pill — manipulated only by GSAP, sits behind buttons */}
+                  <div
+                    ref={pillRef}
+                    className="absolute top-0 left-0 pointer-events-none z-0 rounded-lg opacity-0"
+                    aria-hidden="true"
+                    style={{ width: 0, height: 0 }}
+                  />
+
+                  {/* Role button rows — z-10 to sit above pill */}
+                  <div className="relative z-10">
+                    {SELECTOR_ROWS.map((row, ri) => (
+                      <div key={ri} className="grid grid-cols-2 gap-1.5 mb-1.5">
+                        {row.map(r => (
+                          <button
+                            key={r}
+                            ref={el => { if (el) roleBtnRefs.current[r] = el }}
+                            onClick={e => selectDemoRole(r, e.currentTarget)}
+                            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-left ${
+                              demoRole === r ? 'text-white' : 'text-white/40 hover:text-white/60'
+                            }`}
+                          >
+                            <span data-role-icon>{ROLE_META[r].icon}</span>
+                            <span className="truncate">{ROLE_META[r].label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+
+                    {/* Super Admin — full-width row */}
+                    <div className="border-t border-white/8 pt-1.5 mt-0.5">
+                      <button
+                        ref={el => { if (el) roleBtnRefs.current['SUPER_ADMIN'] = el }}
+                        onClick={e => selectDemoRole('SUPER_ADMIN', e.currentTarget)}
+                        className={`w-full flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                          demoRole === 'SUPER_ADMIN' ? 'text-white' : 'text-amber-400/50 hover:text-amber-400'
+                        }`}
+                      >
+                        <span data-role-icon>🌐</span>
+                        <span>Super Admin</span>
+                        {/* SaaS shimmer badge */}
+                        <span
+                          ref={saasIconRef}
+                          className="ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400"
+                        >
+                          SaaS
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <button onClick={handleLogin} disabled={loading}
-                className={`w-full py-3 text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 flex items-center justify-center gap-2 ${
-                  demoRole === 'SUPER_ADMIN' ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500' : 'bg-cyan-600 hover:bg-cyan-500'
-                }`}>
+              {/* ── Login button ────────────────────────────────────────── */}
+              <button
+                ref={loginBtnRef}
+                onClick={handleLogin}
+                onMouseEnter={handleBtnEnter}
+                onMouseLeave={handleBtnLeave}
+                disabled={loading}
+                className={`w-full py-3 text-white rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2 ${
+                  demoRole === 'SUPER_ADMIN'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-600'
+                    : 'bg-cyan-600'
+                }`}
+                style={{ willChange: 'transform' }}
+              >
                 {loading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    {/* GSAP-animated spinner via ref */}
+                    <div
+                      ref={spinnerRef}
+                      className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                      style={{ willChange: 'transform' }}
+                    />
                     Verificando acceso...
                   </>
                 ) : demoRole === 'SUPER_ADMIN' ? '🌐 Acceder como Super Admin' : 'Ingresar'}
@@ -278,12 +616,13 @@ export default function Login() {
 
             <p className="text-center text-xs text-white/20 mt-6">
               ¿Eres paciente?{' '}
-              <button onClick={() => { setDemoRole('PACIENTE'); setTimeout(() => handleLogin(), 0) }}
-                className="text-white/50 hover:text-white/80 transition-colors underline underline-offset-2">
+              <button
+                onClick={() => { setDemoRole('PACIENTE'); setTimeout(() => handleLogin(), 0) }}
+                className="text-white/50 hover:text-white/80 transition-colors underline underline-offset-2"
+              >
                 Acceder a la app móvil
               </button>
             </p>
-
           </div>
 
           <p className="text-center text-xs text-white/15 mt-5">

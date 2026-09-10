@@ -68,7 +68,7 @@ function ToothSVG({ toothId, data, selected, aiHighlight, onClick, onFaceClick }
       <div
         onClick={onClick}
         onMouseEnter={() => {}}
-        className={`relative transition-transform ${selected ? 'scale-110' : aiHighlight ? 'scale-105' : 'hover:scale-105'}`}
+        className={`relative transition-transform cursor-pointer ${selected ? 'scale-110' : aiHighlight ? 'scale-105' : 'hover:scale-105'}`}
       >
         <svg width="28" height="28" viewBox="0 0 28 28" className="cursor-pointer">
           {isExtracted ? (

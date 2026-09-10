@@ -1,4 +1,4 @@
-﻿# 🦷 CORONYX — Sistema de Gestión Dental
+# 🦷 CORONYX — Sistema de Gestión Dental
 
 > Plataforma SaaS multi-sede para clínicas odontológicas con asistente IA, análisis ML de radiografías y teleodontología integrada.
 
@@ -8,6 +8,7 @@
 
 - [Descripción general](#descripción-general)
 - [Stack tecnológico](#stack-tecnológico)
+- [Animaciones GSAP](#animaciones-gsap)
 - [Estructura del proyecto](#estructura-del-proyecto)
 - [Roles y módulos](#roles-y-módulos)
 - [Páginas y vistas](#páginas-y-vistas)
@@ -47,7 +48,45 @@
 | Styling | Tailwind CSS v4 | 4.x |
 | Plugin Tailwind | @tailwindcss/vite | 4.x |
 | Plugin React | @vitejs/plugin-react | 6.x |
+| Animaciones | GSAP | 3.15.x |
+| React GSAP | @gsap/react | 2.1.x |
 | Formatter | oxfmt | 0.2.x |
+
+---
+
+## Animaciones GSAP
+
+El proyecto usa **GSAP 3.15** con el hook `useGSAP` de `@gsap/react` para todas las animaciones. No se usa `gsap.registerPlugin(useGSAP)` — `useGSAP` es un hook de React y solo se importa directamente.
+
+### Páginas animadas
+
+#### `LandingPage` — animaciones con ScrollTrigger
+- Hero, features y secciones animadas al hacer scroll
+- Selector de roles con pill deslizante
+- Registra `ScrollTrigger` con `gsap.registerPlugin(ScrollTrigger)`
+
+#### `Login` — 6 sistemas de animación
+
+| Sistema | Técnica |
+|---|---|
+| **Entrada de pantalla** | `gsap.timeline` con `back.out`, stagger por rol, panel derecho con offset `<0.15` |
+| **Focus glow en inputs** | `gsap.to({ boxShadow })` en `onFocus`/`onBlur` |
+| **Pill deslizante de roles** | `getBoundingClientRect` + `gsap.to` con `overwrite: 'auto'` |
+| **Bounce de ícono de rol** | `gsap.fromTo` con `back.out(1.6)` al seleccionar |
+| **Shimmer badge SaaS** | `gsap.timeline({ repeat: -1, yoyo: true })` |
+| **Shake de validación** | `gsap.timeline()` secuencial sobre el eje `x` |
+| **Botón hover** | `gsap.to({ scale, boxShadow })` en `mouseenter`/`mouseleave` |
+| **Spinner de carga** | `gsap.to({ rotation: 360, repeat: -1 })` via `useEffect` con cleanup |
+
+### Convenciones de animación
+
+- Todas las animaciones de entrada se envuelven en `gsap.matchMedia()`:
+  - `(prefers-reduced-motion: no-preference)` → animaciones completas
+  - `(prefers-reduced-motion: reduce)` → `gsap.set(...)` al estado final inmediatamente, sin loops
+- `force3D: true` en todos los tweens con transforms para GPU acceleration
+- `overwrite: 'auto'` en tweens que pueden solaparse (pill, botón hover)
+- Cleanup automático via `useGSAP` scope + `return () => mm.revert()`
+- Spinner `useEffect` incluye `return () => gsap.killTweensOf(ref)` para evitar tweens huérfanos al desmontar
 
 ---
 
@@ -77,8 +116,8 @@ Frontend_Dentista/
 │   │   └── DashboardLayout.tsx # Sidebar + topbar shell (Outlet de react-router)
 │   │
 │   ├── pages/
-│   │   ├── LandingPage.tsx     # Página pública de marketing
-│   │   ├── Login.tsx           # Pantalla de inicio de sesión con demo de roles
+│   │   ├── LandingPage.tsx     # Página pública de marketing (GSAP + ScrollTrigger)
+│   │   ├── Login.tsx           # Autenticación con 6 sistemas de animación GSAP
 │   │   ├── Dashboard.tsx       # Panel principal del odontólogo/admin
 │   │   ├── AgendaUpdated.tsx   # Gestión de citas con calendario interactivo
 │   │   ├── Patients.tsx        # Listado de pacientes
@@ -102,7 +141,7 @@ Frontend_Dentista/
 ├── vite.config.ts              # Config Vite: React, Tailwind v4, alias @/src
 ├── tsconfig.json               # Config TypeScript
 ├── package.json                # Dependencias y scripts npm
-└── AGENTS.md                   # Notas internas para agentes de código
+└── AGENTS.md                   # Reglas de arquitectura para agentes de código
 ```
 
 ---
@@ -128,10 +167,10 @@ CORONYX implementa un sistema de **5 roles** con acceso granular a módulos:
 #### `LandingPage` — `/`
 Página de marketing con:
 - Navbar flotante con scroll con logo CORONYX
-- Hero con dashboard mockup animado
+- Hero con dashboard mockup animado (GSAP + ScrollTrigger)
 - Strip de estadísticas clave
 - Grid de funcionalidades
-- Selector de roles (explica cada perfil de usuario)
+- Selector de roles con pill deslizante animado (GSAP)
 - Tabla de planes (Individual, Pro, Enterprise)
 - Seguridad y compliance (HIPAA, ISO 27001, AES-256)
 - Formulario de contacto/demo
@@ -140,10 +179,15 @@ Página de marketing con:
 
 #### `Login` — `/login`
 Pantalla de autenticación con:
-- Panel izquierdo con branding y descripción de roles
-- Panel derecho con formulario email + contraseña
-- Demo de roles: selector para simular cualquiera de los 5 roles sin backend
+- Panel izquierdo con branding y descripción de roles (animado con GSAP entry timeline)
+- Panel derecho con formulario email + contraseña (animado con delay de profundidad)
+- Demo de roles: selector con pill deslizante GSAP para simular cualquiera de los 5 roles
 - Detección automática de rol por patrón de email
+- Glow animado en inputs al hacer focus (GSAP `boxShadow`)
+- Shake de validación en campos vacíos (GSAP timeline secuencial sobre eje X)
+- Botón con hover scale+glow (GSAP) y spinner de carga animado
+- Shimmer sutil en badge SaaS (loop infinito, pausado con `prefers-reduced-motion`)
+- Soporte completo `prefers-reduced-motion` via `gsap.matchMedia()`
 - Pantalla de recuperación de contraseña
 
 ---
@@ -291,13 +335,13 @@ VITE_STORAGE_URL=https://storage.coronyx.io
 
 ### Paleta por rol
 
-| Rol | Color |
-|---|---|
-| Odontólogo | `#5FC9BE` / cyan-400 |
-| Recepcionista | `#7C3AED` / violet-400 |
-| Admin Clínica | `#64748B` / slate-400 |
-| Paciente | `#059669` / emerald-400 |
-| Super Admin | `#D97706` / amber-400 |
+| Rol | Color hex | Tailwind |
+|---|---|---|
+| Odontólogo | `#5FC9BE` | cyan-400 |
+| Recepcionista | `#7C3AED` | violet-600 |
+| Admin Clínica | `#64748B` | slate-500 |
+| Paciente | `#059669` | emerald-600 |
+| Super Admin | `#D97706` | amber-500 |
 
 ---
 

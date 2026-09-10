@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import HistoriaClinica from './HistoriaClinica'
+import { useAuth } from '../contexts/AuthContext'
 
 type Tab = 'resumen'|'historia'|'odontograma'|'radiografias'|'documentos'
 
@@ -334,13 +335,19 @@ function RadiografiaItem({ name, date, onView }: { name: string; date: string; o
 }
 
 // ── Patient tabs ──────────────────────────────────────────────────────────────
-function PatientDetail({ patient, readOnly }: { patient: Patient; readOnly: boolean }) {
+function PatientDetail({ patient }: { patient: Patient }) {
+  const { role } = useAuth()
+  const readOnly = role === 'RECEPCIONISTA'
   const [tab, setTab] = useState<Tab>('resumen')
   const [modal, setModal] = useState<'cita'|'rx'|null>(null)
-  const tabs: {id:Tab;label:string}[] = [
+  const allTabs: {id:Tab;label:string}[] = [
     {id:'resumen',label:'Resumen'}, {id:'historia',label:'Historia clínica'},
     {id:'odontograma',label:'Odontograma'}, {id:'radiografias',label:'Radiografías'}, {id:'documentos',label:'Documentos'},
   ]
+  // Recepcionista only sees Resumen and Documentos
+  const tabs = role === 'RECEPCIONISTA'
+    ? allTabs.filter(t => t.id === 'resumen' || t.id === 'documentos')
+    : allTabs
 
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -454,7 +461,9 @@ function PatientDetail({ patient, readOnly }: { patient: Patient; readOnly: bool
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function PacientePerfil({ readOnly = false }: { readOnly?: boolean }) {
+export default function PacientePerfil() {
+  const { role } = useAuth()
+  const readOnly = role === 'RECEPCIONISTA'
   const [patients, setPatients] = useState(PATIENTS)
   const [selId, setSelId] = useState(PATIENTS[0].id)
   const [search, setSearch] = useState('')
@@ -532,7 +541,7 @@ export default function PacientePerfil({ readOnly = false }: { readOnly?: boolea
       </aside>
 
       {/* Patient detail */}
-      <PatientDetail patient={sel} readOnly={readOnly}/>
+      <PatientDetail patient={sel}/>
     </div>
   )
 }

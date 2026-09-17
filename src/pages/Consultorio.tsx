@@ -34,11 +34,6 @@ const USERS_INIT: User[] = [
   { id:7, name:'Carlos Rivas',        role:'PACIENTE',      email:'carlos.rivas@gmail.com',specialty:'—',                 schedule:'—',               status:'active', phone:'+57 313 700 8006', document:'1023456789', dob:'1990-05-14' },
 ]
 
-const PLANS = [
-  { id:'starter', name:'Starter', price:450000, color:'#64748B', features:['1 consultorio','2 usuarios','15 GB almacenamiento','Sin asistente IA'] },
-  { id:'pro',     name:'Clínicas Pro', price:980000, color:'#1E8C82', features:['5 consultorios','15 usuarios','100 GB DICOM','Asistente IA incluido','Reportes avanzados'] },
-  { id:'enterprise', name:'Enterprise', price:2490000, color:'#7C3AED', features:['Ilimitado','Usuarios ilimitados','1 TB DICOM','IA prioritaria','SLA 99.9%','Soporte 24/7'] },
-]
 
 // ── Modals ────────────────────────────────────────────────────────────────────
 const BLANK_USER = (): Omit<User,'id'> => ({ name:'', role:'ODONTOLOGO', email:'', specialty:SPECIALTIES[0], schedule:SCHEDULES[0], status:'active', phone:'', document:'', dob:'' })
@@ -160,243 +155,114 @@ function ModalUsuario({ user, onSave, onClose }: { user?: User; onSave: (u: Omit
   )
 }
 
-function ModalSolicitarPlan({ currentPlan, onClose }: { currentPlan: string; onClose: () => void }) {
-  const [sel, setSel] = useState(currentPlan)
-  const [reason, setReason] = useState('')
-  const [sent, setSent] = useState(false)
-  const [sending, setSending] = useState(false)
-
-  function submit() {
-    if (sel === currentPlan || !reason.trim()) return
-    setSending(true)
-    setTimeout(() => { setSending(false); setSent(true) }, 1000)
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(0,0,0,0.65)',backdropFilter:'blur(4px)'}}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div>
-            <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>Solicitar cambio de plan</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Tu solicitud será revisada y aprobada por el equipo CORONYX</p>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5"/></button>
-        </div>
-
-        <div className="px-6 py-5">
-          {sent ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
-                <Icon d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" className="w-8 h-8 text-amber-600"/>
-              </div>
-              <p className="font-bold text-slate-800 text-lg mb-2" style={{fontFamily:'Outfit'}}>¡Solicitud enviada!</p>
-              <p className="text-slate-500 text-sm max-w-xs mx-auto">Tu solicitud de cambio al plan <strong>{PLANS.find(p=>p.id===sel)?.name}</strong> fue enviada al panel de CORONYX y está pendiente de aprobación.</p>
-              <div className="mt-4 flex items-center justify-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 mx-auto w-fit">
-                <Icon d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" className="w-3.5 h-3.5"/>
-                Tiempo estimado de respuesta: 24–48 h
-              </div>
-              <button onClick={onClose} className="mt-5 px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500">Entendido</button>
-            </div>
-          ) : (
-            <>
-              {/* Plan grid */}
-              <div className="grid grid-cols-3 gap-4 mb-5">
-                {PLANS.map(p=>(
-                  <button key={p.id} onClick={()=>setSel(p.id)}
-                    className={`text-left p-4 rounded-2xl border-2 transition-all ${sel===p.id?'shadow-lg':'border-slate-200 hover:border-slate-300'}`}
-                    style={sel===p.id?{borderColor:p.color}:{}}>
-                    {p.id===currentPlan && (
-                      <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full mb-2 inline-block">Plan actual</span>
-                    )}
-                    <p className="font-bold text-slate-800 text-sm mb-1" style={{fontFamily:'Outfit',color:sel===p.id?p.color:undefined}}>{p.name}</p>
-                    <p className="font-bold text-lg" style={{color:p.color,fontFamily:'Outfit'}}>{fmt(p.price)}<span className="text-xs font-normal text-slate-400">/mes</span></p>
-                    <ul className="mt-3 space-y-1">
-                      {p.features.map(f=>(
-                        <li key={f} className="text-xs text-slate-600 flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full shrink-0" style={{backgroundColor:p.color}}/>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                  </button>
-                ))}
-              </div>
-
-              {/* Reason */}
-              {sel !== currentPlan && (
-                <div className="mb-5">
-                  <label className="text-xs font-semibold text-slate-500 block mb-1.5">Motivo de la solicitud *</label>
-                  <textarea value={reason} onChange={e=>setReason(e.target.value)} rows={3}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50 resize-none"
-                    placeholder="Ej: Necesitamos acceso a teleodontología y radiografías para nuestra segunda sede..."/>
-                  <p className="text-[10px] text-slate-400 mt-1">Este mensaje será visible para el equipo CORONYX al revisar tu solicitud.</p>
-                </div>
-              )}
-
-              <div className="flex gap-2 justify-end">
-                <button onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button onClick={submit} disabled={sending || sel===currentPlan || !reason.trim()}
-                  className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
-                  {sending && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>}
-                  {sending ? 'Enviando...' : `Solicitar plan ${PLANS.find(p=>p.id===sel)?.name}`}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ModalTarjeta({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({ number:'', name:'', exp:'', cvv:'' })
-  const [saved, setSaved] = useState(false)
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(0,0,0,0.65)',backdropFilter:'blur(4px)'}}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>Actualizar tarjeta de pago</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5"/></button>
-        </div>
-        {saved ? (
-          <div className="px-6 py-10 text-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
-              <Icon d="M5 13l4 4L19 7" className="w-6 h-6 text-emerald-600"/>
-            </div>
-            <p className="font-bold text-slate-800">¡Tarjeta actualizada!</p>
-            <button onClick={onClose} className="mt-3 text-xs text-cyan-600 font-semibold">Cerrar</button>
-          </div>
-        ) : (
-          <>
-            <div className="px-6 py-5 space-y-4">
-              {/* Card preview */}
-              <div className="rounded-2xl h-28 relative overflow-hidden flex flex-col justify-between p-4" style={{background:'linear-gradient(135deg,#0B3D3A,#1E8C82)'}}>
-                <div className="flex justify-between items-start">
-                  <p className="text-white/60 text-xs font-semibold">CORONYX</p>
-                  <div className="flex gap-1">
-                    <div className="w-6 h-4 bg-amber-400 rounded opacity-80"/>
-                    <div className="w-6 h-4 bg-amber-600 rounded opacity-60 -ml-2"/>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-white font-mono text-base tracking-widest">{form.number||'•••• •••• •••• ••••'}</p>
-                  <div className="flex justify-between mt-1">
-                    <p className="text-white/70 text-xs">{form.name||'NOMBRE TITULAR'}</p>
-                    <p className="text-white/70 text-xs">{form.exp||'MM/AA'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1.5">Número de tarjeta</label>
-                <input value={form.number} onChange={e=>setForm(f=>({...f,number:e.target.value}))} maxLength={19} placeholder="1234 5678 9012 3456" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1.5">Nombre del titular</label>
-                <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value.toUpperCase()}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1.5">Vencimiento</label>
-                  <input value={form.exp} onChange={e=>setForm(f=>({...f,exp:e.target.value}))} placeholder="MM/AA" maxLength={5} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 block mb-1.5">CVV</label>
-                  <input value={form.cvv} onChange={e=>setForm(f=>({...f,cvv:e.target.value}))} placeholder="•••" maxLength={4} type="password" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 bg-slate-50 rounded-xl p-3">
-                <Icon d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" className="w-4 h-4 text-slate-400 shrink-0"/>
-                <p className="text-[10px] text-slate-500">Pago cifrado con SSL. No almacenamos datos de tarjeta.</p>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex gap-2 justify-end">
-              <button onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-              <button onClick={()=>setSaved(true)} className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500">Guardar tarjeta</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Tab: Usuarios ─────────────────────────────────────────────────────────────
 function TabUsuarios() {
   const [users, setUsers] = useState(USERS_INIT)
   const [modal, setModal] = useState<'new'|'edit'|null>(null)
   const [editUser, setEditUser] = useState<User|undefined>()
+  const [filterRole, setFilterRole] = useState<Role|'ALL'>('ALL')
+  const [filterStatus, setFilterStatus] = useState<'all'|'active'|'inactive'>('all')
   const [search, setSearch] = useState('')
 
-  function save(data: Omit<User,'id'>) {
-    if(editUser) setUsers(us=>us.map(u=>u.id===editUser.id?{...data,id:editUser.id}:u))
-    else setUsers(us=>[...us,{...data,id:Date.now()}])
-    setModal(null); setEditUser(undefined)
+  const visible = users.filter(u => {
+    if (filterRole !== 'ALL' && u.role !== filterRole) return false
+    if (filterStatus !== 'all' && u.status !== filterStatus) return false
+    if (search && !u.name.toLowerCase().includes(search.toLowerCase()) && !u.email.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  function saveUser(u: Omit<User,'id'>) {
+    if (editUser) {
+      setUsers(us => us.map(x => x.id === editUser.id ? { ...u, id: editUser.id } : x))
+    } else {
+      setUsers(us => [...us, { ...u, id: Date.now() }])
+    }
+    setModal(null)
+    setEditUser(undefined)
   }
 
-  const visible = users.filter(u=>u.name.toLowerCase().includes(search.toLowerCase())||u.email.includes(search))
-
-  const roleColors: Record<Role,string> = {
+  const roleColors: Record<Role, string> = {
     ODONTOLOGO:'bg-cyan-100 text-cyan-700',
     RECEPCIONISTA:'bg-violet-100 text-violet-700',
     ASISTENTE:'bg-emerald-100 text-emerald-700',
-    ADMIN_CLINICA:'bg-slate-100 text-slate-600',
+    ADMIN_CLINICA:'bg-slate-100 text-slate-700',
     PACIENTE:'bg-amber-100 text-amber-700',
   }
 
   return (
     <div className="space-y-4">
-      {(modal==='new'||modal==='edit') && <ModalUsuario user={editUser} onSave={save} onClose={()=>{setModal(null);setEditUser(undefined)}}/>}
+      {modal && (
+        <ModalUsuario user={editUser} onSave={saveUser} onClose={()=>{setModal(null);setEditUser(undefined)}}/>
+      )}
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar usuario..." className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+      {/* Header controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm">
+          <div className="relative w-full">
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre o correo..."
+              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+            <span className="absolute left-3 top-2.5 text-slate-400">
+              <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" className="w-3.5 h-3.5"/>
+            </span>
+          </div>
         </div>
-        <div className="flex-1"/>
-        <button onClick={()=>setModal('new')} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl" style={{backgroundColor:'#1E8C82'}}>
-          <Icon d="M12 4v16m8-8H4" className="w-4 h-4"/>
-          + Crear nuevo usuario
-        </button>
+
+        <div className="flex items-center gap-2">
+          {/* Role filter */}
+          <select value={filterRole} onChange={e=>setFilterRole(e.target.value as Role|'ALL')}
+            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-600 focus:outline-none">
+            <option value="ALL">Todos los roles</option>
+            {ROLES.map(r=><option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          </select>
+
+          {/* Status filter */}
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value as 'all'|'active'|'inactive')}
+            className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-600 focus:outline-none">
+            <option value="all">Todos los estados</option>
+            <option value="active">Activos</option>
+            <option value="inactive">Inactivos</option>
+          </select>
+
+          <button onClick={()=>{setEditUser(undefined);setModal('new')}}
+            className="px-4 py-2 bg-cyan-600 text-white rounded-xl text-xs font-semibold hover:bg-cyan-500 flex items-center gap-1.5 transition-colors">
+            <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5"/>
+            Nuevo usuario
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      {/* Users table */}
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100">
-              {['Usuario','Rol','Especialidad','Horario','Estado','Acciones'].map(h=>(
-                <th key={h} className="text-left text-xs text-slate-400 font-medium px-4 py-3">{h}</th>
+            <tr className="border-b border-slate-100 text-left">
+              {['Usuario / Nombre','Rol','Especialidad','Horario','Teléfono','Estado',''].map(h=>(
+                <th key={h} className="text-xs font-semibold text-slate-400 px-4 py-3">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody>
-            {visible.map(u=>(
-              <tr key={u.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors group">
+          <tbody className="divide-y divide-slate-50">
+            {visible.map(u => (
+              <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                      {u.name.split(' ').map(n=>n[0]).join('').slice(0,2)}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-700 text-sm">{u.name}</p>
-                      <p className="text-[10px] text-slate-400">{u.email}</p>
-                    </div>
-                  </div>
+                  <p className="font-semibold text-slate-800 text-sm">{u.name}</p>
+                  <p className="text-xs text-slate-400 font-mono">{u.email}</p>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${roleColors[u.role]}`}>{ROLE_LABELS[u.role]}</span>
+                  <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${roleColors[u.role]}`}>
+                    {ROLE_LABELS[u.role]}
+                  </span>
                 </td>
-                <td className="px-4 py-3 text-xs text-slate-500">{u.specialty}</td>
+                <td className="px-4 py-3 text-xs text-slate-600">{u.specialty}</td>
                 <td className="px-4 py-3 text-xs text-slate-500">{u.schedule}</td>
+                <td className="px-4 py-3 text-xs text-slate-500 font-mono">{u.phone}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${u.status==='active'?'bg-emerald-100 text-emerald-600':'bg-slate-100 text-slate-400'}`}>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${u.status==='active'?'bg-emerald-100 text-emerald-600':'bg-slate-100 text-slate-400'}`}>
                     {u.status==='active'?'Activo':'Inactivo'}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
                     <button onClick={()=>{setEditUser(u);setModal('edit')}} className="text-xs text-cyan-600 hover:text-cyan-700 font-semibold">Editar</button>
                     <button className="text-xs text-rose-400 hover:text-rose-600 font-semibold">Desactivar</button>
                   </div>
@@ -412,127 +278,14 @@ function TabUsuarios() {
   )
 }
 
-// ── Tab: Planes ───────────────────────────────────────────────────────────────
-function TabPlanes() {
-  const [modal, setModal] = useState<'solicitar'|'tarjeta'|null>(null)
-  const currentPlan = 'pro'
-  const plan = PLANS.find(p=>p.id===currentPlan)!
-
-  const usage = { users:6, maxUsers:15, storage:38, maxStorage:100, ai:847, maxAi:1000 }
-
-  return (
-    <div className="space-y-5 max-w-3xl">
-      {modal==='solicitar' && <ModalSolicitarPlan currentPlan={currentPlan} onClose={()=>setModal(null)}/>}
-      {modal==='tarjeta' && <ModalTarjeta onClose={()=>setModal(null)}/>}
-
-      {/* Current plan */}
-      <div className="rounded-2xl border-2 p-6" style={{borderColor:plan.color, background:`${plan.color}08`}}>
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <p className="font-bold text-xl" style={{color:plan.color,fontFamily:'Outfit'}}>{plan.name}</p>
-              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full">Plan activo</span>
-            </div>
-            <p className="text-slate-500 text-sm">{fmt(plan.price)}/mes · Renovación 01 Sep 2026</p>
-          </div>
-          <button onClick={()=>setModal('solicitar')} className="px-4 py-2 text-sm font-semibold border-2 rounded-xl transition-colors hover:opacity-90" style={{borderColor:plan.color,color:plan.color}}>
-            Solicitar cambio de plan
-          </button>
-        </div>
-
-        {/* Usage */}
-        <div className="grid grid-cols-3 gap-4 mt-5">
-          {[
-            { label:'Usuarios', used:usage.users, max:usage.maxUsers, unit:'usuarios' },
-            { label:'Almacenamiento DICOM', used:usage.storage, max:usage.maxStorage, unit:'GB' },
-            { label:'Consultas IA', used:usage.ai, max:usage.maxAi, unit:'este mes' },
-          ].map(u=>(
-            <div key={u.label}>
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-slate-500">{u.label}</span>
-                <span className="font-semibold text-slate-700">{u.used}/{u.max} {u.unit}</span>
-              </div>
-              <div className="h-1.5 bg-white rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{width:`${(u.used/u.max)*100}%`,backgroundColor:plan.color}}/>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Features list */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4" style={{fontFamily:'Outfit'}}>Incluido en tu plan</p>
-        <div className="grid grid-cols-2 gap-2">
-          {plan.features.map(f=>(
-            <div key={f} className="flex items-center gap-2 text-sm text-slate-700">
-              <span className="w-4 h-4 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                <Icon d="M5 13l4 4L19 7" className="w-2.5 h-2.5 text-emerald-600"/>
-              </span>
-              {f}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Payment method */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest" style={{fontFamily:'Outfit'}}>Método de pago</p>
-          <button onClick={()=>setModal('tarjeta')} className="text-xs text-cyan-600 hover:text-cyan-700 font-semibold">Actualizar tarjeta</button>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-8 bg-gradient-to-br from-slate-700 to-slate-900 rounded-lg flex items-center justify-center">
-            <div className="flex gap-0.5">
-              <div className="w-3 h-3 bg-amber-400 rounded-full opacity-80"/>
-              <div className="w-3 h-3 bg-amber-600 rounded-full opacity-60 -ml-1.5"/>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-700">Mastercard •••• 4521</p>
-            <p className="text-xs text-slate-400">Vence 09/28</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Invoices */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4" style={{fontFamily:'Outfit'}}>Historial de facturación</p>
-        <div className="space-y-2">
-          {[
-            ['01/08/2026', 'Clínicas Pro — Agosto 2026', fmt(980000), 'Pagada'],
-            ['01/07/2026', 'Clínicas Pro — Julio 2026',  fmt(980000), 'Pagada'],
-            ['01/06/2026', 'Clínicas Pro — Junio 2026',  fmt(980000), 'Pagada'],
-          ].map(([d,l,v,s])=>(
-            <div key={d} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-              <div>
-                <p className="text-sm font-medium text-slate-700">{l}</p>
-                <p className="text-xs text-slate-400">{d}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="font-semibold text-slate-700">{v}</span>
-                <span className="text-xs bg-emerald-100 text-emerald-600 font-semibold px-2 py-0.5 rounded-full">{s}</span>
-                <button className="text-xs text-slate-400 hover:text-slate-600">
-                  <Icon d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" className="w-3.5 h-3.5"/>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main ──────────────────────────────────────────────────────────────────────
-type ConsultTab = 'usuarios'|'planes'|'clinica'|'integraciones'
+type ConsultTab = 'usuarios'|'clinica'|'integraciones'
 
 export default function Consultorio() {
   const [tab, setTab] = useState<ConsultTab>('usuarios')
 
   const tabs: { id: ConsultTab; label: string }[] = [
     { id:'usuarios',      label:'Usuarios y roles' },
-    { id:'planes',        label:'Planes y suscripción' },
     { id:'clinica',       label:'Datos del consultorio' },
     { id:'integraciones', label:'Integraciones' },
   ]
@@ -552,7 +305,6 @@ export default function Consultorio() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-5">
         {tab==='usuarios' && <TabUsuarios/>}
-        {tab==='planes' && <TabPlanes/>}
 
         {tab==='clinica' && (
           <div className="max-w-2xl space-y-5">

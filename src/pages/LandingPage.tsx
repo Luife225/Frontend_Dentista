@@ -150,76 +150,6 @@ function DashboardMockup() {
   )
 }
 
-// ── Plans ─────────────────────────────────────────────────────────────────────
-const PLANS = [
-  {
-    id: 'individual',
-    name: 'Individual',
-    subtitle: 'Para el odontólogo independiente',
-    price: 149000,
-    priceNote: '/mes',
-    badge: null,
-    color: '#5FC9BE',
-    highlight: false,
-    cta: 'Comenzar gratis',
-    features: [
-      '1 consultorio · 1 usuario clínico',
-      'Agenda con recordatorios WhatsApp',
-      'Historia clínica ilimitada',
-      'Odontograma digital',
-      'Portal del paciente incluido',
-      '10 GB almacenamiento DICOM',
-      'Soporte por email',
-    ],
-    missing: ['Asistente IA por voz', 'Análisis ML de radiografías', 'Teleodontología', 'Multi-sede'],
-  },
-  {
-    id: 'pro',
-    name: 'Clínicas Pro',
-    subtitle: 'Para clínicas en crecimiento',
-    price: 490000,
-    priceNote: '/mes',
-    badge: 'Más popular',
-    color: '#1E8C82',
-    highlight: true,
-    cta: 'Solicitar plan Pro',
-    features: [
-      'Hasta 5 consultorios · 15 usuarios',
-      'Todo lo de Individual',
-      'Asistente IA por voz 🎙',
-      'Análisis ML de radiografías 🔬',
-      'Teleodontología integrada 📹',
-      '100 GB DICOM + backups diarios',
-      'Notificaciones multicanal (WA, SMS, Email)',
-      'Reportes financieros avanzados',
-      'Soporte prioritario',
-    ],
-    missing: [],
-  },
-  {
-    id: 'enterprise',
-    name: 'Red / Enterprise',
-    subtitle: 'Multi-sede y grandes redes',
-    price: 0,
-    priceNote: 'A medida',
-    badge: 'Enterprise',
-    color: '#7C3AED',
-    highlight: false,
-    cta: 'Solicitar cotización',
-    features: [
-      'Consultorios y usuarios ilimitados',
-      'Todo lo de Clínicas Pro',
-      'Multi-sede con dashboard unificado',
-      '1 TB DICOM + almacenamiento escalable',
-      'IA prioritaria y modelos personalizados',
-      'SLA 99.9% garantizado',
-      'Integración con sistemas existentes (API)',
-      'Onboarding dedicado + capacitación',
-      'Soporte 24/7 con ejecutivo de cuenta',
-    ],
-    missing: [],
-  },
-]
 
 // ── Feature card data ─────────────────────────────────────────────────────────
 const FEATURES = [
@@ -265,7 +195,7 @@ const ROLES = [
     badge: 'Config.',
     badgeColor: '#475569',
     desc: 'Configuración del consultorio, gestión del equipo médico, horarios, facturación avanzada y reportes gerenciales.',
-    modules: ['Configuración sede', 'Usuarios y roles', 'Reportes financieros', 'Inventario', 'Suscripción'],
+    modules: ['Configuración sede', 'Usuarios y roles', 'Reportes financieros', 'Inventario'],
     bg: 'from-slate-500/10 to-gray-500/5',
     accent: '#64748B',
   },
@@ -360,31 +290,8 @@ function ContactForm() {
       <div>
         <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Mensaje *</label>
         <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-          required rows={5} placeholder="Cuéntanos sobre tu clínica, número de usuarios estimado, consultas sobre planes, integraciones..."
+          required rows={5} placeholder="Cuéntanos sobre tu clínica, número de usuarios estimado, integraciones requeridas..."
           className={`${inputCls} resize-none`} style={inputStyle} />
-      </div>
-
-      {/* Plan interest quick select */}
-      <div>
-        <p className="text-xs text-white/40 mb-2" style={{ fontFamily: 'Outfit' }}>¿Qué plan te interesa? (opcional)</p>
-        <div className="flex gap-2">
-          {['Individual', 'Clínicas Pro', 'Enterprise', 'Aún no lo sé'].map(p => {
-            const isActive = form.message.startsWith(`[Plan: ${p}]`)
-            return (
-              <button type="button" key={p}
-                onClick={() => setForm(f => ({ ...f, message: isActive ? f.message.replace(`[Plan: ${p}] `, '') : `[Plan: ${p}] ${f.message}` }))}
-                className="px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all"
-                style={{
-                  fontFamily: 'Outfit',
-                  backgroundColor: isActive ? 'rgba(30,140,130,0.2)' : 'transparent',
-                  borderColor: isActive ? '#1E8C82' : 'rgba(255,255,255,0.12)',
-                  color: isActive ? '#5FC9BE' : 'rgba(255,255,255,0.4)',
-                }}>
-                {p}
-              </button>
-            )
-          })}
-        </div>
       </div>
 
       <button type="submit" disabled={sending}
@@ -765,7 +672,7 @@ export default function LandingPage() {
 
           {/* Anchor links */}
           <div className="hidden md:flex items-center gap-6 flex-1">
-            {[['#funcionalidades','Funcionalidades'],['#roles','Por rol'],['#planes','Precios'],['#contacto','Contacto']].map(([href, label]) => (
+            {[['#funcionalidades','Funcionalidades'],['#roles','Por rol'],['#contacto','Contacto']].map(([href, label]) => (
               <a key={href} href={href}
                 className="text-sm text-white/45 hover:text-white/90 transition-colors"
                 style={{ fontFamily: 'Outfit' }}>
@@ -1149,107 +1056,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Planes y Precios ─────────────────────────────────────────────────── */}
-      <section id="planes" className="py-28" style={{ background: '#0a1715' }}>
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
-              style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>Planes y precios</p>
-            <h2 className="text-white font-bold mb-4"
-              style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)' }}>
-              El plan adecuado<br />para tu consultorio.
-            </h2>
-            <p className="text-white/40 text-sm max-w-md mx-auto leading-relaxed">
-              Sin contratos de permanencia. Cambia o cancela cuando quieras. 14 días gratis en todos los planes.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-6 items-start">
-            {PLANS.map(plan => (
-              <div key={plan.id}
-                className={`relative rounded-3xl p-7 flex flex-col transition-all ${plan.highlight ? 'shadow-2xl ring-2' : 'border border-white/8'}`}
-                style={{
-                  background: plan.highlight
-                    ? `linear-gradient(135deg, ${plan.color}18, ${plan.color}08)`
-                    : 'rgba(255,255,255,0.02)',
-                  ...(plan.highlight ? { ringColor: plan.color } : {}),
-                  ...(plan.highlight ? { border: `2px solid ${plan.color}50` } : {}),
-                }}>
-                {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="text-xs font-bold px-3 py-1 rounded-full text-white"
-                      style={{ backgroundColor: plan.color, fontFamily: 'Outfit' }}>
-                      {plan.badge}
-                    </span>
-                  </div>
-                )}
-
-                <div className="mb-5">
-                  <p className="text-white font-bold text-xl mb-0.5" style={{ fontFamily: 'Outfit' }}>{plan.name}</p>
-                  <p className="text-white/40 text-xs">{plan.subtitle}</p>
-                </div>
-
-                <div className="mb-6">
-                  {plan.price > 0 ? (
-                    <>
-                      <span className="text-white font-bold text-3xl" style={{ fontFamily: 'Outfit' }}>
-                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(plan.price)}
-                      </span>
-                      <span className="text-white/40 text-sm">{plan.priceNote}</span>
-                    </>
-                  ) : (
-                    <span className="text-white font-bold text-2xl" style={{ fontFamily: 'Outfit', color: plan.color }}>
-                      {plan.priceNote}
-                    </span>
-                  )}
-                </div>
-
-                <ul className="space-y-2.5 mb-6 flex-1">
-                  {plan.features.map(f => (
-                    <li key={f} className="flex items-start gap-2.5 text-xs">
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                        style={{ backgroundColor: plan.color + '25' }}>
-                        <svg className="w-2.5 h-2.5" fill="none" stroke={plan.color} viewBox="0 0 24 24" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                      </div>
-                      <span className="text-white/70 leading-relaxed">{f}</span>
-                    </li>
-                  ))}
-                  {plan.missing.map(f => (
-                    <li key={f} className="flex items-start gap-2.5 text-xs opacity-30">
-                      <div className="w-4 h-4 flex items-center justify-center shrink-0 mt-0.5">
-                        <svg className="w-3 h-3 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                      </div>
-                      <span className="text-white/30">{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
-                  style={{
-                    fontFamily: 'Outfit',
-                    backgroundColor: plan.highlight ? plan.color : 'transparent',
-                    color: plan.highlight ? '#fff' : plan.color,
-                    border: plan.highlight ? 'none' : `1.5px solid ${plan.color}50`,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}>
-                  {plan.cta} →
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-center text-white/25 text-xs mt-8" style={{ fontFamily: 'Outfit' }}>
-            Todos los precios en COP + IVA. Sin tarjeta de crédito para el período de prueba.
-          </p>
-        </div>
-      </section>
-
       {/* ── Contacto ──────────────────────────────────────────────────────────── */}
       <section id="contacto" className="py-28 max-w-6xl mx-auto px-6">
         <div className="grid grid-cols-2 gap-16 items-start">
@@ -1262,7 +1068,7 @@ export default function LandingPage() {
               Hablemos sobre<br />tu clínica.
             </h2>
             <p className="text-white/45 text-sm leading-relaxed mb-10">
-              Nuestro equipo de especialistas en tecnología dental está disponible para acompañarte en la implementación, resolver dudas y personalizar el plan adecuado para ti.
+              Nuestro equipo de especialistas en tecnología dental está disponible para acompañarte en la implementación, resolver dudas y personalizar la solución adecuada para ti.
             </p>
 
             <div className="space-y-5">
@@ -1310,7 +1116,7 @@ export default function LandingPage() {
         <div className="relative max-w-2xl mx-auto px-6 text-center">
           <div className="inline-flex items-center gap-2 border border-white/15 text-xs font-medium px-3 py-1.5 rounded-full mb-8"
             style={{ backgroundColor: 'rgba(94,201,190,0.08)', color: '#5FC9BE', fontFamily: 'Outfit' }}>
-            Sin tarjeta de crédito · Plan Starter gratis por 14 días
+            Plataforma integral de gestión clínica e inteligencia artificial
           </div>
           <h2 className="text-white font-bold mb-5"
             style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', lineHeight: 1.1 }}>
@@ -1356,7 +1162,7 @@ export default function LandingPage() {
           {/* Plataforma */}
           <div>
             <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-4" style={{ fontFamily: 'Outfit' }}>Plataforma</p>
-            {['Funcionalidades', 'Precios', 'Seguridad', 'Integraciones', 'API'].map(l => (
+            {['Funcionalidades', 'Seguridad', 'Integraciones', 'API'].map(l => (
               <p key={l} className="text-white/30 text-xs mb-2 hover:text-white/60 transition-colors cursor-pointer">{l}</p>
             ))}
           </div>

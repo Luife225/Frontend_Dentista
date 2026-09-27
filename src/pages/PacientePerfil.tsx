@@ -475,8 +475,8 @@ function PatientDetail({ patient, readOnly }: { patient: Patient; readOnly: bool
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function PacientePerfil({ readOnly = false }: { readOnly?: boolean }) {
-  const [patients, setPatients] = useState<Patient[]>(PATIENTS)
-  const [selId, setSelId] = useState<number | string>(PATIENTS[0].id)
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [selId, setSelId] = useState<number | string>('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all'|'active'|'inactive'>('all')
   const [showNewModal, setShowNewModal] = useState(false)
@@ -511,12 +511,10 @@ export default function PacientePerfil({ readOnly = false }: { readOnly?: boolea
             isRealDb: true,
           }))
 
-          setPatients(prev => {
-            const existingDocs = new Set(mapped.map(m => m.doc))
-            const remaining = prev.filter(p => !existingDocs.has(p.doc))
-            return [...mapped, ...remaining]
-          })
+          setPatients(mapped)
           setSelId(mapped[0].id)
+        } else {
+          setPatients([])
         }
       } catch (err) {
         if (!isMounted) return

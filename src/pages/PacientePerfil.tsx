@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import HistoriaClinica from './HistoriaClinica'
+import { fetchPatientsFromApi, createPatientInApi, BackendPatientDto } from '../services/patientService'
 
 type Tab = 'resumen'|'historia'|'odontograma'|'radiografias'|'documentos'
 
@@ -9,9 +10,10 @@ function Icon({ d, className='w-4 h-4' }: { d: string; className?: string }) {
 
 // ── Patient data ──────────────────────────────────────────────────────────────
 interface Patient {
-  id: number; name: string; doc: string; dob: string; phone: string; email: string
+  id: number | string; name: string; doc: string; dob: string; phone: string; email: string
   blood: string; eps: string; allergy: string; antecedentes: string; city: string
   status: 'active'|'inactive'; nextAppt: string; lastVisit: string; balance: number
+  isRealDb?: boolean
 }
 
 const PATIENTS: Patient[] = [
@@ -31,7 +33,7 @@ function fmt(n: number) { return n ? new Intl.NumberFormat('es-CO',{style:'curre
 
 // ── Modal: Nuevo paciente ─────────────────────────────────────────────────────
 const BLANK_P = () => ({ name:'', doc:'', dob:'', phone:'', email:'', blood:'O+', eps:'', allergy:'', antecedentes:'', city:'' })
-function ModalNuevoPaciente({ onSave, onClose }: { onSave: (p: typeof BLANK_P extends () => infer R ? R : never) => void; onClose: () => void }) {
+function ModalNuevoPaciente({ onSave, onClose, isSaving }: { onSave: (p: typeof BLANK_P extends () => infer R ? R : never) => void; onClose: () => void; isSaving?: boolean }) {
   const [form, setForm] = useState(BLANK_P())
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>) => setForm(f=>({...f,[k]:e.target.value}))
 
@@ -39,7 +41,13 @@ function ModalNuevoPaciente({ onSave, onClose }: { onSave: (p: typeof BLANK_P ex
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(0,0,0,0.65)',backdropFilter:'blur(4px)'}}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>+ Nuevo paciente</h2>
+          <div>
+            <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>+ Nuevo paciente</h2>
+            <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Sincronizado con PostgreSQL en vivo
+            </p>
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5"/></button>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
@@ -50,7 +58,7 @@ function ModalNuevoPaciente({ onSave, onClose }: { onSave: (p: typeof BLANK_P ex
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1.5">N° Documento *</label>
-              <input value={form.doc} onChange={set('doc')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="CC / CE / Pasaporte"/>
+              <input value={form.doc} onChange={set('doc')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="CC / CE / Pasaporte / DNI"/>
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1.5">Fecha de nacimiento</label>
@@ -58,7 +66,7 @@ function ModalNuevoPaciente({ onSave, onClose }: { onSave: (p: typeof BLANK_P ex
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1.5">Teléfono</label>
-              <input value={form.phone} onChange={set('phone')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="+57..."/>
+              <input value={form.phone} onChange={set('phone')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="+51... / +57..."/>
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1.5">Email</label>
@@ -89,8 +97,20 @@ function ModalNuevoPaciente({ onSave, onClose }: { onSave: (p: typeof BLANK_P ex
           </div>
         </div>
         <div className="px-6 py-4 border-t border-slate-100 flex gap-2 justify-end shrink-0">
-          <button onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-          <button onClick={()=>onSave(form)} className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500">Registrar paciente</button>
+          <button disabled={isSaving} onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
+          <button 
+            disabled={isSaving} 
+            onClick={()=>onSave(form)} 
+            className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-cyan-600/20"
+          >
+            {isSaving && (
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
+            {isSaving ? 'Guardando en BD...' : 'Registrar paciente'}
+          </button>
         </div>
       </div>
     </div>
@@ -455,11 +475,58 @@ function PatientDetail({ patient, readOnly }: { patient: Patient; readOnly: bool
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function PacientePerfil({ readOnly = false }: { readOnly?: boolean }) {
-  const [patients, setPatients] = useState(PATIENTS)
-  const [selId, setSelId] = useState(PATIENTS[0].id)
+  const [patients, setPatients] = useState<Patient[]>(PATIENTS)
+  const [selId, setSelId] = useState<number | string>(PATIENTS[0].id)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all'|'active'|'inactive'>('all')
   const [showNewModal, setShowNewModal] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [dbConnected, setDbConnected] = useState<boolean | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadDbPatients() {
+      try {
+        const dbData = await fetchPatientsFromApi()
+        if (!isMounted) return
+        setDbConnected(true)
+        if (dbData && dbData.length > 0) {
+          const mapped: Patient[] = dbData.map(d => ({
+            id: d.id || `db-${d.numeroDocumento}`,
+            name: `${d.nombres} ${d.apellidos || ''}`.trim(),
+            doc: d.numeroDocumento || 'S/D',
+            dob: d.fechaNacimiento || '1995-01-01',
+            phone: d.telefono || 'Sin teléfono',
+            email: d.correo || '',
+            blood: 'O+',
+            eps: 'Particular',
+            allergy: d.alergias || 'Ninguna',
+            antecedentes: d.antecedentesMedicos || 'Sin antecedentes registrados.',
+            city: 'Sede Central',
+            status: (d.estado === 'INACTIVO' ? 'inactive' : 'active') as 'active'|'inactive',
+            nextAppt: '',
+            lastVisit: d.fechaCreacion ? d.fechaCreacion.substring(0, 10) : '2026-09-26',
+            balance: 0,
+            isRealDb: true,
+          }))
+
+          setPatients(prev => {
+            const existingDocs = new Set(mapped.map(m => m.doc))
+            const remaining = prev.filter(p => !existingDocs.has(p.doc))
+            return [...mapped, ...remaining]
+          })
+          setSelId(mapped[0].id)
+        }
+      } catch (err) {
+        if (!isMounted) return
+        console.warn('Backend PostgreSQL no accesible o desconectado:', err)
+        setDbConnected(false)
+      }
+    }
+    loadDbPatients()
+    return () => { isMounted = false }
+  }, [])
 
   const visible = patients.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.doc.includes(search)
@@ -467,25 +534,103 @@ export default function PacientePerfil({ readOnly = false }: { readOnly?: boolea
     return matchSearch && matchFilter
   })
 
-  const sel = patients.find(p=>p.id===selId)!
+  const sel = patients.find(p=>p.id===selId) || patients[0]
 
-  function addPatient(data: { name:string; doc:string; dob:string; phone:string; email:string; blood:string; eps:string; allergy:string; antecedentes:string; city:string }) {
-    const np: Patient = {
-      id: Date.now(), name:data.name||'Nuevo paciente', doc:data.doc, dob:data.dob, phone:data.phone,
-      email:data.email, blood:data.blood as Patient['blood'], eps:data.eps, allergy:data.allergy||'Ninguna',
-      antecedentes:data.antecedentes, city:data.city, status:'active', nextAppt:'', lastVisit:'', balance:0,
+  async function addPatient(data: { name:string; doc:string; dob:string; phone:string; email:string; blood:string; eps:string; allergy:string; antecedentes:string; city:string }) {
+    setIsSaving(true)
+    try {
+      const parts = data.name.trim().split(' ')
+      const nombres = parts.length > 1 ? parts.slice(0, parts.length - 1).join(' ') : data.name
+      const apellidos = parts.length > 1 ? parts[parts.length - 1] : 'Sin apellido'
+
+      const created = await createPatientInApi({
+        nombres,
+        apellidos,
+        tipoDocumento: 'DNI',
+        numeroDocumento: data.doc,
+        fechaNacimiento: data.dob || null,
+        telefono: data.phone,
+        correo: data.email,
+        alergias: data.allergy || 'Ninguna',
+        antecedentesMedicos: data.antecedentes || null,
+        medicamentos: null,
+        estado: 'ACTIVO'
+      })
+
+      const np: Patient = {
+        id: created.id || Date.now(),
+        name: `${created.nombres} ${created.apellidos || ''}`.trim(),
+        doc: created.numeroDocumento || data.doc,
+        dob: created.fechaNacimiento || data.dob,
+        phone: created.telefono || data.phone,
+        email: created.correo || data.email,
+        blood: data.blood as Patient['blood'],
+        eps: data.eps || 'Particular',
+        allergy: created.alergias || 'Ninguna',
+        antecedentes: created.antecedentesMedicos || data.antecedentes,
+        city: data.city || 'Sede Central',
+        status: 'active',
+        nextAppt: '',
+        lastVisit: new Date().toISOString().substring(0, 10),
+        balance: 0,
+        isRealDb: true,
+      }
+
+      setPatients(ps => [np, ...ps])
+      setSelId(np.id)
+      setDbConnected(true)
+      setToastMessage(`✓ Paciente guardado en PostgreSQL (ID: ${String(created.id).substring(0, 8)}...)`)
+      setTimeout(() => setToastMessage(null), 4000)
+      setShowNewModal(false)
+    } catch (err: any) {
+      console.error('Error al persistir en backend:', err)
+      const np: Patient = {
+        id: Date.now(), name:data.name||'Nuevo paciente', doc:data.doc, dob:data.dob, phone:data.phone,
+        email:data.email, blood:data.blood as Patient['blood'], eps:data.eps, allergy:data.allergy||'Ninguna',
+        antecedentes:data.antecedentes, city:data.city, status:'active', nextAppt:'', lastVisit:'', balance:0,
+      }
+      setPatients(ps => [np, ...ps])
+      setSelId(np.id)
+      setShowNewModal(false)
+      setToastMessage(`⚠ Guardado localmente (Backend: ${err.message || 'Sin conexión'})`)
+      setTimeout(() => setToastMessage(null), 5000)
+    } finally {
+      setIsSaving(false)
     }
-    setPatients(ps=>[np,...ps])
-    setSelId(np.id)
-    setShowNewModal(false)
   }
 
   return (
-    <div className="flex h-full">
-      {showNewModal && <ModalNuevoPaciente onSave={addPatient} onClose={()=>setShowNewModal(false)}/>}
+    <div className="flex h-full relative">
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="absolute top-4 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs flex items-center gap-2 border border-slate-700 animate-bounce">
+          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {showNewModal && <ModalNuevoPaciente onSave={addPatient} onClose={()=>setShowNewModal(false)} isSaving={isSaving}/>}
 
       {/* Patient sidebar */}
       <aside className="w-64 shrink-0 flex flex-col border-r border-slate-200 bg-white">
+        {/* Status header */}
+        <div className="px-3 pt-2.5 pb-1 flex items-center justify-between border-b border-slate-50">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Base de Datos</span>
+          {dbConnected === true ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              PostgreSQL Conectado
+            </span>
+          ) : dbConnected === false ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              Modo Local
+            </span>
+          ) : (
+            <span className="text-[10px] text-slate-400">Conectando...</span>
+          )}
+        </div>
+
         <div className="p-3 border-b border-slate-100 space-y-2">
           <div className="relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -514,11 +659,19 @@ export default function PacientePerfil({ readOnly = false }: { readOnly?: boolea
           {visible.map(p=>(
             <button key={p.id} onClick={()=>setSelId(p.id)}
               className={`w-full text-left px-4 py-3 border-b border-slate-50 transition-all flex items-center gap-2.5 ${selId===p.id?'bg-cyan-50 border-l-2 border-l-cyan-500':'hover:bg-slate-50'}`}>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-700 flex items-center justify-center text-white text-xs font-bold shrink-0 relative">
                 {p.name.split(' ').map(n=>n[0]).join('').slice(0,2)}
+                {p.isRealDb && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border border-white rounded-full" title="Guardado en PostgreSQL"></span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`text-xs font-semibold truncate ${selId===p.id?'text-cyan-700':'text-slate-700'}`}>{p.name}</p>
+                <div className="flex items-center gap-1">
+                  <p className={`text-xs font-semibold truncate ${selId===p.id?'text-cyan-700':'text-slate-700'}`}>{p.name}</p>
+                  {p.isRealDb && (
+                    <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1 rounded shrink-0">DB</span>
+                  )}
+                </div>
                 <p className="text-[10px] text-slate-400 truncate">{calcAge(p.dob)} años · {p.city}</p>
               </div>
               {p.balance>0 && <span className="w-1.5 h-1.5 bg-amber-400 rounded-full shrink-0"/>}
@@ -532,7 +685,7 @@ export default function PacientePerfil({ readOnly = false }: { readOnly?: boolea
       </aside>
 
       {/* Patient detail */}
-      <PatientDetail patient={sel} readOnly={readOnly}/>
+      {sel && <PatientDetail patient={sel} readOnly={readOnly}/>}
     </div>
   )
 }

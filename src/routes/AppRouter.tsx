@@ -47,11 +47,31 @@ export default function AppRouter() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="agenda" element={<AgendaUpdated />} />
         <Route path="pacientes" element={<PacientePerfil />} />
-        <Route path="teleodontologia" element={<Teleodontologia />} />
-        <Route path="notificaciones" element={<Notificaciones />} />
-        <Route path="inventario" element={<Inventario />} />
-        <Route path="caja" element={<Caja />} />
-        <Route path="consultorio" element={<Consultorio />} />
+        <Route path="teleodontologia" element={
+          <ProtectedRoute allowedRoles={['ODONTOLOGO']}>
+            <Teleodontologia />
+          </ProtectedRoute>
+        } />
+        <Route path="notificaciones" element={
+          <ProtectedRoute allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}>
+            <Notificaciones />
+          </ProtectedRoute>
+        } />
+        <Route path="inventario" element={
+          <ProtectedRoute allowedRoles={['RECEPCIONISTA', 'ADMIN_CLINICA']}>
+            <Inventario />
+          </ProtectedRoute>
+        } />
+        <Route path="caja" element={
+          <ProtectedRoute allowedRoles={['ODONTOLOGO', 'ADMIN_CLINICA']}>
+            <Caja />
+          </ProtectedRoute>
+        } />
+        <Route path="consultorio" element={
+          <ProtectedRoute allowedRoles={['ADMIN_CLINICA']}>
+            <Consultorio />
+          </ProtectedRoute>
+        } />
       </Route>
 
       {/* Catch-all → landing */}

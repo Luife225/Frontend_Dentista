@@ -2,21 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { gsap } from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { useAuth } from '../contexts/AuthContext'
-import { loginWithApi, fetchUsersFromApi, UserItem } from '../services/authService'
+import { loginWithApi } from '../services/authService'
 import coronixLogo from '../imports/coronixlogo.png'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
 
-const ROLE_META: Record<Role, { label: string; desc: string; icon: string; color: string; badge?: string }> = {
-  SUPER_ADMIN:   { label: 'Super Admin',   desc: 'Gestión global SaaS, clínicas y planes',    icon: '🌐', color: 'from-amber-500 to-orange-600',  badge: 'SaaS' },
-  ODONTOLOGO:    { label: 'Odontólogo',    desc: 'Historia clínica, pacientes, IA',            icon: '🦷', color: 'from-cyan-600 to-cyan-700' },
-  RECEPCIONISTA: { label: 'Recepcionista', desc: 'Agenda, citas, inventario',                  icon: '📋', color: 'from-violet-600 to-violet-700' },
-  ADMIN_CLINICA: { label: 'Administrador', desc: 'Configuración, usuarios, reportes',          icon: '⚙️', color: 'from-slate-600 to-slate-700' },
-  PACIENTE:      { label: 'Paciente',      desc: 'App móvil — mis citas y avances',            icon: '👤', color: 'from-emerald-600 to-emerald-700' },
-}
-
-// ─── Demo credentials ─────────────────────────────────────────────────────────
+// ─── Demo credentials fallback ────────────────────────────────────────────────
 const DEMO_ACCOUNTS: { email: string; password: string; role: Role; name: string; label: string; icon: string }[] = [
   { email: 'dr.herrera@coronyx.co',      password: 'demo1234', role: 'ODONTOLOGO',    name: 'Dr. Herrera',     label: 'Odontólogo',    icon: '🦷' },
   { email: 'paula.rios@coronyx.co',      password: 'demo1234', role: 'RECEPCIONISTA', name: 'Paula Ríos',      label: 'Recepcionista', icon: '📋' },
@@ -38,14 +30,12 @@ export default function Login() {
   const { login: onLogin, loginWithSession } = useAuth()
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [email, setEmail]               = useState('odontologo@coronyx.pe')
-  const [password, setPassword]         = useState('123456')
+  const [email, setEmail]               = useState('')
+  const [password, setPassword]         = useState('')
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
   const [forgot, setForgot]             = useState(false)
   const [forgotSent, setForgotSent]     = useState(false)
-  const [dbUsers, setDbUsers]           = useState<UserItem[]>([])
-  const [dbConnected, setDbConnected]   = useState<boolean | null>(null)
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const containerRef      = useRef<HTMLDivElement>(null)
@@ -57,27 +47,6 @@ export default function Login() {
   const passwordInputRef  = useRef<HTMLInputElement>(null)
   const loginBtnRef       = useRef<HTMLButtonElement>(null)
   const spinnerRef        = useRef<HTMLDivElement>(null)
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Cargar usuarios reales registrados en PostgreSQL
-  // ─────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    let isMounted = true
-    async function loadUsers() {
-      try {
-        const users = await fetchUsersFromApi()
-        if (!isMounted) return
-        setDbUsers(users)
-        setDbConnected(true)
-      } catch (err) {
-        if (!isMounted) return
-        setDbConnected(false)
-        console.warn('Backend PostgreSQL no accesible o desconectado:', err)
-      }
-    }
-    loadUsers()
-    return () => { isMounted = false }
-  }, [])
 
   // ─────────────────────────────────────────────────────────────────────────
   // UTIL: check reduced motion preference
@@ -175,10 +144,11 @@ export default function Login() {
     setLoading(true)
 
     try {
+      // 1. Intentar autenticación real contra PostgreSQL con JWT
       const session = await loginWithApi(email.trim(), password)
       loginWithSession(session)
     } catch (apiErr: any) {
-      // Fallback a cuenta demo si falla backend o coincide con credencial demo
+      // 2. Fallback a credencial demo si no hay conexión al backend
       const demoAccount = DEMO_ACCOUNTS.find(
         a => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password
       )
@@ -186,7 +156,7 @@ export default function Login() {
       if (demoAccount) {
         onLogin(demoAccount.role)
       } else {
-        setError(apiErr?.message || 'Credenciales inválidas o servicio no disponible.')
+        setError(apiErr?.message || 'Credenciales inválidas. Revisa el email y la contraseña.')
         shakeInput(emailInputRef.current)
         shakeInput(passwordInputRef.current)
       }
@@ -195,17 +165,11 @@ export default function Login() {
     }
   }
 
-  function selectUserAccount(user: UserItem) {
-    setEmail(user.correo)
-    setPassword('123456')
-    setError('')
-  }
-
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter') handleLogin()
   }
 
-  // Fill fields with a demo credential when clicked
+  // Fill fields with a demo credential when clicked (mobile hint)
   function fillCredential(account: typeof DEMO_ACCOUNTS[0]) {
     setEmail(account.email)
     setPassword(account.password)
@@ -327,7 +291,7 @@ export default function Login() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // MAIN LOGIN SCREEN
+  // MAIN LOGIN SCREEN (Clean Minimal 2-field card from origin/main)
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div ref={containerRef} className="min-h-screen bg-slate-950 flex">
@@ -354,7 +318,7 @@ export default function Login() {
 
           {/* Paragraph */}
           <p ref={paraRef} className="text-white/40 text-sm leading-relaxed mb-8">
-            Plataforma SaaS para clínicas odontológicas con base de datos real PostgreSQL, roles institucionales, análisis ML y teleodontología.
+            Plataforma SaaS para clínicas odontológicas con asistente IA, análisis ML de radiografías y teleodontología integrada.
           </p>
 
           {/* Role list */}
@@ -372,7 +336,7 @@ export default function Login() {
 
         </div>
 
-        <p className="text-white/20 text-xs">CORONYX Enterprise · PostgreSQL 16 · v2.0</p>
+        <p className="text-white/20 text-xs">CORONYX v2.0 · Multi-sede Enterprise</p>
       </div>
 
       {/* ── Right form panel ─────────────────────────────────────────────── */}
@@ -389,28 +353,8 @@ export default function Login() {
           </div>
 
           <div className="bg-slate-900 border border-white/8 rounded-2xl p-8 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-white text-2xl font-semibold" style={{fontFamily:'Outfit'}}>Iniciar Sesión</h2>
-                <p className="text-white/40 text-xs mt-0.5">Ingresa con tus credenciales de acceso</p>
-              </div>
-              {dbConnected === true && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  PostgreSQL Conectado
-                </span>
-              )}
-            </div>
-
-            {/* Error message banner */}
-            {error && (
-              <div className="mb-4 flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2.5">
-                <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                </svg>
-                <p className="text-xs text-rose-300">{error}</p>
-              </div>
-            )}
+            <h2 className="text-white text-2xl font-semibold mb-1" style={{fontFamily:'Outfit'}}>Bienvenido</h2>
+            <p className="text-white/40 text-sm mb-7">Ingresa con tu cuenta institucional</p>
 
             <form onSubmit={handleLogin} className="space-y-4" onKeyDown={handleKeyDown}>
 
@@ -425,8 +369,8 @@ export default function Login() {
                   onChange={e => { setEmail(e.target.value); setError('') }}
                   onFocus={() => handleInputFocus(emailInputRef.current)}
                   onBlur={() => handleInputBlur(emailInputRef.current)}
-                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-colors"
-                  placeholder="usuario@coronyx.pe"
+                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none transition-colors"
+                  placeholder="usuario@coronyx.co"
                 />
               </div>
 
@@ -441,50 +385,26 @@ export default function Login() {
                   onChange={e => { setPassword(e.target.value); setError('') }}
                   onFocus={() => handleInputFocus(passwordInputRef.current)}
                   onBlur={() => handleInputBlur(passwordInputRef.current)}
-                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none transition-colors"
                   placeholder="••••••••"
                 />
               </div>
+
+              {/* Error message */}
+              {error && (
+                <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2.5">
+                  <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                  </svg>
+                  <p className="text-xs text-rose-300">{error}</p>
+                </div>
+              )}
 
               <div className="flex justify-end">
                 <button type="button" onClick={() => setForgot(true)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
                   ¿Olvidaste tu contraseña?
                 </button>
               </div>
-
-              {/* Real accounts registered in PostgreSQL */}
-              {dbUsers.length > 0 && (
-                <div className="bg-white/3 border border-white/8 rounded-xl p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[11px] text-white/40 font-medium">Cuentas activas en PostgreSQL:</p>
-                    <span className="text-[10px] text-cyan-400 font-mono">Clave: 123456</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {dbUsers.map(u => {
-                      const meta = ROLE_META[u.rol as Role] || { icon: '👤', label: u.rol }
-                      const isSelected = email.toLowerCase() === u.correo.toLowerCase()
-                      return (
-                        <button
-                          key={u.id}
-                          type="button"
-                          onClick={() => selectUserAccount(u)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-left ${
-                            isSelected
-                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                              : 'text-white/50 hover:bg-white/5 hover:text-white/80 border border-transparent'
-                          }`}
-                        >
-                          <span className="text-sm">{meta.icon}</span>
-                          <div className="truncate flex-1 min-w-0">
-                            <p className="truncate leading-none text-[11px]">{meta.label}</p>
-                            <p className="text-[9px] text-white/30 truncate mt-0.5">{u.correo}</p>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
 
               {/* ── Login button ────────────────────────────────────────── */}
               <button
@@ -493,7 +413,7 @@ export default function Login() {
                 onMouseEnter={handleBtnEnter}
                 onMouseLeave={handleBtnLeave}
                 disabled={loading}
-                className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg shadow-cyan-600/20 cursor-pointer"
+                className="w-full py-3 bg-cyan-600 text-white rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2 hover:bg-cyan-500 transition-colors cursor-pointer"
                 style={{ willChange: 'transform' }}
               >
                 {loading ? (
@@ -503,11 +423,9 @@ export default function Login() {
                       className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                       style={{ willChange: 'transform' }}
                     />
-                    Autenticando en PostgreSQL...
+                    Verificando acceso...
                   </>
-                ) : (
-                  'Iniciar Sesión'
-                )}
+                ) : 'Ingresar'}
               </button>
             </form>
 
@@ -531,7 +449,7 @@ export default function Login() {
           </div>
 
           <p className="text-center text-xs text-white/15 mt-5">
-            CORONYX Enterprise · Base de Datos PostgreSQL · v2.0
+            CORONYX Enterprise · Multi-sede · v2.0
           </p>
         </div>
       </div>

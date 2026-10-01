@@ -154,10 +154,8 @@ export default function Login() {
       )
 
       if (demoAccount) {
-        console.info('ℹ️ [CORONYX Demo] Sesión iniciada con credencial demo local (sin token JWT de PostgreSQL). Para obtener token real JWT ingresa con: odontologo@coronyx.pe / 123456')
         onLogin(demoAccount.role)
       } else {
-        console.error('❌ [CORONYX Auth] Error al autenticar:', apiErr?.message)
         setError(apiErr?.message || 'Credenciales inválidas. Revisa el email y la contraseña.')
         shakeInput(emailInputRef.current)
         shakeInput(passwordInputRef.current)

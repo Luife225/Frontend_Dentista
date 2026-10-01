@@ -48,13 +48,6 @@ export async function loginWithApi(correo: string, clave: string): Promise<Login
   const data: LoginResponse = await response.json();
   if (data.token) {
     localStorage.setItem('coronyx_jwt_token', data.token);
-    console.group('%c🔐 [CORONYX] Sesión Iniciada con Éxito (JWT)', 'color: #5FC9BE; font-weight: bold; font-size: 13px;');
-    console.log('👤 Usuario:', `${data.nombreCompleto} (${data.correo})`);
-    console.log('🏷️ Rol:', data.rol);
-    console.log('🏥 Clínica:', data.clinicaNombre || 'N/A');
-    console.log('🔑 Token JWT:', data.token);
-    console.log('💾 Guardado en: localStorage.getItem("coronyx_jwt_token")');
-    console.groupEnd();
   }
   return data;
 }

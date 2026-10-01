@@ -116,7 +116,7 @@ export default function Patients() {
         telefono: form.telefono,
         correo: form.correo,
         alergias: form.alergias || 'Ninguna',
-        antecedentesMedicos: form.antecedentesMedicos || null,
+        antecedentesMedicos: form.antecedentesMedicos || undefined,
         estado: 'ACTIVO',
       })
 

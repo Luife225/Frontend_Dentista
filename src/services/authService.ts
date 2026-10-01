@@ -7,6 +7,8 @@ export interface LoginResponse {
   rol: 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE';
   clinicaId?: string;
   clinicaNombre?: string;
+  token?: string;
+  tipoToken?: string;
 }
 
 export interface UserItem {
@@ -43,7 +45,11 @@ export async function loginWithApi(correo: string, clave: string): Promise<Login
     throw new Error(message);
   }
 
-  return response.json();
+  const data: LoginResponse = await response.json();
+  if (data.token) {
+    localStorage.setItem('coronyx_jwt_token', data.token);
+  }
+  return data;
 }
 
 export async function fetchUsersFromApi(): Promise<UserItem[]> {

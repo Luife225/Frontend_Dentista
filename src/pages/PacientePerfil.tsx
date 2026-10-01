@@ -8,6 +8,7 @@ import {
   archivePatientInApi,
   BackendPatientDto 
 } from '../services/patientService'
+import { useAuth } from '../contexts/AuthContext'
 
 type Tab = 'resumen'|'historia'|'odontograma'|'radiografias'|'documentos'
 
@@ -753,23 +754,29 @@ function RadiografiaItem({ name, date, onView }: { name: string; date: string; o
 // ── Patient tabs ──────────────────────────────────────────────────────────────
 function PatientDetail({ 
   patient, 
-  readOnly,
+  readOnly: propReadOnly,
   onUpdate,
   onArchive,
   onReload,
 }: { 
   patient: Patient; 
-  readOnly: boolean;
+  readOnly?: boolean;
   onUpdate: (id: string | number, updates: Partial<BackendPatientDto>) => Promise<void>;
   onArchive: (id: string | number) => Promise<void>;
   onReload: (id: string | number) => Promise<void>;
 }) {
+  const { role } = useAuth()
+  const readOnly = propReadOnly ?? (role === 'RECEPCIONISTA')
   const [tab, setTab] = useState<Tab>('resumen')
   const [modal, setModal] = useState<'cita'|'rx'|'detalle'|'editar'|'archivar'|null>(null)
-  const tabs: {id:Tab;label:string}[] = [
+  const allTabs: {id:Tab;label:string}[] = [
     {id:'resumen',label:'Resumen'}, {id:'historia',label:'Historia clínica'},
     {id:'odontograma',label:'Odontograma'}, {id:'radiografias',label:'Radiografías'}, {id:'documentos',label:'Documentos'},
   ]
+  // Recepcionista only sees Resumen and Documentos
+  const tabs = role === 'RECEPCIONISTA'
+    ? allTabs.filter(t => t.id === 'resumen' || t.id === 'documentos')
+    : allTabs
 
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -916,7 +923,9 @@ function PatientDetail({
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function PacientePerfil({ readOnly = false }: { readOnly?: boolean }) {
+export default function PacientePerfil({ readOnly: propReadOnly }: { readOnly?: boolean } = {}) {
+  const { role } = useAuth()
+  const readOnly = propReadOnly ?? (role === 'RECEPCIONISTA')
   const [patients, setPatients] = useState<Patient[]>([])
   const [selId, setSelId] = useState<number | string>('')
   const [search, setSearch] = useState('')

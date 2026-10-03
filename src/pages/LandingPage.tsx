@@ -1,6 +1,22 @@
-import { useState, useEffect } from 'react'
-
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useGSAP } from '@gsap/react'
+import coronixLogo from '../imports/coronixlogo.png'
+
+// Registro oficial de plugins GSAP
+gsap.registerPlugin(ScrollTrigger)
+
+// ── Stats data config ────────────────────────────────────────────────────────
+// NOTA: Valores demostrativos actuales de la landing page.
+// Modificar aquí si se conectan a métricas reales o dinámicas.
+const STATS_DATA = [
+  { target: 2400, prefix: '', suffix: '+', decimals: 0, label: 'Pacientes gestionados', sub: 'en clínicas activas', formatThousand: true },
+  { target: 11,   prefix: '', suffix: '',  decimals: 0, label: 'Módulos clínicos',      sub: 'integrados en 1 plataforma', formatThousand: false },
+  { target: 5,    prefix: '', suffix: '',  decimals: 0, label: 'Roles de usuario',      sub: 'control granular de acceso', formatThousand: false },
+  { target: 99.9, prefix: '', suffix: '%', decimals: 1, label: 'Uptime garantizado',    sub: 'SLA Enterprise', formatThousand: false },
+]
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
 function CxLogo({ size = 36 }: { size?: number }) {
@@ -30,7 +46,7 @@ function DashboardMockup() {
         style={{ background: 'radial-gradient(ellipse at 60% 40%, #1E8C82, transparent 70%)' }} />
 
       {/* Browser chrome */}
-      <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
+      <div className="mockup-window relative w-full h-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
         style={{ background: '#0d1a18' }}>
 
         {/* URL bar */}
@@ -52,14 +68,14 @@ function DashboardMockup() {
           {/* Sidebar */}
           <div className="w-12 shrink-0 flex flex-col items-center py-3 gap-3 border-r border-white/5"
             style={{ background: '#0B3D3A' }}>
-            <CxLogo size={22} />
+            <img src={coronixLogo} alt="CORONYX" className="w-7 h-7 object-contain" />
             {[
               'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
               'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
               'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857',
               'M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z',
             ].map((d, i) => (
-              <div key={i} className={`w-7 h-7 rounded-lg flex items-center justify-center ${i === 0 ? 'bg-cyan-500/25' : ''}`}>
+              <div key={i} className={`mockup-sidebar-icon w-7 h-7 rounded-lg flex items-center justify-center ${i === 0 ? 'bg-cyan-500/25' : ''}`}>
                 <svg className={`w-3.5 h-3.5 ${i === 0 ? 'text-cyan-400' : 'text-white/25'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
                   <path d={d}/>
                 </svg>
@@ -77,7 +93,7 @@ function DashboardMockup() {
                 { label: 'Pendientes', val: '3', color: '#D97706' },
                 { label: 'Ingresos', val: '$4.2M', color: '#059669' },
               ].map((s, i) => (
-                <div key={i} className="rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
+                <div key={i} className="mockup-stat-card rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
                   <p className="text-[8px] text-white/40 mb-0.5">{s.label}</p>
                   <p className="text-sm font-bold" style={{ color: s.color, fontFamily: 'Outfit' }}>{s.val}</p>
                 </div>
@@ -87,7 +103,7 @@ function DashboardMockup() {
             {/* Content row */}
             <div className="grid grid-cols-3 gap-2">
               {/* Calendar */}
-              <div className="col-span-2 rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
+              <div className="mockup-calendar col-span-2 rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
                 <p className="text-[8px] text-white/50 mb-2 font-medium">Agenda · Hoy</p>
                 {[
                   { time: '09:00', patient: 'Ana Torres', type: 'Revisión', color: '#1E8C82' },
@@ -95,7 +111,7 @@ function DashboardMockup() {
                   { time: '11:00', patient: 'María Gil', type: 'Ortodoncia', color: '#7C3AED' },
                   { time: '14:30', patient: 'Carlos V.', type: 'Blanqueamiento', color: '#1E8C82' },
                 ].map((a, i) => (
-                  <div key={i} className="flex items-center gap-1.5 py-1 border-b border-white/4">
+                  <div key={i} className="mockup-agenda-item flex items-center gap-1.5 py-1 border-b border-white/4">
                     <span className="text-[7px] text-white/30 w-8 shrink-0 font-mono">{a.time}</span>
                     <div className="w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: a.color }}/>
                     <span className="text-[7px] text-white/70 truncate flex-1">{a.patient}</span>
@@ -106,22 +122,22 @@ function DashboardMockup() {
               </div>
 
               {/* Odontogram preview */}
-              <div className="rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
+              <div className="mockup-odontogram rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
                 <p className="text-[8px] text-white/50 mb-2 font-medium">Odontograma</p>
                 <div className="grid grid-cols-8 gap-0.5 mb-1.5">
                   {Array.from({length: 16}).map((_, i) => (
-                    <div key={i} className="w-3 h-3 rounded-sm"
+                    <div key={i} className="mockup-odontogram-cell w-3 h-3 rounded-sm"
                       style={{ backgroundColor: [2,5,9].includes(i) ? '#1E8C82' : [7,11].includes(i) ? '#D97706' : '#ffffff12' }}/>
                   ))}
                 </div>
                 <div className="grid grid-cols-8 gap-0.5">
                   {Array.from({length: 16}).map((_, i) => (
-                    <div key={i} className="w-3 h-3 rounded-sm"
+                    <div key={i} className="mockup-odontogram-cell w-3 h-3 rounded-sm"
                       style={{ backgroundColor: [3,6,13].includes(i) ? '#7C3AED' : '#ffffff12' }}/>
                   ))}
                 </div>
                 {/* AI badge */}
-                <div className="mt-2 flex items-center gap-1 bg-rose-500/15 rounded-md px-1.5 py-1">
+                <div className="mockup-ai-badge mt-2 flex items-center gap-1 bg-rose-500/15 rounded-md px-1.5 py-1">
                   <div className="w-1 h-1 bg-rose-400 rounded-full animate-pulse"/>
                   <span className="text-[7px] text-rose-300 font-medium">IA activa · dictando</span>
                 </div>
@@ -134,76 +150,6 @@ function DashboardMockup() {
   )
 }
 
-// ── Plans ─────────────────────────────────────────────────────────────────────
-const PLANS = [
-  {
-    id: 'individual',
-    name: 'Individual',
-    subtitle: 'Para el odontólogo independiente',
-    price: 149000,
-    priceNote: '/mes',
-    badge: null,
-    color: '#5FC9BE',
-    highlight: false,
-    cta: 'Comenzar gratis',
-    features: [
-      '1 consultorio · 1 usuario clínico',
-      'Agenda con recordatorios WhatsApp',
-      'Historia clínica ilimitada',
-      'Odontograma digital',
-      'Portal del paciente incluido',
-      '10 GB almacenamiento DICOM',
-      'Soporte por email',
-    ],
-    missing: ['Asistente IA por voz', 'Análisis ML de radiografías', 'Teleodontología', 'Multi-sede'],
-  },
-  {
-    id: 'pro',
-    name: 'Clínicas Pro',
-    subtitle: 'Para clínicas en crecimiento',
-    price: 490000,
-    priceNote: '/mes',
-    badge: 'Más popular',
-    color: '#1E8C82',
-    highlight: true,
-    cta: 'Solicitar plan Pro',
-    features: [
-      'Hasta 5 consultorios · 15 usuarios',
-      'Todo lo de Individual',
-      'Asistente IA por voz 🎙',
-      'Análisis ML de radiografías 🔬',
-      'Teleodontología integrada 📹',
-      '100 GB DICOM + backups diarios',
-      'Notificaciones multicanal (WA, SMS, Email)',
-      'Reportes financieros avanzados',
-      'Soporte prioritario',
-    ],
-    missing: [],
-  },
-  {
-    id: 'enterprise',
-    name: 'Red / Enterprise',
-    subtitle: 'Multi-sede y grandes redes',
-    price: 0,
-    priceNote: 'A medida',
-    badge: 'Enterprise',
-    color: '#7C3AED',
-    highlight: false,
-    cta: 'Solicitar cotización',
-    features: [
-      'Consultorios y usuarios ilimitados',
-      'Todo lo de Clínicas Pro',
-      'Multi-sede con dashboard unificado',
-      '1 TB DICOM + almacenamiento escalable',
-      'IA prioritaria y modelos personalizados',
-      'SLA 99.9% garantizado',
-      'Integración con sistemas existentes (API)',
-      'Onboarding dedicado + capacitación',
-      'Soporte 24/7 con ejecutivo de cuenta',
-    ],
-    missing: [],
-  },
-]
 
 // ── Feature card data ─────────────────────────────────────────────────────────
 const FEATURES = [
@@ -249,7 +195,7 @@ const ROLES = [
     badge: 'Config.',
     badgeColor: '#475569',
     desc: 'Configuración del consultorio, gestión del equipo médico, horarios, facturación avanzada y reportes gerenciales.',
-    modules: ['Configuración sede', 'Usuarios y roles', 'Reportes financieros', 'Inventario', 'Suscripción'],
+    modules: ['Configuración sede', 'Usuarios y roles', 'Reportes financieros', 'Inventario'],
     bg: 'from-slate-500/10 to-gray-500/5',
     accent: '#64748B',
   },
@@ -344,31 +290,8 @@ function ContactForm() {
       <div>
         <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Mensaje *</label>
         <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
-          required rows={5} placeholder="Cuéntanos sobre tu clínica, número de usuarios estimado, consultas sobre planes, integraciones..."
+          required rows={5} placeholder="Cuéntanos sobre tu clínica, número de usuarios estimado, integraciones requeridas..."
           className={`${inputCls} resize-none`} style={inputStyle} />
-      </div>
-
-      {/* Plan interest quick select */}
-      <div>
-        <p className="text-xs text-white/40 mb-2" style={{ fontFamily: 'Outfit' }}>¿Qué plan te interesa? (opcional)</p>
-        <div className="flex gap-2">
-          {['Individual', 'Clínicas Pro', 'Enterprise', 'Aún no lo sé'].map(p => {
-            const isActive = form.message.startsWith(`[Plan: ${p}]`)
-            return (
-              <button type="button" key={p}
-                onClick={() => setForm(f => ({ ...f, message: isActive ? f.message.replace(`[Plan: ${p}] `, '') : `[Plan: ${p}] ${f.message}` }))}
-                className="px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all"
-                style={{
-                  fontFamily: 'Outfit',
-                  backgroundColor: isActive ? 'rgba(30,140,130,0.2)' : 'transparent',
-                  borderColor: isActive ? '#1E8C82' : 'rgba(255,255,255,0.12)',
-                  color: isActive ? '#5FC9BE' : 'rgba(255,255,255,0.4)',
-                }}>
-                {p}
-              </button>
-            )
-          })}
-        </div>
       </div>
 
       <button type="submit" disabled={sending}
@@ -390,28 +313,357 @@ function ContactForm() {
 
 export default function LandingPage() {
   const navigate = useNavigate()
-  const [scrolled, setScrolled] = useState(false)
+  const onNavigate = (path: string) => navigate(path)
   const [activeRole, setActiveRole] = useState(0)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Refs para scoping, elementos y timelines de GSAP
+  const mainRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+  const statsRef = useRef<HTMLElement>(null)
+  const statValRefs = useRef<(HTMLParagraphElement | null)[]>([])
+  const rolePanelRef = useRef<HTMLDivElement>(null)
+  const roleTimelineRef = useRef<gsap.core.Timeline | null>(null)
+
+  // Refs e interacción para Carrusel Marquee Infinito de Funcionalidades
+  const marqueeContainerRef = useRef<HTMLDivElement>(null)
+  const marqueeTrackRef = useRef<HTMLDivElement>(null)
+  const marqueeTweenRef = useRef<gsap.core.Tween | null>(null)
+  const isDraggingRef = useRef(false)
+  const startXRef = useRef(0)
+  const startProgressRef = useRef(0)
+  const trackHalfWidthRef = useRef(0)
+  const isHoveredRef = useRef(false)
 
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20)
-    try {
-      window.addEventListener('scroll', handler, { passive: true })
-      return () => window.removeEventListener('scroll', handler)
-    } catch (_) { return undefined }
+    const mqMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const mqMobile = window.matchMedia('(max-width: 767px)')
+
+    setPrefersReducedMotion(mqMotion.matches)
+    setIsMobile(mqMobile.matches)
+
+    const onMotionChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches)
+    const onMobileChange = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+
+    mqMotion.addEventListener('change', onMotionChange)
+    mqMobile.addEventListener('change', onMobileChange)
+
+    return () => {
+      mqMotion.removeEventListener('change', onMotionChange)
+      mqMobile.removeEventListener('change', onMobileChange)
+    }
   }, [])
 
+  const handleMarqueeMouseEnter = () => {
+    isHoveredRef.current = true
+    if (marqueeTweenRef.current && !isDraggingRef.current) {
+      gsap.to(marqueeTweenRef.current, { timeScale: 0, duration: 0.5, ease: 'power1.out', overwrite: 'auto' })
+    }
+  }
+
+  const handleMarqueeMouseLeave = () => {
+    isHoveredRef.current = false
+    if (marqueeTweenRef.current && !isDraggingRef.current) {
+      gsap.to(marqueeTweenRef.current, { timeScale: 1, duration: 0.6, ease: 'power1.out', overwrite: 'auto' })
+    }
+  }
+
+  const handleMarqueePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!marqueeTweenRef.current || !marqueeTrackRef.current) return
+    isDraggingRef.current = true
+    startXRef.current = e.clientX
+    startProgressRef.current = marqueeTweenRef.current.progress()
+    trackHalfWidthRef.current = marqueeTrackRef.current.scrollWidth / 2
+    marqueeTweenRef.current.pause()
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      // Navegadores que no soportan setPointerCapture
+    }
+  }
+
+  const handleMarqueePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current || !marqueeTweenRef.current || !trackHalfWidthRef.current) return
+    const dx = e.clientX - startXRef.current
+    const progressDelta = -dx / trackHalfWidthRef.current
+    const newProgress = gsap.utils.wrap(0, 1, startProgressRef.current + progressDelta)
+    marqueeTweenRef.current.progress(newProgress)
+  }
+
+  const handleMarqueePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return
+    isDraggingRef.current = false
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // Ignorar si ya fue liberado
+    }
+    if (marqueeTweenRef.current) {
+      marqueeTweenRef.current.play()
+      if (isHoveredRef.current) {
+        gsap.to(marqueeTweenRef.current, { timeScale: 0, duration: 0.4, ease: 'power1.out', overwrite: 'auto' })
+      } else {
+        gsap.to(marqueeTweenRef.current, { timeScale: 1, duration: 0.5, ease: 'power1.out', overwrite: 'auto' })
+      }
+    }
+  }
+
+  // ── Animaciones principales con useGSAP y ScrollTrigger ──
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia()
+
+      mm.add(
+        {
+          isDesktop: '(min-width: 768px) and (prefers-reduced-motion: no-preference)',
+          isMobile: '(max-width: 767px) and (prefers-reduced-motion: no-preference)',
+          reduceMotion: '(prefers-reduced-motion: reduce)',
+        },
+        (context) => {
+          const { isDesktop, isMobile, reduceMotion } = context.conditions!
+
+          if (reduceMotion) {
+            // Accesibilidad: fijar elementos directamente en su estado visible sin animaciones de movimiento
+            gsap.set(['.hero-anim-item', '.mockup-window', '.hero-floating-badge'], {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+            })
+            // Navbar estático accesible con scroll
+            ScrollTrigger.create({
+              start: 'top -20',
+              end: 'top -20',
+              onEnter: () => {
+                if (navRef.current) {
+                  navRef.current.style.backgroundColor = 'rgba(8,15,14,0.88)'
+                  navRef.current.style.backdropFilter = 'blur(16px)'
+                  navRef.current.style.borderBottomColor = 'rgba(255,255,255,0.08)'
+                }
+              },
+              onLeaveBack: () => {
+                if (navRef.current) {
+                  navRef.current.style.backgroundColor = 'rgba(8,15,14,0)'
+                  navRef.current.style.backdropFilter = 'blur(0px)'
+                  navRef.current.style.borderBottomColor = 'transparent'
+                }
+              },
+            })
+            return
+          }
+
+          // ── 1. Floating Navbar animado con ScrollTrigger ──
+          if (navRef.current) {
+            gsap.to(navRef.current, {
+              backgroundColor: 'rgba(8,15,14,0.88)',
+              backdropFilter: 'blur(16px)',
+              borderBottomColor: 'rgba(255,255,255,0.08)',
+              boxShadow: '0 10px 30px -10px rgba(0,0,0,0.5)',
+              duration: 0.35,
+              ease: 'power2.out',
+              scrollTrigger: {
+                start: 'top -20',
+                end: 'top -20',
+                toggleActions: 'play none none reverse',
+              },
+            })
+          }
+
+          // ── 2. Hero: Entrada escalonada (stagger) del copy y dashboard mockup ──
+          const heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } })
+
+          // Copy stagger (badge, título, párrafo, trust badges, botones)
+          heroTl.fromTo(
+            '.hero-anim-item',
+            { opacity: 0, y: 24 },
+            { opacity: 1, y: 0, duration: 0.7, stagger: 0.12 }
+          )
+
+          if (isDesktop) {
+            // Mockup ventana del dashboard
+            heroTl.fromTo(
+              '.mockup-window',
+              { opacity: 0, y: 36, scale: 0.95 },
+              { opacity: 1, y: 0, scale: 1, duration: 0.85 },
+              '-=0.4'
+            )
+            // Mockup: stagger de elementos internos
+            heroTl.fromTo(
+              '.mockup-sidebar-icon',
+              { opacity: 0, x: -10 },
+              { opacity: 1, x: 0, duration: 0.35, stagger: 0.05 },
+              '-=0.5'
+            )
+            heroTl.fromTo(
+              '.mockup-stat-card',
+              { opacity: 0, y: 12 },
+              { opacity: 1, y: 0, duration: 0.4, stagger: 0.06 },
+              '-=0.4'
+            )
+            heroTl.fromTo(
+              ['.mockup-calendar', '.mockup-odontogram'],
+              { opacity: 0, y: 12 },
+              { opacity: 1, y: 0, duration: 0.45, stagger: 0.08 },
+              '-=0.3'
+            )
+            heroTl.fromTo(
+              '.mockup-agenda-item',
+              { opacity: 0, x: -6 },
+              { opacity: 1, x: 0, duration: 0.3, stagger: 0.04 },
+              '-=0.3'
+            )
+            heroTl.fromTo(
+              '.mockup-odontogram-cell',
+              { opacity: 0, scale: 0.6 },
+              { opacity: 1, scale: 1, duration: 0.25, stagger: 0.015 },
+              '-=0.3'
+            )
+            heroTl.fromTo(
+              '.mockup-ai-badge',
+              { opacity: 0, scale: 0.8 },
+              { opacity: 1, scale: 1, duration: 0.35, ease: 'back.out(1.7)' },
+              '-=0.2'
+            )
+            // Badges flotantes exteriores
+            heroTl.fromTo(
+              '.hero-floating-badge',
+              { opacity: 0, scale: 0.8, y: 16 },
+              { opacity: 1, scale: 1, y: 0, duration: 0.5, stagger: 0.15, ease: 'back.out(1.6)' },
+              '-=0.2'
+            )
+          } else if (isMobile) {
+            // Mobile: entrada suave simplificada para cuidar rendimiento y GPU
+            heroTl.fromTo(
+              '.mockup-window',
+              { opacity: 0, y: 20 },
+              { opacity: 1, y: 0, duration: 0.6 },
+              '-=0.3'
+            )
+            heroTl.fromTo(
+              '.hero-floating-badge',
+              { opacity: 0, y: 10 },
+              { opacity: 1, y: 0, duration: 0.4, stagger: 0.1 },
+              '-=0.2'
+            )
+          }
+
+          // ── 3. Strip de estadísticas: contador animado odómetro con ScrollTrigger ──
+          if (statsRef.current) {
+            ScrollTrigger.create({
+              trigger: statsRef.current,
+              start: 'top 85%',
+              once: true,
+              onEnter: () => {
+                STATS_DATA.forEach((stat, i) => {
+                  const el = statValRefs.current[i]
+                  if (!el) return
+                  const proxy = { value: 0 }
+                  gsap.to(proxy, {
+                    value: stat.target,
+                    duration: 1.8,
+                    ease: 'power2.out',
+                    onUpdate: () => {
+                      if (stat.formatThousand) {
+                        const valStr = Math.floor(proxy.value)
+                          .toLocaleString('es-CO')
+                          .replace(/,/g, ' ')
+                        el.textContent = `${stat.prefix}${valStr}${stat.suffix}`
+                      } else if (stat.decimals > 0) {
+                        el.textContent = `${stat.prefix}${proxy.value.toFixed(stat.decimals)}${stat.suffix}`
+                      } else {
+                        el.textContent = `${stat.prefix}${Math.floor(proxy.value)}${stat.suffix}`
+                      }
+                    },
+                  })
+                })
+              },
+            })
+          }
+        }
+      )
+
+      return () => mm.revert()
+    },
+    { scope: mainRef }
+  )
+
+  // ── Carrusel Marquee Infinito Horizontal para Funcionalidades ──
+  useGSAP(
+    () => {
+      if (!marqueeTrackRef.current) return
+
+      // Animar el track al 50% hacia la izquierda en loop infinito continuo lento y suave
+      const tween = gsap.to(marqueeTrackRef.current, {
+        xPercent: -50,
+        repeat: -1,
+        duration: 45,
+        ease: 'none',
+        force3D: true,
+      })
+
+      marqueeTweenRef.current = tween
+
+      return () => {
+        tween.kill()
+      }
+    },
+    { scope: marqueeContainerRef }
+  )
+
+  // ── 5. Selector de roles: transición fluida al cambiar de rol ──
+  useGSAP(
+    () => {
+      if (!rolePanelRef.current) return
+      // Matar timeline anterior si el usuario hace clics rápidos entre roles
+      if (roleTimelineRef.current) {
+        roleTimelineRef.current.kill()
+      }
+
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (prefersReduced) return
+
+      const activeColor = ROLES[activeRole].accent
+      const tl = gsap.timeline({ defaults: { ease: 'power2.out' } })
+      roleTimelineRef.current = tl
+
+      tl.fromTo(
+        rolePanelRef.current,
+        { borderColor: 'rgba(255,255,255,0.08)' },
+        { borderColor: `${activeColor}55`, duration: 0.32 },
+        0
+      )
+        .fromTo(
+          '.role-icon-box',
+          { scale: 0.85, rotate: -6 },
+          { scale: 1, rotate: 0, duration: 0.3, ease: 'back.out(2)' },
+          0
+        )
+        .fromTo('.role-badge-pill', { scale: 0.88, opacity: 0.6 }, { scale: 1, opacity: 1, duration: 0.25 }, 0)
+        .fromTo('.role-desc-text', { opacity: 0.3, y: 4 }, { opacity: 1, y: 0, duration: 0.22 }, 0.04)
+        .fromTo(
+          '.role-module-item',
+          { opacity: 0.2, x: -8 },
+          { opacity: 1, x: 0, duration: 0.22, stagger: 0.03 },
+          0.05
+        )
+        .fromTo('.role-cta-btn', { scale: 0.96, opacity: 0.8 }, { scale: 1, opacity: 1, duration: 0.2 }, 0.08)
+    },
+    { dependencies: [activeRole], scope: rolePanelRef }
+  )
+
   return (
-    <div className="min-h-screen" style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#080f0e', color: '#e2e8f0' }}>
+    <div ref={mainRef} className="min-h-screen" style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#080f0e', color: '#e2e8f0' }}>
 
       {/* ── Floating Navbar ──────────────────────────────────────────────────── */}
-      <nav className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled ? 'border-b border-white/8' : ''
-      }`} style={{ backdropFilter: scrolled ? 'blur(16px)' : 'none', backgroundColor: scrolled ? 'rgba(8,15,14,0.88)' : 'transparent' }}>
+      <nav
+        ref={navRef}
+        className="fixed top-0 inset-x-0 z-50 border-b border-transparent"
+        style={{ backdropFilter: 'blur(0px)', backgroundColor: 'rgba(8,15,14,0)' }}
+      >
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center gap-8">
           {/* Logo */}
-          <button onClick={() => navigate('/')} className="flex items-center gap-2.5 shrink-0">
-            <CxLogo size={32} />
+          <button onClick={() => onNavigate('/')} className="flex items-center gap-2.5 shrink-0">
+            <img src={coronixLogo} alt="CORONYX" className="w-10 h-10 object-contain shrink-0"/>
             <div>
               <p className="text-white font-bold text-sm leading-tight tracking-widest" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
               <p className="text-[10px] leading-none" style={{ color: '#5FC9BE' }}>Sistema Dental</p>
@@ -420,7 +672,7 @@ export default function LandingPage() {
 
           {/* Anchor links */}
           <div className="hidden md:flex items-center gap-6 flex-1">
-            {[['#funcionalidades','Funcionalidades'],['#roles','Por rol'],['#planes','Precios'],['#contacto','Contacto']].map(([href, label]) => (
+            {[['#funcionalidades','Funcionalidades'],['#roles','Por rol'],['#contacto','Contacto']].map(([href, label]) => (
               <a key={href} href={href}
                 className="text-sm text-white/45 hover:text-white/90 transition-colors"
                 style={{ fontFamily: 'Outfit' }}>
@@ -432,7 +684,7 @@ export default function LandingPage() {
           <div className="flex-1 hidden md:block" />
 
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => onNavigate('/login')}
             className="px-5 py-2 text-sm font-semibold text-white rounded-xl transition-all shrink-0"
             style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
             onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#0B3D3A')}
@@ -459,26 +711,26 @@ export default function LandingPage() {
 
             {/* Left — copy */}
             <div>
-              <div className="inline-flex items-center gap-2 border border-white/15 text-xs font-medium px-3 py-1.5 rounded-full mb-8"
+              <div className="hero-anim-item inline-flex items-center gap-2 border border-white/15 text-xs font-medium px-3 py-1.5 rounded-full mb-8"
                 style={{ backgroundColor: 'rgba(94,201,190,0.08)', color: '#5FC9BE', fontFamily: 'Outfit' }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>
                 Plataforma SaaS · Versión 2.0 · Enterprise
               </div>
 
-              <h1 className="text-white font-bold leading-[1.08] mb-6"
+              <h1 className="hero-anim-item text-white font-bold leading-[1.08] mb-6"
                 style={{ fontFamily: 'Outfit', fontSize: 'clamp(2.2rem, 4vw, 3.4rem)' }}>
                 La clínica dental<br />
                 <span style={{ color: '#5FC9BE' }}>del futuro</span>,<br />
                 disponible hoy.
               </h1>
 
-              <p className="text-white/55 leading-relaxed mb-8 max-w-md"
+              <p className="hero-anim-item text-white/55 leading-relaxed mb-8 max-w-md"
                 style={{ fontSize: '1.0625rem' }}>
                 CORONYX unifica agenda, historia clínica, odontograma interactivo, asistente IA por voz y teleodontología en un solo sistema — diseñado para el consultorio real.
               </p>
 
               {/* Trust badges */}
-              <div className="flex flex-wrap gap-2 mb-9">
+              <div className="hero-anim-item flex flex-wrap gap-2 mb-9">
                 {['HIPAA Compliant','ISO 27001','SOC 2','AES-256','99.9% SLA'].map(b => (
                   <span key={b} className="text-xs font-medium px-2.5 py-1 rounded-lg border border-white/10"
                     style={{ backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', fontFamily: 'Outfit' }}>
@@ -487,8 +739,8 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-3">
-                <button onClick={() => navigate('/login')}
+              <div className="hero-anim-item flex items-center gap-3">
+                <button onClick={() => onNavigate('/login')}
                   className="px-7 py-3.5 text-white text-sm font-semibold rounded-xl transition-all shadow-lg"
                   style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#15635d')}
@@ -507,7 +759,7 @@ export default function LandingPage() {
             <div className="relative">
               <DashboardMockup />
               {/* Floating badges */}
-              <div className="absolute -left-6 bottom-12 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/10 shadow-xl"
+              <div className="hero-floating-badge absolute -left-6 bottom-12 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/10 shadow-xl"
                 style={{ background: 'rgba(11,61,58,0.95)', backdropFilter: 'blur(12px)' }}>
                 <div className="w-2 h-2 rounded-full bg-rose-400 animate-pulse shrink-0"/>
                 <div>
@@ -515,7 +767,7 @@ export default function LandingPage() {
                   <p className="text-white/40 text-[10px]">Historia clínica · Molar #36</p>
                 </div>
               </div>
-              <div className="absolute -right-4 top-10 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/10 shadow-xl"
+              <div className="hero-floating-badge absolute -right-4 top-10 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/10 shadow-xl"
                 style={{ background: 'rgba(11,61,58,0.95)', backdropFilter: 'blur(12px)' }}>
                 <span className="text-base">🦷</span>
                 <div>
@@ -533,16 +785,17 @@ export default function LandingPage() {
       </section>
 
       {/* ── Stats strip ──────────────────────────────────────────────────────── */}
-      <section className="border-y border-white/6" style={{ background: '#0d1a18' }}>
+      <section ref={statsRef} className="border-y border-white/6" style={{ background: '#0d1a18' }}>
         <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-4 divide-x divide-white/8">
-          {[
-            { val: '2 400+', label: 'Pacientes gestionados',   sub: 'en clínicas activas' },
-            { val: '11',     label: 'Módulos clínicos',        sub: 'integrados en 1 plataforma' },
-            { val: '5',      label: 'Roles de usuario',        sub: 'control granular de acceso' },
-            { val: '99.9%',  label: 'Uptime garantizado',      sub: 'SLA Enterprise' },
-          ].map((s, i) => (
+          {STATS_DATA.map((s, i) => (
             <div key={i} className="px-8 first:pl-0 last:pr-0">
-              <p className="font-bold text-3xl text-white mb-1" style={{ fontFamily: 'Outfit' }}>{s.val}</p>
+              <p
+                ref={el => { statValRefs.current[i] = el }}
+                className="font-bold text-3xl text-white mb-1"
+                style={{ fontFamily: 'Outfit' }}
+              >
+                {s.formatThousand ? '0+' : s.decimals > 0 ? '0.0%' : '0'}
+              </p>
               <p className="text-white/70 text-sm font-medium">{s.label}</p>
               <p className="text-white/30 text-xs mt-0.5">{s.sub}</p>
             </div>
@@ -550,47 +803,124 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Funcionalidades ───────────────────────────────────────────────────── */}
-      <section id="funcionalidades" className="py-28 max-w-6xl mx-auto px-6">
-        <div className="grid grid-cols-2 gap-16 items-start">
-          {/* Left label col */}
-          <div className="sticky top-24">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] mb-4"
-              style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>
-              Funcionalidades
-            </p>
-            <h2 className="text-white font-bold leading-tight mb-5"
-              style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)' }}>
-              Todo lo que necesita<br />tu clínica — en uno.
-            </h2>
-            <p className="text-white/45 text-sm leading-relaxed max-w-sm">
-              Cada módulo fue diseñado desde flujos clínicos reales, probado con odontólogos en ejercicio y construido para usarse con el paciente presente.
-            </p>
-          </div>
+      {/* ── Funcionalidades (Carrusel Marquee Infinito de Cards) ─────────────── */}
+      <section id="funcionalidades" className="py-28 overflow-hidden relative" style={{ background: '#080f0e' }}>
+        {/* Encabezado centrado */}
+        <div className="max-w-4xl mx-auto px-6 text-center mb-14">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
+            style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>
+            Funcionalidades
+          </p>
+          <h2 className="text-white font-bold leading-tight mb-4"
+            style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.9rem, 3.5vw, 2.7rem)' }}>
+            Todo lo que necesita<br />
+            <span style={{ color: '#5FC9BE' }}>tu clínica</span> — en uno.
+          </h2>
+          <p className="text-white/45 text-sm md:text-base leading-relaxed max-w-xl mx-auto">
+            Cada módulo fue diseñado desde flujos clínicos reales, probado con odontólogos en ejercicio y construido para usarse con el paciente presente.
+          </p>
+        </div>
 
-          {/* Right feature grid */}
-          <div className="grid grid-cols-1 gap-3">
-            {FEATURES.map((f, i) => (
-              <div key={i}
-                className="flex items-start gap-4 p-4 rounded-2xl border border-white/6 hover:border-white/12 transition-all group"
-                style={{ background: 'rgba(255,255,255,0.02)' }}>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-                  style={{ background: 'rgba(30,140,130,0.12)' }}>
-                  {f.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-white text-sm font-semibold" style={{ fontFamily: 'Outfit' }}>{f.title}</p>
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
-                      style={{ background: 'rgba(30,140,130,0.15)', color: '#5FC9BE', fontFamily: 'Outfit' }}>
+        {/* Contenedor del Carrusel Infinito */}
+        <div
+          ref={marqueeContainerRef}
+          className="relative w-full overflow-hidden select-none py-4"
+          onMouseEnter={handleMarqueeMouseEnter}
+          onMouseLeave={handleMarqueeMouseLeave}
+          onPointerDown={handleMarqueePointerDown}
+          onPointerMove={handleMarqueePointerMove}
+          onPointerUp={handleMarqueePointerUp}
+          onPointerCancel={handleMarqueePointerUp}
+          style={{ touchAction: 'pan-y' }}
+        >
+          {/* Gradient Masks (fades de difuminado lateral sin bordes duros) */}
+          <div
+            className="absolute left-0 top-0 bottom-0 w-16 sm:w-28 md:w-40 z-20 pointer-events-none"
+            style={{ background: 'linear-gradient(to right, #080f0e 15%, transparent 100%)' }}
+          />
+          <div
+            className="absolute right-0 top-0 bottom-0 w-16 sm:w-28 md:w-40 z-20 pointer-events-none"
+            style={{ background: 'linear-gradient(to left, #080f0e 15%, transparent 100%)' }}
+          />
+
+          {/* Track con doble conjunto de cards para loop infinito continuo perfecto */}
+          <div
+            ref={marqueeTrackRef}
+            className="flex gap-6 w-max cursor-grab active:cursor-grabbing px-6"
+            style={{ willChange: 'transform' }}
+          >
+            {[...FEATURES, ...FEATURES].map((f, idx) => (
+              <div
+                key={`${f.title}-${idx}`}
+                className="group relative flex flex-col justify-between p-6 sm:p-7 rounded-2xl border border-white/10 bg-[#0c1d1a]/95 hover:bg-[#0f2724] hover:border-[#5FC9BE]/60 transition-all duration-300 hover:shadow-[0_12px_35px_-10px_rgba(95,201,190,0.25)] hover:-translate-y-1.5 w-[310px] sm:w-[350px] md:w-[380px] min-h-[220px] shrink-0"
+              >
+                {/* Glow decorativo sutil en hover */}
+                <div
+                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                  style={{
+                    background: 'radial-gradient(circle at 50% 0%, rgba(95,201,190,0.12), transparent 70%)',
+                  }}
+                />
+
+                <div>
+                  {/* Fila superior: Icono + Tag */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl border border-[#5FC9BE]/25 shadow-sm group-hover:scale-105 transition-transform duration-300"
+                      style={{
+                        background: 'rgba(30,140,130,0.2)',
+                      }}
+                    >
+                      {f.icon}
+                    </div>
+                    <span
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full border border-[#5FC9BE]/30 bg-[#5FC9BE]/10 text-[#5FC9BE] group-hover:bg-[#5FC9BE]/20 transition-colors"
+                      style={{ fontFamily: 'Outfit' }}
+                    >
                       {f.tag}
                     </span>
                   </div>
-                  <p className="text-white/40 text-xs leading-relaxed">{f.desc}</p>
+
+                  {/* Título de la card */}
+                  <h3
+                    className="text-lg md:text-xl font-bold text-white mb-2 group-hover:text-[#5FC9BE] transition-colors"
+                    style={{ fontFamily: 'Outfit' }}
+                  >
+                    {f.title}
+                  </h3>
+
+                  {/* Descripción nítida y legible */}
+                  <p
+                    className="text-xs md:text-sm text-white/60 leading-relaxed"
+                    style={{ fontFamily: 'Inter, sans-serif' }}
+                  >
+                    {f.desc}
+                  </p>
+                </div>
+
+                {/* Fila inferior */}
+                <div className="mt-5 pt-3 border-t border-white/8 flex items-center justify-between">
+                  <span className="text-[11px] text-white/30 font-mono">
+                    0{(idx % FEATURES.length) + 1} / 0{FEATURES.length}
+                  </span>
+                  <div
+                    className="flex items-center gap-1.5 text-[11px] text-[#5FC9BE] opacity-70 group-hover:opacity-100 transition-opacity font-medium"
+                    style={{ fontFamily: 'Outfit' }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#5FC9BE] animate-pulse" />
+                    <span>Módulo Pro</span>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Indicador sutil de interacción */}
+        <div className="mt-8 flex items-center justify-center gap-2 text-white/30 text-xs" style={{ fontFamily: 'Outfit' }}>
+          <span>←</span>
+          <span>Desplazamiento automático continuo · Pasa el cursor para pausar o arrastra</span>
+          <span>→</span>
         </div>
       </section>
 
@@ -632,27 +962,29 @@ export default function LandingPage() {
           {(() => {
             const r = ROLES[activeRole]
             return (
-              <div className="rounded-3xl border border-white/8 p-8 grid grid-cols-2 gap-10 items-center"
+              <div
+                ref={rolePanelRef}
+                className="rounded-3xl border border-white/8 p-8 grid grid-cols-2 gap-10 items-center"
                 style={{ background: `linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))` }}>
                 <div>
                   <div className="flex items-center gap-3 mb-5">
-                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+                    <div className="role-icon-box w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
                       style={{ background: r.accent + '20' }}>
                       {r.icon}
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-0.5">
                         <h3 className="text-white text-xl font-bold" style={{ fontFamily: 'Outfit' }}>{r.title}</h3>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        <span className="role-badge-pill text-[10px] font-bold px-2 py-0.5 rounded-full"
                           style={{ backgroundColor: r.accent + '25', color: r.accent, fontFamily: 'Outfit' }}>
                           {r.badge}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <p className="text-white/55 text-sm leading-relaxed mb-6">{r.desc}</p>
-                  <button onClick={() => navigate('/login')}
-                    className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all"
+                  <p className="role-desc-text text-white/55 text-sm leading-relaxed mb-6">{r.desc}</p>
+                  <button onClick={() => onNavigate('/login')}
+                    className="role-cta-btn px-5 py-2.5 text-sm font-semibold rounded-xl transition-all"
                     style={{ backgroundColor: r.accent, color: '#fff', fontFamily: 'Outfit' }}>
                     Probar como {r.title} →
                   </button>
@@ -662,7 +994,7 @@ export default function LandingPage() {
                   <p className="text-white/30 text-xs uppercase tracking-widest mb-4" style={{ fontFamily: 'Outfit' }}>Módulos disponibles</p>
                   <div className="space-y-2.5">
                     {r.modules.map(m => (
-                      <div key={m} className="flex items-center gap-3">
+                      <div key={m} className="role-module-item flex items-center gap-3">
                         <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
                           style={{ backgroundColor: r.accent + '20' }}>
                           <svg className="w-2.5 h-2.5" fill="none" stroke={r.accent} viewBox="0 0 24 24" strokeWidth={3}>
@@ -724,107 +1056,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Planes y Precios ─────────────────────────────────────────────────── */}
-      <section id="planes" className="py-28" style={{ background: '#0a1715' }}>
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
-              style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>Planes y precios</p>
-            <h2 className="text-white font-bold mb-4"
-              style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)' }}>
-              El plan adecuado<br />para tu consultorio.
-            </h2>
-            <p className="text-white/40 text-sm max-w-md mx-auto leading-relaxed">
-              Sin contratos de permanencia. Cambia o cancela cuando quieras. 14 días gratis en todos los planes.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-6 items-start">
-            {PLANS.map(plan => (
-              <div key={plan.id}
-                className={`relative rounded-3xl p-7 flex flex-col transition-all ${plan.highlight ? 'shadow-2xl ring-2' : 'border border-white/8'}`}
-                style={{
-                  background: plan.highlight
-                    ? `linear-gradient(135deg, ${plan.color}18, ${plan.color}08)`
-                    : 'rgba(255,255,255,0.02)',
-                  ...(plan.highlight ? { ringColor: plan.color } : {}),
-                  ...(plan.highlight ? { border: `2px solid ${plan.color}50` } : {}),
-                }}>
-                {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="text-xs font-bold px-3 py-1 rounded-full text-white"
-                      style={{ backgroundColor: plan.color, fontFamily: 'Outfit' }}>
-                      {plan.badge}
-                    </span>
-                  </div>
-                )}
-
-                <div className="mb-5">
-                  <p className="text-white font-bold text-xl mb-0.5" style={{ fontFamily: 'Outfit' }}>{plan.name}</p>
-                  <p className="text-white/40 text-xs">{plan.subtitle}</p>
-                </div>
-
-                <div className="mb-6">
-                  {plan.price > 0 ? (
-                    <>
-                      <span className="text-white font-bold text-3xl" style={{ fontFamily: 'Outfit' }}>
-                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(plan.price)}
-                      </span>
-                      <span className="text-white/40 text-sm">{plan.priceNote}</span>
-                    </>
-                  ) : (
-                    <span className="text-white font-bold text-2xl" style={{ fontFamily: 'Outfit', color: plan.color }}>
-                      {plan.priceNote}
-                    </span>
-                  )}
-                </div>
-
-                <ul className="space-y-2.5 mb-6 flex-1">
-                  {plan.features.map(f => (
-                    <li key={f} className="flex items-start gap-2.5 text-xs">
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                        style={{ backgroundColor: plan.color + '25' }}>
-                        <svg className="w-2.5 h-2.5" fill="none" stroke={plan.color} viewBox="0 0 24 24" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                      </div>
-                      <span className="text-white/70 leading-relaxed">{f}</span>
-                    </li>
-                  ))}
-                  {plan.missing.map(f => (
-                    <li key={f} className="flex items-start gap-2.5 text-xs opacity-30">
-                      <div className="w-4 h-4 flex items-center justify-center shrink-0 mt-0.5">
-                        <svg className="w-3 h-3 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                      </div>
-                      <span className="text-white/30">{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
-                  style={{
-                    fontFamily: 'Outfit',
-                    backgroundColor: plan.highlight ? plan.color : 'transparent',
-                    color: plan.highlight ? '#fff' : plan.color,
-                    border: plan.highlight ? 'none' : `1.5px solid ${plan.color}50`,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
-                  onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}>
-                  {plan.cta} →
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-center text-white/25 text-xs mt-8" style={{ fontFamily: 'Outfit' }}>
-            Todos los precios en COP + IVA. Sin tarjeta de crédito para el período de prueba.
-          </p>
-        </div>
-      </section>
-
       {/* ── Contacto ──────────────────────────────────────────────────────────── */}
       <section id="contacto" className="py-28 max-w-6xl mx-auto px-6">
         <div className="grid grid-cols-2 gap-16 items-start">
@@ -837,7 +1068,7 @@ export default function LandingPage() {
               Hablemos sobre<br />tu clínica.
             </h2>
             <p className="text-white/45 text-sm leading-relaxed mb-10">
-              Nuestro equipo de especialistas en tecnología dental está disponible para acompañarte en la implementación, resolver dudas y personalizar el plan adecuado para ti.
+              Nuestro equipo de especialistas en tecnología dental está disponible para acompañarte en la implementación, resolver dudas y personalizar la solución adecuada para ti.
             </p>
 
             <div className="space-y-5">
@@ -885,7 +1116,7 @@ export default function LandingPage() {
         <div className="relative max-w-2xl mx-auto px-6 text-center">
           <div className="inline-flex items-center gap-2 border border-white/15 text-xs font-medium px-3 py-1.5 rounded-full mb-8"
             style={{ backgroundColor: 'rgba(94,201,190,0.08)', color: '#5FC9BE', fontFamily: 'Outfit' }}>
-            Sin tarjeta de crédito · Plan Starter gratis por 14 días
+            Plataforma integral de gestión clínica e inteligencia artificial
           </div>
           <h2 className="text-white font-bold mb-5"
             style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', lineHeight: 1.1 }}>
@@ -895,7 +1126,7 @@ export default function LandingPage() {
             Más de 6 clínicas en Colombia ya gestionan su agenda, historia clínica y facturación en CORONYX. Únete hoy.
           </p>
           <div className="flex gap-3 justify-center">
-            <button onClick={() => navigate('/login')}
+            <button onClick={() => onNavigate('/login')}
               className="px-8 py-4 text-white font-semibold text-sm rounded-xl shadow-xl transition-all"
               style={{ backgroundColor: '#1E8C82', fontFamily: 'Outfit' }}
               onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#15635d')}
@@ -917,7 +1148,7 @@ export default function LandingPage() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2.5 mb-4">
-              <CxLogo size={28} />
+              <img src={coronixLogo} alt="CORONYX" className="w-10 h-10 object-contain shrink-0"/>
               <div>
                 <p className="text-white font-bold text-sm tracking-wide" style={{ fontFamily: 'Outfit' }}>CORONYX</p>
                 <p className="text-[10px]" style={{ color: '#5FC9BE' }}>Sistema Dental</p>
@@ -931,7 +1162,7 @@ export default function LandingPage() {
           {/* Plataforma */}
           <div>
             <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-4" style={{ fontFamily: 'Outfit' }}>Plataforma</p>
-            {['Funcionalidades', 'Precios', 'Seguridad', 'Integraciones', 'API'].map(l => (
+            {['Funcionalidades', 'Seguridad', 'Integraciones', 'API'].map(l => (
               <p key={l} className="text-white/30 text-xs mb-2 hover:text-white/60 transition-colors cursor-pointer">{l}</p>
             ))}
           </div>

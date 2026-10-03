@@ -1,22 +1,24 @@
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth, Role } from '../contexts/AuthContext';
+import { Navigate } from 'react-router-dom'
+import { useAuth, type Role } from '../contexts/AuthContext'
 
-interface ProtectedRouteProps {
-    allowedRoles?: Role[];
-    children?: React.ReactNode;
+interface Props {
+  children: React.ReactNode
+  /** Optional: restrict to specific roles */
+  allowedRoles?: Role[]
 }
 
-export const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
-    const { role, isAuthenticated } = useAuth();
+export default function ProtectedRoute({ children, allowedRoles }: Props) {
+  const { role } = useAuth()
 
-    if (!isAuthenticated) {
-        return <Navigate to="/login" replace />;
-    }
+  // Not authenticated → redirect to login
+  if (!role) {
+    return <Navigate to="/login" replace />
+  }
 
-    if (allowedRoles && role && !allowedRoles.includes(role)) {
-        return <Navigate to="/" replace />;
-    }
+  // Authenticated but role not allowed → redirect to app root
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    return <Navigate to="/app/dashboard" replace />
+  }
 
-    return children ? <>{children}</> : <Outlet />;
-};
+  return <>{children}</>
+}

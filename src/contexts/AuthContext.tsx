@@ -1,42 +1,46 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-export type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE';
+export type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
 
 interface AuthContextType {
-    role: Role | null;
-    isAuthenticated: boolean;
-    login: (role: Role) => void;
-    logout: () => void;
+  role: Role | null
+  login: (role: Role) => void
+  logout: () => void
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | null>(null)
+
+export function useAuth(): AuthContextType {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [role, setRole] = useState<Role | null>(() => {
-        return (localStorage.getItem('role') as Role) || null;
-    });
+  const [role, setRole] = useState<Role | null>(null)
+  const navigate = useNavigate()
 
-    const login = (newRole: Role) => {
-        setRole(newRole);
-        localStorage.setItem('role', newRole);
-    };
-
-    const logout = () => {
-        setRole(null);
-        localStorage.removeItem('role');
-    };
-
-    return (
-        <AuthContext.Provider value={{ role, isAuthenticated: !!role, login, logout }}>
-            {children}
-        </AuthContext.Provider>
-    );
-}
-
-export function useAuth() {
-    const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
+  function login(r: Role) {
+    setRole(r)
+    // Redirect based on role
+    if (r === 'SUPER_ADMIN') {
+      navigate('/app/super-admin')
+    } else if (r === 'PACIENTE') {
+      navigate('/app/patient-portal')
+    } else {
+      navigate('/app/dashboard')
     }
-    return context;
+  }
+
+  function logout() {
+    setRole(null)
+    navigate('/')
+  }
+
+  return (
+    <AuthContext.Provider value={{ role, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }

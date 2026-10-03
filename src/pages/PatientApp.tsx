@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
+import coronixLogo from '../imports/coronixlogo.png'
 
 type Tab = 'inicio' | 'agenda' | 'pagos' | 'tratamientos' | 'tele' | 'documentos' | 'perfil'
 
@@ -785,7 +787,8 @@ function TabPerfil() {
 }
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
-export default function PatientApp({ onLogout }: { onLogout?: () => void }) {
+export default function PatientApp() {
+  const { logout: onLogout } = useAuth()
   const [tab, setTab] = useState<Tab>('inicio')
   const [collapsed, setCollapsed] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -802,13 +805,17 @@ export default function PatientApp({ onLogout }: { onLogout?: () => void }) {
       {/* Sidebar */}
       <aside className={`${collapsed ? 'w-14' : 'w-56'} shrink-0 flex flex-col h-full transition-all duration-200 bg-white border-r border-slate-100`}>
         {/* Logo */}
-        <div className={`flex items-center gap-3 px-4 py-5 border-b border-slate-100 ${collapsed ? 'justify-center' : ''}`}>
-          <CxLogo size={26} />
-          {!collapsed && (
-            <div>
-              <p className="font-bold text-sm leading-tight tracking-wide" style={{ fontFamily:'Outfit', color:'#0B3D3A' }}>CORONYX</p>
-              <p className="text-[10px] font-medium" style={{ color:'#1E8C82' }}>Portal del Paciente</p>
-            </div>
+        <div className={`flex items-center gap-2.5 px-4 py-4 border-b border-slate-100 ${collapsed ? 'justify-center' : ''}`}>
+          {collapsed ? (
+            <img src={coronixLogo} alt="CORONYX" className="w-9 h-9 object-contain shrink-0"/>
+          ) : (
+            <>
+              <img src={coronixLogo} alt="CORONYX" className="w-10 h-10 object-contain shrink-0"/>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm leading-tight tracking-wide" style={{ fontFamily:'Outfit', color:'#0B3D3A' }}>CORONYX</p>
+                <p className="text-[10px] font-medium" style={{ color:'#1E8C82' }}>Portal del Paciente</p>
+              </div>
+            </>
           )}
         </div>
 
@@ -838,9 +845,7 @@ export default function PatientApp({ onLogout }: { onLogout?: () => void }) {
                 <p className="text-xs font-semibold text-slate-700 truncate">Carlos Rivas</p>
                 <p className="text-[10px] text-slate-400 truncate">Paciente</p>
               </div>
-              {onLogout && (
-                <button onClick={onLogout} className="text-slate-300 hover:text-slate-500 transition-colors text-xs" title="Cerrar sesión">⏏</button>
-              )}
+              <button onClick={onLogout} className="text-slate-300 hover:text-slate-500 transition-colors text-xs" title="Cerrar sesión">⏏</button>
             </>
           )}
           <button onClick={() => setCollapsed(!collapsed)}

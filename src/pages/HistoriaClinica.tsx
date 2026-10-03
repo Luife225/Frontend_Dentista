@@ -6,7 +6,7 @@ export interface Consulta {
   examen: string; diagnostico: string; procedimientos: string; plan: string; indicaciones: string; proxima: string
 }
 export interface HCPaciente {
-  id: number; name: string; doc: string; dob: string; blood: string; allergy: string; antecedentes: string; consultas: Consulta[]
+  id: number | string; name: string; doc: string; dob: string; blood: string; allergy: string; antecedentes: string; consultas: Consulta[]
 }
 
 const MOCK_HC: HCPaciente[] = [
@@ -190,7 +190,7 @@ function ModalImprimir({ consulta, patient, onClose }: { consulta: Consulta; pat
   )
 }
 
-export default function HistoriaClinica({ initialPatientId }: { initialPatientId?: number }) {
+export default function HistoriaClinica({ initialPatientId }: { initialPatientId?: number | string }) {
   const [patients, setPatients] = useState(MOCK_HC)
   const selId = initialPatientId ?? MOCK_HC[0].id
   const [selConsultaId, setSelConsultaId] = useState<number|null>(null)
@@ -198,7 +198,7 @@ export default function HistoriaClinica({ initialPatientId }: { initialPatientId
   const [editTarget, setEditTarget] = useState<Consulta|undefined>()
   const [printTarget, setPrintTarget] = useState<Consulta|null>(null)
 
-  const patient = patients.find(p=>p.id===selId)!
+  const patient = patients.find(p=>p.id===selId) || patients[0]
   const activeC = selConsultaId ? patient?.consultas.find(c=>c.id===selConsultaId) ?? patient?.consultas[0] : patient?.consultas[0]
 
   function save(data: Omit<Consulta,'id'>) {

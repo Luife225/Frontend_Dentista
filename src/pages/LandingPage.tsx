@@ -420,7 +420,7 @@ export default function LandingPage() {
           isMobile: '(max-width: 767px) and (prefers-reduced-motion: no-preference)',
           reduceMotion: '(prefers-reduced-motion: reduce)',
         },
-        (context) => {
+        (context: any) => {
           const { isDesktop, isMobile, reduceMotion } = context.conditions!
 
           if (reduceMotion) {

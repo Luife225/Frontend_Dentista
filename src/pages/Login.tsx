@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { gsap } from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { useAuth } from '../contexts/AuthContext'
+import { loginWithApi } from '../services/authService'
 import coronixLogo from '../imports/coronixlogo.png'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
 
-// ─── Demo credentials ─────────────────────────────────────────────────────────
+// ─── Demo credentials fallback ────────────────────────────────────────────────
 const DEMO_ACCOUNTS: { email: string; password: string; role: Role; name: string; label: string; icon: string }[] = [
   { email: 'dr.herrera@coronyx.co',      password: 'demo1234', role: 'ODONTOLOGO',    name: 'Dr. Herrera',     label: 'Odontólogo',    icon: '🦷' },
   { email: 'paula.rios@coronyx.co',      password: 'demo1234', role: 'RECEPCIONISTA', name: 'Paula Ríos',      label: 'Recepcionista', icon: '📋' },
@@ -26,7 +27,7 @@ const ROLE_FEATURES: { icon: string; label: string; desc: string }[] = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Login() {
-  const { login: onLogin } = useAuth()
+  const { login: onLogin, loginWithSession } = useAuth()
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [email, setEmail]               = useState('')
@@ -124,46 +125,51 @@ export default function Login() {
   // ─────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ─────────────────────────────────────────────────────────────────────────
-  function handleLogin() {
+  async function handleLogin(e?: React.FormEvent) {
+    if (e) e.preventDefault()
     setError('')
 
     if (!email.trim()) {
       shakeInput(emailInputRef.current)
       if (!password.trim()) shakeInput(passwordInputRef.current)
+      setError('Por favor ingresa tu correo electrónico.')
       return
     }
     if (!password.trim()) {
       shakeInput(passwordInputRef.current)
-      return
-    }
-
-    const account = DEMO_ACCOUNTS.find(
-      a => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password
-    )
-
-    if (!account) {
-      setError('Credenciales inválidas. Revisa el email y la contraseña.')
-      shakeInput(emailInputRef.current)
+      setError('Por favor ingresa tu contraseña.')
       return
     }
 
     setLoading(true)
-    setTimeout(() => {
+
+    try {
+      // 1. Intentar autenticación real contra PostgreSQL con JWT
+      const session = await loginWithApi(email.trim(), password)
+      loginWithSession(session)
+    } catch (apiErr: any) {
+      // 2. Fallback a credencial demo si no hay conexión al backend
+      const demoAccount = DEMO_ACCOUNTS.find(
+        a => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password
+      )
+
+      if (demoAccount) {
+        onLogin(demoAccount.role)
+      } else {
+        setError(apiErr?.message || 'Credenciales inválidas. Revisa el email y la contraseña.')
+        shakeInput(emailInputRef.current)
+        shakeInput(passwordInputRef.current)
+      }
+    } finally {
       setLoading(false)
-      onLogin(account.role)
-    }, 900)
-  }
-
-  function handleForgot() {
-    setLoading(true)
-    setTimeout(() => { setLoading(false); setForgotSent(true) }, 800)
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter') handleLogin()
   }
 
-  // Fill fields with a demo credential when clicked
+  // Fill fields with a demo credential when clicked (mobile hint)
   function fillCredential(account: typeof DEMO_ACCOUNTS[0]) {
     setEmail(account.email)
     setPassword(account.password)
@@ -268,9 +274,9 @@ export default function Login() {
                     <input value={email} onChange={e => setEmail(e.target.value)}
                       className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50" />
                   </div>
-                  <button onClick={handleForgot} disabled={loading}
-                    className="w-full py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors disabled:opacity-60">
-                    {loading ? 'Enviando...' : 'Enviar instrucciones'}
+                  <button onClick={() => setForgotSent(true)}
+                    className="w-full py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors">
+                    Enviar instrucciones
                   </button>
                   <button onClick={() => setForgot(false)} className="w-full text-center text-sm text-white/40 hover:text-white/70 transition-colors">
                     Volver al login
@@ -285,7 +291,7 @@ export default function Login() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // MAIN LOGIN SCREEN
+  // MAIN LOGIN SCREEN (Clean Minimal 2-field card from origin/main)
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div ref={containerRef} className="min-h-screen bg-slate-950 flex">
@@ -350,13 +356,15 @@ export default function Login() {
             <h2 className="text-white text-2xl font-semibold mb-1" style={{fontFamily:'Outfit'}}>Bienvenido</h2>
             <p className="text-white/40 text-sm mb-7">Ingresa con tu cuenta institucional</p>
 
-            <div className="space-y-4" onKeyDown={handleKeyDown}>
+            <form onSubmit={handleLogin} className="space-y-4" onKeyDown={handleKeyDown}>
 
               {/* ── Email input ─────────────────────────────────────────── */}
               <div>
                 <label className="text-xs text-white/50 font-medium block mb-1.5">Correo electrónico</label>
                 <input
                   ref={emailInputRef}
+                  type="email"
+                  required
                   value={email}
                   onChange={e => { setEmail(e.target.value); setError('') }}
                   onFocus={() => handleInputFocus(emailInputRef.current)}
@@ -372,6 +380,7 @@ export default function Login() {
                 <input
                   ref={passwordInputRef}
                   type="password"
+                  required
                   value={password}
                   onChange={e => { setPassword(e.target.value); setError('') }}
                   onFocus={() => handleInputFocus(passwordInputRef.current)}
@@ -392,7 +401,7 @@ export default function Login() {
               )}
 
               <div className="flex justify-end">
-                <button onClick={() => setForgot(true)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
+                <button type="button" onClick={() => setForgot(true)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
                   ¿Olvidaste tu contraseña?
                 </button>
               </div>
@@ -400,11 +409,11 @@ export default function Login() {
               {/* ── Login button ────────────────────────────────────────── */}
               <button
                 ref={loginBtnRef}
-                onClick={handleLogin}
+                type="submit"
                 onMouseEnter={handleBtnEnter}
                 onMouseLeave={handleBtnLeave}
                 disabled={loading}
-                className="w-full py-3 bg-cyan-600 text-white rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2 hover:bg-cyan-500 transition-colors"
+                className="w-full py-3 bg-cyan-600 text-white rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2 hover:bg-cyan-500 transition-colors cursor-pointer"
                 style={{ willChange: 'transform' }}
               >
                 {loading ? (
@@ -418,7 +427,7 @@ export default function Login() {
                   </>
                 ) : 'Ingresar'}
               </button>
-            </div>
+            </form>
 
             {/* Mobile: demo credentials hint */}
             <div className="lg:hidden mt-6 bg-white/3 border border-white/8 rounded-xl p-3">

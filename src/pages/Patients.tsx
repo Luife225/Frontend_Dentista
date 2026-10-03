@@ -1,6 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { fetchPatientsFromApi, createPatientInApi, BackendPatientDto } from '../services/patientService'
 
-const patients = [
+interface PatientItem {
+  id: string | number
+  name: string
+  age: number
+  phone: string
+  email: string | null
+  lastVisit: string
+  nextVisit: string | null
+  tags: string[]
+  status: 'active' | 'inactive'
+  doc?: string
+  isRealDb?: boolean
+}
+
+const INITIAL_PATIENTS: PatientItem[] = [
   { id: 1, name: 'María González', age: 34, phone: '310 234 5678', email: 'maria.g@gmail.com', lastVisit: '2026-07-14', nextVisit: '2026-08-10', tags: ['ortodoncia', 'hipertensión'], status: 'active' },
   { id: 2, name: 'Carlos Rivas', age: 52, phone: '315 987 6543', email: 'c.rivas@hotmail.com', lastVisit: '2026-08-01', nextVisit: '2026-08-08', tags: ['diabético', 'cirugía'], status: 'active' },
   { id: 3, name: 'Sofía Mendez', age: 28, phone: '300 112 2334', email: 'sofiamendez@gmail.com', lastVisit: '2026-06-20', nextVisit: '2026-08-10', tags: ['embarazada'], status: 'active' },
@@ -24,9 +39,62 @@ const tagColors: Record<string, string> = {
 }
 
 export default function Patients() {
+  const [patients, setPatients] = useState<PatientItem[]>(INITIAL_PATIENTS)
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<typeof patients[0] | null>(null)
+  const [selected, setSelected] = useState<PatientItem | null>(null)
   const [filter, setFilter] = useState<'all'|'active'|'inactive'>('all')
+  const [showModal, setShowModal] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [dbConnected, setDbConnected] = useState<boolean | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  // Form inputs
+  const [form, setForm] = useState({
+    nombres: '',
+    apellidos: '',
+    numeroDocumento: '',
+    telefono: '',
+    correo: '',
+    alergias: '',
+    antecedentesMedicos: '',
+  })
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadPatients() {
+      try {
+        const dbData = await fetchPatientsFromApi()
+        if (!isMounted) return
+        setDbConnected(true)
+        if (dbData && dbData.length > 0) {
+          const mapped: PatientItem[] = dbData.map(d => ({
+            id: d.id || `db-${d.numeroDocumento}`,
+            name: `${d.nombres} ${d.apellidos || ''}`.trim(),
+            age: d.fechaNacimiento ? Math.floor((Date.now() - new Date(d.fechaNacimiento).getTime()) / 31557600000) : 30,
+            phone: d.telefono || 'Sin teléfono',
+            email: d.correo || null,
+            lastVisit: d.fechaCreacion ? d.fechaCreacion.substring(0, 10) : '2026-09-26',
+            nextVisit: null,
+            tags: d.alergias && d.alergias !== 'Ninguna' ? [d.alergias] : [],
+            status: (d.estado === 'INACTIVO' ? 'inactive' : 'active') as 'active' | 'inactive',
+            doc: d.numeroDocumento,
+            isRealDb: true,
+          }))
+
+          setPatients(prev => {
+            const existingIds = new Set(mapped.map(m => m.id))
+            const remaining = prev.filter(p => !existingIds.has(p.id))
+            return [...mapped, ...remaining]
+          })
+        }
+      } catch (err) {
+        if (!isMounted) return
+        setDbConnected(false)
+      }
+    }
+    loadPatients()
+    return () => { isMounted = false }
+  }, [])
 
   const filtered = patients.filter(p =>
     (filter === 'all' || p.status === filter) &&
@@ -35,14 +103,128 @@ export default function Patients() {
      p.tags.some(t => t.includes(search.toLowerCase())))
   )
 
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.nombres || !form.numeroDocumento) return
+    setIsSaving(true)
+    try {
+      const created = await createPatientInApi({
+        nombres: form.nombres,
+        apellidos: form.apellidos || 'Sin apellido',
+        tipoDocumento: 'DNI',
+        numeroDocumento: form.numeroDocumento,
+        telefono: form.telefono,
+        correo: form.correo,
+        alergias: form.alergias || 'Ninguna',
+        antecedentesMedicos: form.antecedentesMedicos || undefined,
+        estado: 'ACTIVO',
+      })
+
+      const newItem: PatientItem = {
+        id: created.id || Date.now(),
+        name: `${created.nombres} ${created.apellidos || ''}`.trim(),
+        age: 30,
+        phone: created.telefono || 'Sin teléfono',
+        email: created.correo || null,
+        lastVisit: new Date().toISOString().substring(0, 10),
+        nextVisit: null,
+        tags: created.alergias && created.alergias !== 'Ninguna' ? [created.alergias] : [],
+        status: 'active',
+        doc: created.numeroDocumento,
+        isRealDb: true,
+      }
+
+      setPatients(prev => [newItem, ...prev])
+      setSelected(newItem)
+      setShowModal(false)
+      setForm({ nombres: '', apellidos: '', numeroDocumento: '', telefono: '', correo: '', alergias: '', antecedentesMedicos: '' })
+      setToastMessage(`✓ Paciente guardado en PostgreSQL (ID: ${String(created.id).substring(0, 8)}...)`)
+      setTimeout(() => setToastMessage(null), 4000)
+    } catch (err: any) {
+      console.error(err)
+      setToastMessage(`Error: ${err.message}`)
+      setTimeout(() => setToastMessage(null), 5000)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
-    <div className="flex h-full fade-in">
+    <div className="flex h-full fade-in relative">
+      {/* Toast */}
+      {toastMessage && (
+        <div className="absolute top-4 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs flex items-center gap-2 border border-slate-700">
+          <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>+ Nuevo Paciente</h2>
+                <p className="text-xs text-emerald-600 font-medium">Persistencia directa en PostgreSQL</p>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <form onSubmit={handleRegister} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Nombres *</label>
+                  <input required value={form.nombres} onChange={e => setForm(f=>({...f, nombres: e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder="Ej: Luis"/>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Apellidos</label>
+                  <input value={form.apellidos} onChange={e => setForm(f=>({...f, apellidos: e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder="Ej: Gamboa"/>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">N° Documento *</label>
+                  <input required value={form.numeroDocumento} onChange={e => setForm(f=>({...f, numeroDocumento: e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder="DNI / CC"/>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Teléfono</label>
+                  <input value={form.telefono} onChange={e => setForm(f=>({...f, telefono: e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder="+51 9..."/>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Correo electrónico</label>
+                  <input type="email" value={form.correo} onChange={e => setForm(f=>({...f, correo: e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder="paciente@correo.com"/>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Alergias</label>
+                  <input value={form.alergias} onChange={e => setForm(f=>({...f, alergias: e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder="Ninguna o alergia conocida"/>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Antecedentes médicos</label>
+                  <textarea rows={2} value={form.antecedentesMedicos} onChange={e => setForm(f=>({...f, antecedentesMedicos: e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none" placeholder="Condiciones médicas..."/>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button disabled={isSaving} type="submit" className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 disabled:opacity-50">
+                  {isSaving ? 'Guardando...' : 'Registrar en PostgreSQL'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* List */}
       <div className={`${selected ? 'w-1/2' : 'w-full'} flex flex-col h-full transition-all duration-200`}>
         <div className="p-6 pb-4">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-semibold text-slate-900" style={{fontFamily:'Outfit'}}>Pacientes</h1>
-            <button className="px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-semibold text-slate-900" style={{fontFamily:'Outfit'}}>Pacientes</h1>
+              {dbConnected && (
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  PostgreSQL 🐘
+                </span>
+              )}
+            </div>
+            <button onClick={() => setShowModal(true)} className="px-4 py-2 rounded-lg bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors">
               + Nuevo paciente
             </button>
           </div>
@@ -73,12 +255,18 @@ export default function Patients() {
               onClick={() => setSelected(selected?.id === p.id ? null : p)}
               className={`bg-white rounded-xl border transition-all cursor-pointer hover:shadow-sm ${selected?.id === p.id ? 'border-cyan-400 shadow-sm' : 'border-slate-100'}`}>
               <div className="flex items-center gap-4 p-4">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-white font-semibold text-sm shrink-0" style={{fontFamily:'Outfit'}}>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-white font-semibold text-sm shrink-0 relative" style={{fontFamily:'Outfit'}}>
                   {p.name.split(' ').map(n => n[0]).join('').slice(0,2)}
+                  {p.isRealDb && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border border-white rounded-full" title="PostgreSQL"/>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-slate-800 text-sm">{p.name}</p>
+                    {p.isRealDb && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded">BD</span>
+                    )}
                     <span className="text-xs text-slate-400">{p.age} años</span>
                     {p.status === 'inactive' && <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Inactivo</span>}
                   </div>

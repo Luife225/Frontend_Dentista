@@ -57,7 +57,7 @@ const ROLE_MODULES: Record<Role, ModuleId[]> = {
   SUPER_ADMIN:   [],
   ODONTOLOGO:    ['dashboard', 'agenda', 'pacientes', 'teleodontologia', 'notificaciones', 'caja'],
   RECEPCIONISTA: ['dashboard', 'agenda', 'pacientes', 'notificaciones', 'inventario'],
-  ADMIN_CLINICA: ['dashboard', 'inventario', 'caja', 'consultorio'],
+  ADMIN_CLINICA: ['dashboard', 'agenda', 'inventario', 'caja', 'consultorio'],
   PACIENTE:      [],
 }
 
@@ -102,7 +102,8 @@ export default function DashboardLayout() {
   const [showAI, setShowAI] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
 
-  if (!role) return null
+  const savedRole = typeof window !== 'undefined' ? localStorage.getItem('coronyx_role') : null
+  if (!role || !savedRole) return null
 
   // Determine active module from current URL
   const pathSegment = location.pathname.split('/').pop() || 'dashboard'

@@ -788,10 +788,13 @@ function TabPerfil() {
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 export default function PatientApp() {
-  const { logout: onLogout } = useAuth()
+  const { role, logout: onLogout } = useAuth()
   const [tab, setTab] = useState<Tab>('inicio')
   const [collapsed, setCollapsed] = useState(false)
   const [showModal, setShowModal] = useState(false)
+
+  const savedRole = typeof window !== 'undefined' ? localStorage.getItem('coronyx_role') : null
+  if (!role && !savedRole) return null
 
   const SECTION_TITLES: Record<Tab, string> = {
     inicio:'Inicio', agenda:'Mi agenda', pagos:'Pagos', tratamientos:'Mis tratamientos',

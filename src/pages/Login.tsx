@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { gsap } from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { useAuth } from '../contexts/AuthContext'
 import { loginWithApi } from '../services/authService'
+import { getDefaultRouteForRole } from '../routes/routeHelpers'
 import coronixLogo from '../imports/coronixlogo.png'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -28,6 +30,8 @@ const ROLE_FEATURES: { icon: string; label: string; desc: string }[] = [
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Login() {
   const { login: onLogin, loginWithSession } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [email, setEmail]               = useState('')
@@ -123,6 +127,27 @@ export default function Login() {
   }, [loading])
 
   // ─────────────────────────────────────────────────────────────────────────
+  // PREVENCIÓN DE NAVEGACIÓN "ATRÁS" TRAS CERRAR SESIÓN
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    // Si no hay sesión iniciada, atrapar el evento popstate para que el botón "Atrás"
+    // no pueda restaurar vistas previas de la sesión cerrada
+    window.history.pushState(null, '', window.location.href)
+
+    const handlePopState = () => {
+      const savedRole = typeof window !== 'undefined' ? localStorage.getItem('coronyx_role') : null
+      if (!savedRole) {
+        window.history.pushState(null, '', window.location.href)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
+  // ─────────────────────────────────────────────────────────────────────────
   // HANDLERS
   // ─────────────────────────────────────────────────────────────────────────
   async function handleLogin(e?: React.FormEvent) {
@@ -143,10 +168,18 @@ export default function Login() {
 
     setLoading(true)
 
+    const fromPath = (location.state as { from?: { pathname?: string } })?.from?.pathname
+    const targetPath =
+      fromPath && fromPath !== '/login' && fromPath !== '/sin-acceso' && fromPath !== '/403'
+        ? fromPath
+        : null
+
     try {
       // 1. Intentar autenticación real contra PostgreSQL con JWT
       const session = await loginWithApi(email.trim(), password)
-      loginWithSession(session)
+      const destination = targetPath || getDefaultRouteForRole(session.rol)
+      loginWithSession(session, destination)
+      navigate(destination, { replace: true })
     } catch (apiErr: any) {
       // 2. Fallback a credencial demo si no hay conexión al backend
       const demoAccount = DEMO_ACCOUNTS.find(
@@ -154,7 +187,9 @@ export default function Login() {
       )
 
       if (demoAccount) {
-        onLogin(demoAccount.role)
+        const destination = targetPath || getDefaultRouteForRole(demoAccount.role)
+        onLogin(demoAccount.role, destination)
+        navigate(destination, { replace: true })
       } else {
         setError(apiErr?.message || 'Credenciales inválidas. Revisa el email y la contraseña.')
         shakeInput(emailInputRef.current)

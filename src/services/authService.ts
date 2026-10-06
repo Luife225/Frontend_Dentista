@@ -13,6 +13,7 @@ export interface LoginResponse {
 
 export interface UserItem {
   id: string;
+  usuarioClinicaId?: string;
   correo: string;
   nombres: string;
   apellidos: string;

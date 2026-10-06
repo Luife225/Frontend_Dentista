@@ -76,84 +76,495 @@ function calcAge(dob: string) { return dob ? Math.floor((Date.now()-new Date(dob
 function fmt(n: number) { return n ? new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(n) : '$0' }
 
 // ── Modal: Nuevo paciente ─────────────────────────────────────────────────────
-const BLANK_P = () => ({ name:'', doc:'', dob:'', phone:'', email:'', blood:'O+', eps:'', allergy:'', antecedentes:'', city:'' })
-function ModalNuevoPaciente({ onSave, onClose, isSaving }: { onSave: (p: typeof BLANK_P extends () => infer R ? R : never) => void; onClose: () => void; isSaving?: boolean }) {
-  const [form, setForm] = useState(BLANK_P())
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>) => setForm(f=>({...f,[k]:e.target.value}))
+export interface NewPatientFormData {
+  nombres: string;
+  apellidos: string;
+  tipoDocumento: 'DNI' | 'CE' | 'PASAPORTE' | 'CC';
+  numeroDocumento: string;
+  fechaNacimiento: string;
+  telefono: string;
+  correo: string;
+  tipoSangre: string;
+  seguro: string;
+  ciudad: string;
+  alergias: string;
+  antecedentesMedicos: string;
+}
+
+const BLANK_P = (): NewPatientFormData => ({
+  nombres: '',
+  apellidos: '',
+  tipoDocumento: 'DNI',
+  numeroDocumento: '',
+  fechaNacimiento: '',
+  telefono: '',
+  correo: '',
+  tipoSangre: 'POR DETERMINAR',
+  seguro: 'PARTICULAR',
+  ciudad: 'Lima',
+  alergias: '',
+  antecedentesMedicos: '',
+})
+
+const DOC_CONFIG: Record<string, { maxLen: number; label: string; placeholder: string; helper: string; isNumeric: boolean }> = {
+  DNI: { maxLen: 8, label: 'DNI (Perú - 8 dígitos)', placeholder: 'Ej: 71234567', helper: 'Exactamente 8 dígitos numéricos', isNumeric: true },
+  CE: { maxLen: 12, label: 'Carné de Extranjería (CE)', placeholder: 'Ej: 001234567', helper: 'Entre 9 y 12 caracteres alfanuméricos', isNumeric: false },
+  PASAPORTE: { maxLen: 12, label: 'Pasaporte', placeholder: 'Ej: A12345678', helper: 'Entre 6 y 12 caracteres alfanuméricos', isNumeric: false },
+  CC: { maxLen: 10, label: 'Cédula de Ciudadanía (CC)', placeholder: 'Ej: 1020304050', helper: 'Entre 6 y 10 dígitos numéricos', isNumeric: true },
+}
+
+const BLOOD_TYPES = ['POR DETERMINAR', 'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
+const INSURANCE_OPTIONS = ['PARTICULAR', 'EsSalud', 'SIS', 'Rímac EPS', 'Pacífico EPS', 'Mapfre EPS', 'Sanitas EPS', 'Otro']
+const CITY_OPTIONS = ['Lima', 'Callao', 'Arequipa', 'Trujillo', 'Chiclayo', 'Piura', 'Cusco', 'Otra']
+
+function getDobLimits() {
+  const today = new Date()
+  const y = today.getFullYear()
+  const m = String(today.getMonth() + 1).padStart(2, '0')
+  const d = String(today.getDate()).padStart(2, '0')
+  return {
+    maxDob: `${y - 5}-${m}-${d}`,   // Fecha de hoy menos 5 años (máximo cumpleaños, edad mínima 5)
+    minDob: `${y - 100}-${m}-${d}`, // Fecha de hoy menos 100 años (mínimo cumpleaños, edad máxima 100)
+  }
+}
+
+function ModalNuevoPaciente({
+  onSave,
+  onClose,
+  isSaving,
+}: {
+  onSave: (p: NewPatientFormData) => Promise<void> | void;
+  onClose: () => void;
+  isSaving?: boolean;
+}) {
+  const [form, setForm] = useState<NewPatientFormData>(BLANK_P())
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [apiError, setApiError] = useState<string | null>(null)
+
+  const { minDob, maxDob } = getDobLimits()
+  const currentDocRule = DOC_CONFIG[form.tipoDocumento] || DOC_CONFIG.DNI
+
+  // Manejo de cambio de tipo de documento
+  const handleTipoDocChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextType = e.target.value as NewPatientFormData['tipoDocumento']
+    const nextRule = DOC_CONFIG[nextType] || DOC_CONFIG.DNI
+
+    let sanitized = form.numeroDocumento
+    if (nextRule.isNumeric) {
+      sanitized = sanitized.replace(/\D/g, '')
+    } else {
+      sanitized = sanitized.replace(/[^a-zA-Z0-9]/g, '')
+    }
+    sanitized = sanitized.slice(0, nextRule.maxLen)
+
+    setForm(f => ({ ...f, tipoDocumento: nextType, numeroDocumento: sanitized }))
+    setFieldErrors(fe => ({ ...fe, tipoDocumento: '', numeroDocumento: '' }))
+    setApiError(null)
+  }
+
+  // Manejo dinámico de número de documento según tipo activo
+  const handleNumeroDocChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value
+    if (currentDocRule.isNumeric) {
+      raw = raw.replace(/\D/g, '')
+    } else {
+      raw = raw.replace(/[^a-zA-Z0-9]/g, '')
+    }
+    raw = raw.slice(0, currentDocRule.maxLen)
+    setForm(f => ({ ...f, numeroDocumento: raw }))
+    setFieldErrors(fe => ({ ...fe, numeroDocumento: '' }))
+    setApiError(null)
+  }
+
+  // Prevención de teclas inválidas en teclado
+  const handleDocKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter'].includes(e.key)) {
+      return
+    }
+    if (e.ctrlKey || e.metaKey) return
+
+    if (currentDocRule.isNumeric && !/^\d$/.test(e.key)) {
+      e.preventDefault()
+    } else if (!currentDocRule.isNumeric && !/^[a-zA-Z0-9]$/.test(e.key)) {
+      e.preventDefault()
+    }
+  }
+
+  const setField = (field: keyof NewPatientFormData) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    setForm(f => ({ ...f, [field]: e.target.value }))
+    setFieldErrors(fe => ({ ...fe, [field]: '' }))
+    setApiError(null)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFieldErrors({})
+    setApiError(null)
+
+    // Pre-validaciones cliente sincronizadas con reglas del Backend
+    const errors: Record<string, string> = {}
+
+    if (!form.nombres.trim()) {
+      errors.nombres = 'Los nombres son obligatorios'
+    } else if (form.nombres.trim().length < 2 || form.nombres.trim().length > 100) {
+      errors.nombres = 'Los nombres deben tener entre 2 y 100 caracteres'
+    }
+
+    if (!form.apellidos.trim()) {
+      errors.apellidos = 'Los apellidos son obligatorios'
+    } else if (form.apellidos.trim().length < 2 || form.apellidos.trim().length > 100) {
+      errors.apellidos = 'Los apellidos deben tener entre 2 y 100 caracteres'
+    }
+
+    if (!form.numeroDocumento.trim()) {
+      errors.numeroDocumento = 'El número de documento es obligatorio'
+    } else {
+      const doc = form.numeroDocumento.trim()
+      switch (form.tipoDocumento) {
+        case 'DNI':
+          if (!/^\d{8}$/.test(doc)) {
+            errors.numeroDocumento = 'El DNI debe contener exactamente 8 dígitos numéricos.'
+          }
+          break
+        case 'CE':
+          if (!/^[a-zA-Z0-9]{9,12}$/.test(doc)) {
+            errors.numeroDocumento = 'El Carné de Extranjería (CE) debe contener entre 9 y 12 caracteres alfanuméricos.'
+          }
+          break
+        case 'PASAPORTE':
+          if (!/^[a-zA-Z0-9]{6,12}$/.test(doc)) {
+            errors.numeroDocumento = 'El Pasaporte debe contener entre 6 y 12 caracteres alfanuméricos.'
+          }
+          break
+        case 'CC':
+          if (!/^\d{6,10}$/.test(doc)) {
+            errors.numeroDocumento = 'La Cédula de Ciudadanía (CC) debe contener entre 6 y 10 dígitos numéricos.'
+          }
+          break
+      }
+    }
+
+    if (!form.fechaNacimiento) {
+      errors.fechaNacimiento = 'La fecha de nacimiento es obligatoria'
+    } else {
+      const dobDate = new Date(form.fechaNacimiento + 'T00:00')
+      const today = new Date()
+      if (dobDate > today) {
+        errors.fechaNacimiento = 'La fecha de nacimiento no puede ser futura.'
+      } else {
+        const age = Math.floor((Date.now() - dobDate.getTime()) / 31557600000)
+        if (age < 5) {
+          errors.fechaNacimiento = 'El paciente debe tener al menos 5 años de edad cumplidos para ser registrado en la clínica.'
+        } else if (age > 100) {
+          errors.fechaNacimiento = 'La fecha de nacimiento ingresada no es válida (el paciente no puede exceder los 100 años de edad).'
+        }
+      }
+    }
+
+    if (form.telefono && form.telefono.trim()) {
+      if (!/^[+]?[0-9\s\-]{8,25}$/.test(form.telefono.trim())) {
+        errors.telefono = 'El formato del número de teléfono o celular no es válido (ej: +51 987654321).'
+      }
+    }
+
+    if (form.correo && form.correo.trim()) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())) {
+        errors.correo = 'El formato de correo electrónico no es válido'
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      return
+    }
+
+    try {
+      await onSave(form)
+    } catch (err: any) {
+      const backendErrors = err.errors || err.response?.data?.errors
+      const msg = err.message || err.response?.data?.message || 'Error al registrar paciente (HTTP 400)'
+      if (backendErrors && typeof backendErrors === 'object' && Object.keys(backendErrors).length > 0) {
+        setFieldErrors(backendErrors)
+      }
+      setApiError(msg)
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(0,0,0,0.65)',backdropFilter:'blur(4px)'}}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in duration-150">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50/50">
           <div>
-            <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>+ Nuevo paciente</h2>
+            <h2 className="font-bold text-slate-800 text-lg" style={{ fontFamily: 'Outfit' }}>+ Nuevo paciente</h2>
             <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Sincronizado con PostgreSQL en vivo
+              Sincronizado con Spring Boot / PostgreSQL en vivo
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5"/></button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+            <Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5" />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+
+        {/* Form Body */}
+        <form id="new-patient-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {/* Banner de error general API 400 */}
+          {apiError && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-rose-700 animate-in fade-in duration-200">
+              <svg className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <div>
+                <p className="font-semibold text-rose-800">Error del Servidor (HTTP 400)</p>
+                <p className="mt-0.5">{apiError}</p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Nombre completo *</label>
-              <input value={form.name} onChange={set('name')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="Nombre y apellidos"/>
-            </div>
+            {/* 1. Nombres */}
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">N° Documento *</label>
-              <input value={form.doc} onChange={set('doc')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="CC / CE / Pasaporte / DNI"/>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Nombres <span className="text-rose-500">*</span>
+              </label>
+              <input
+                value={form.nombres}
+                onChange={setField('nombres')}
+                className={`w-full px-3 py-2 border rounded-xl text-sm transition-colors ${
+                  fieldErrors.nombres ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-400/40' : 'border-slate-200 focus:ring-2 focus:ring-cyan-400/50'
+                }`}
+                placeholder="Ej: Juan Carlos"
+                required
+              />
+              {fieldErrors.nombres && (
+                <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                  <span>⚠</span> {fieldErrors.nombres}
+                </p>
+              )}
             </div>
+
+            {/* 2. Apellidos */}
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Fecha de nacimiento</label>
-              <input type="date" value={form.dob} onChange={set('dob')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Apellidos <span className="text-rose-500">*</span>
+              </label>
+              <input
+                value={form.apellidos}
+                onChange={setField('apellidos')}
+                className={`w-full px-3 py-2 border rounded-xl text-sm transition-colors ${
+                  fieldErrors.apellidos ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-400/40' : 'border-slate-200 focus:ring-2 focus:ring-cyan-400/50'
+                }`}
+                placeholder="Ej: Pérez Morales"
+                required
+              />
+              {fieldErrors.apellidos && (
+                <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                  <span>⚠</span> {fieldErrors.apellidos}
+                </p>
+              )}
             </div>
+
+            {/* 3. Tipo de Documento */}
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Teléfono</label>
-              <input value={form.phone} onChange={set('phone')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="+51... / +57..."/>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Email</label>
-              <input value={form.email} onChange={set('email')} type="email" className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="correo@..."/>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">EPS / Seguro</label>
-              <input value={form.eps} onChange={set('eps')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Tipo de sangre</label>
-              <select value={form.blood} onChange={set('blood')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
-                {['A+','A-','B+','B-','O+','O-','AB+','AB-'].map(b=><option key={b}>{b}</option>)}
+              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                Tipo de documento <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={form.tipoDocumento}
+                onChange={handleTipoDocChange}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 font-medium text-slate-700"
+              >
+                <option value="DNI">DNI (Perú - 8 dígitos)</option>
+                <option value="CE">CE (Carné de Extranjería)</option>
+                <option value="PASAPORTE">PASAPORTE (Pasaporte)</option>
+                <option value="CC">CC (Cédula de Ciudadanía)</option>
               </select>
             </div>
+
+            {/* 4. Número de Documento */}
             <div>
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Ciudad</label>
-              <input value={form.city} onChange={set('city')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700">
+                  N° Documento <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {form.numeroDocumento.length}/{currentDocRule.maxLen}
+                </span>
+              </div>
+              <input
+                value={form.numeroDocumento}
+                onChange={handleNumeroDocChange}
+                onKeyDown={handleDocKeyDown}
+                maxLength={currentDocRule.maxLen}
+                className={`w-full px-3 py-2 border rounded-xl text-sm transition-colors ${
+                  fieldErrors.numeroDocumento ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-400/40' : 'border-slate-200 focus:ring-2 focus:ring-cyan-400/50'
+                }`}
+                placeholder={currentDocRule.placeholder}
+                required
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">{currentDocRule.helper}</p>
+              {fieldErrors.numeroDocumento && (
+                <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                  <span>⚠</span> {fieldErrors.numeroDocumento}
+                </p>
+              )}
             </div>
-            <div className="col-span-2">
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Alergias conocidas</label>
-              <input value={form.allergy} onChange={set('allergy')} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="Ej: Penicilina, Latex, Ibuprofeno..."/>
+
+            {/* 5. Fecha de Nacimiento (Rango 5 a 100 años) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700">
+                  Fecha de nacimiento <span className="text-rose-500">*</span>
+                </label>
+                {form.fechaNacimiento && (
+                  <span className="text-[10px] font-semibold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200">
+                    {calcAge(form.fechaNacimiento)} años
+                  </span>
+                )}
+              </div>
+              <input
+                type="date"
+                min={minDob}
+                max={maxDob}
+                value={form.fechaNacimiento}
+                onChange={setField('fechaNacimiento')}
+                className={`w-full px-3 py-2 border rounded-xl text-sm transition-colors ${
+                  fieldErrors.fechaNacimiento ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-400/40' : 'border-slate-200 focus:ring-2 focus:ring-cyan-400/50'
+                }`}
+                required
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">Rango de edad permitido: 5 a 100 años</p>
+              {fieldErrors.fechaNacimiento && (
+                <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                  <span>⚠</span> {fieldErrors.fechaNacimiento}
+                </p>
+              )}
             </div>
+
+            {/* 6. Teléfono */}
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Teléfono / Celular</label>
+              <input
+                value={form.telefono}
+                onChange={setField('telefono')}
+                className={`w-full px-3 py-2 border rounded-xl text-sm transition-colors ${
+                  fieldErrors.telefono ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-400/40' : 'border-slate-200 focus:ring-2 focus:ring-cyan-400/50'
+                }`}
+                placeholder="Ej: +51 987654321"
+              />
+              {fieldErrors.telefono && (
+                <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                  <span>⚠</span> {fieldErrors.telefono}
+                </p>
+              )}
+            </div>
+
+            {/* 7. Correo Electrónico */}
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Correo electrónico</label>
+              <input
+                type="email"
+                value={form.correo}
+                onChange={setField('correo')}
+                className={`w-full px-3 py-2 border rounded-xl text-sm transition-colors ${
+                  fieldErrors.correo ? 'border-rose-400 bg-rose-50/20 focus:ring-2 focus:ring-rose-400/40' : 'border-slate-200 focus:ring-2 focus:ring-cyan-400/50'
+                }`}
+                placeholder="correo@ejemplo.com"
+              />
+              {fieldErrors.correo && (
+                <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                  <span>⚠</span> {fieldErrors.correo}
+                </p>
+              )}
+            </div>
+
+            {/* 8. Ciudad */}
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Ciudad</label>
+              <select
+                value={form.ciudad}
+                onChange={setField('ciudad')}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 text-slate-700"
+              >
+                {CITY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            {/* 9. Tipo de Sangre */}
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Tipo de sangre</label>
+              <select
+                value={form.tipoSangre}
+                onChange={setField('tipoSangre')}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 font-mono text-slate-700"
+              >
+                {BLOOD_TYPES.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+
+            {/* 10. Seguro de Salud */}
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Seguro de salud</label>
+              <select
+                value={form.seguro}
+                onChange={setField('seguro')}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50 text-slate-700"
+              >
+                {INSURANCE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+
+            {/* 11. Alergias conocidas */}
             <div className="col-span-2">
-              <label className="text-xs font-semibold text-slate-500 block mb-1.5">Antecedentes médicos</label>
-              <textarea value={form.antecedentes} onChange={set('antecedentes')} rows={2} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50" placeholder="Condiciones preexistentes, medicamentos actuales..."/>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Alergias conocidas</label>
+              <input
+                value={form.alergias}
+                onChange={setField('alergias')}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+                placeholder="Ej: Penicilina, Látex, Ibuprofeno (o Ninguna)..."
+              />
+            </div>
+
+            {/* 12. Antecedentes médicos */}
+            <div className="col-span-2">
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Antecedentes médicos</label>
+              <textarea
+                value={form.antecedentesMedicos}
+                onChange={setField('antecedentesMedicos')}
+                rows={2}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
+                placeholder="Condiciones preexistentes, cirugías, tratamientos crónicos..."
+              />
             </div>
           </div>
-        </div>
-        <div className="px-6 py-4 border-t border-slate-100 flex gap-2 justify-end shrink-0">
-          <button disabled={isSaving} onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancelar</button>
-          <button 
-            disabled={isSaving} 
-            onClick={()=>onSave(form)} 
-            className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-cyan-600/20"
+        </form>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 flex gap-2 justify-end shrink-0 bg-slate-50/50">
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            form="new-patient-form"
+            disabled={isSaving}
+            className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-cyan-600/20 transition-all cursor-pointer"
           >
             {isSaving && (
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-1 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
             )}
-            {isSaving ? 'Guardando en BD...' : 'Registrar paciente'}
+            {isSaving ? 'Guardando en PostgreSQL...' : 'Registrar paciente'}
           </button>
         </div>
       </div>
@@ -323,6 +734,18 @@ function ModalDetallePaciente({
               }`}>
                 {patient.status === 'active' ? 'ACTIVO' : patient.status === 'archived' ? 'ARCHIVADO (Baja lógica)' : 'INACTIVO'}
               </span>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-100 bg-white">
+              <span className="text-slate-400 text-xs block">Tipo de Sangre</span>
+              <p className="font-semibold text-slate-800 mt-0.5 font-mono">{patient.blood || 'POR DETERMINAR'}</p>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-100 bg-white">
+              <span className="text-slate-400 text-xs block">Seguro de Salud</span>
+              <p className="font-semibold text-slate-800 mt-0.5">{patient.eps || 'PARTICULAR'}</p>
+            </div>
+            <div className="p-3 rounded-xl border border-slate-100 bg-white col-span-2 sm:col-span-1">
+              <span className="text-slate-400 text-xs block">Ciudad</span>
+              <p className="font-semibold text-slate-800 mt-0.5">{patient.city || 'Lima'}</p>
             </div>
           </div>
 
@@ -953,12 +1376,12 @@ export default function PacientePerfil({ readOnly: propReadOnly }: { readOnly?: 
             dob: d.fechaNacimiento || '1995-01-01',
             phone: d.telefono || 'Sin teléfono',
             email: d.correo || '',
-            blood: 'O+',
-            eps: 'Particular',
+            blood: d.tipoSangre || d.tipo_sangre || 'POR DETERMINAR',
+            eps: d.seguro || 'PARTICULAR',
             allergy: d.alergias || 'Ninguna',
             antecedentes: d.antecedentesMedicos || 'Sin antecedentes registrados.',
             medicamentos: d.medicamentos || 'Ninguno registrado',
-            city: 'Sede Central',
+            city: d.ciudad || 'Lima',
             status: (d.estado === 'INACTIVO' ? 'inactive' : d.estado === 'ARCHIVADO' ? 'archived' : 'active') as 'active'|'inactive'|'archived',
             nextAppt: '',
             lastVisit: d.fechaCreacion ? d.fechaCreacion.substring(0, 10) : '2026-09-26',
@@ -996,25 +1419,24 @@ export default function PacientePerfil({ readOnly: propReadOnly }: { readOnly?: 
 
   const sel = patients.find(p=>p.id===selId) || patients[0]
 
-  async function addPatient(data: { name:string; doc:string; dob:string; phone:string; email:string; blood:string; eps:string; allergy:string; antecedentes:string; city:string }) {
+  async function addPatient(data: NewPatientFormData) {
     setIsSaving(true)
     try {
-      const parts = data.name.trim().split(' ')
-      const nombres = parts.length > 1 ? parts.slice(0, parts.length - 1).join(' ') : data.name
-      const apellidos = parts.length > 1 ? parts[parts.length - 1] : 'Sin apellido'
-
       const created = await createPatientInApi({
-        nombres,
-        apellidos,
-        tipoDocumento: 'DNI',
-        numeroDocumento: data.doc,
-        fechaNacimiento: data.dob || undefined,
-        telefono: data.phone,
-        correo: data.email,
-        alergias: data.allergy || 'Ninguna',
-        antecedentesMedicos: data.antecedentes || undefined,
-        medicamentos: undefined,
-        estado: 'ACTIVO'
+        nombres: data.nombres.trim(),
+        apellidos: data.apellidos.trim(),
+        tipoDocumento: data.tipoDocumento,
+        numeroDocumento: data.numeroDocumento.trim(),
+        fechaNacimiento: data.fechaNacimiento || undefined,
+        telefono: data.telefono?.trim() || undefined,
+        correo: data.correo?.trim() || undefined,
+        ciudad: data.ciudad,
+        tipoSangre: data.tipoSangre,
+        tipo_sangre: data.tipoSangre,
+        seguro: data.seguro,
+        alergias: data.alergias?.trim() || 'Ninguna',
+        antecedentesMedicos: data.antecedentesMedicos?.trim() || undefined,
+        estado: 'ACTIVO',
       })
 
       const np: Patient = {
@@ -1022,17 +1444,17 @@ export default function PacientePerfil({ readOnly: propReadOnly }: { readOnly?: 
         name: `${created.nombres} ${created.apellidos || ''}`.trim(),
         nombres: created.nombres,
         apellidos: created.apellidos,
-        tipoDocumento: created.tipoDocumento || 'DNI',
-        doc: created.numeroDocumento || data.doc,
-        dob: created.fechaNacimiento || data.dob,
-        phone: created.telefono || data.phone,
-        email: created.correo || data.email,
-        blood: data.blood as Patient['blood'],
-        eps: data.eps || 'Particular',
-        allergy: created.alergias || 'Ninguna',
-        antecedentes: created.antecedentesMedicos || data.antecedentes,
+        tipoDocumento: created.tipoDocumento || data.tipoDocumento,
+        doc: created.numeroDocumento || data.numeroDocumento,
+        dob: created.fechaNacimiento || data.fechaNacimiento,
+        phone: created.telefono || data.telefono || 'Sin teléfono',
+        email: created.correo || data.correo || '',
+        blood: (created.tipoSangre || data.tipoSangre) as Patient['blood'],
+        eps: created.seguro || data.seguro || 'PARTICULAR',
+        allergy: created.alergias || data.alergias || 'Ninguna',
+        antecedentes: created.antecedentesMedicos || data.antecedentesMedicos || '',
         medicamentos: created.medicamentos || 'Ninguno registrado',
-        city: data.city || 'Sede Central',
+        city: created.ciudad || data.ciudad || 'Lima',
         status: 'active',
         nextAppt: '',
         lastVisit: new Date().toISOString().substring(0, 10),
@@ -1046,20 +1468,44 @@ export default function PacientePerfil({ readOnly: propReadOnly }: { readOnly?: 
       setPatients(ps => [np, ...ps])
       setSelId(np.id)
       setDbConnected(true)
-      setToastMessage(`✓ Paciente guardado en PostgreSQL (ID: ${String(created.id).substring(0, 8)}...)`)
+      setToastMessage(`✓ Paciente registrado en PostgreSQL (ID: ${String(created.id).substring(0, 8)}...)`)
       setTimeout(() => setToastMessage(null), 4000)
       setShowNewModal(false)
     } catch (err: any) {
       console.error('Error al persistir en backend:', err)
+      // Si el backend arrojó error de validación (HTTP 400 o con errors mapeados), relanzar para que el modal muestre los campos en rojo y no se cierre
+      if (err.status === 400 || err.response?.status === 400 || err.errors) {
+        const errorMsg = err.message || err.response?.data?.message || 'Error de validación en los campos'
+        setToastMessage(`⚠ HTTP 400: ${errorMsg}`)
+        setTimeout(() => setToastMessage(null), 6000)
+        throw err
+      }
+
+      // Si es otro error (ej. sin conexión a la base de datos), guardar como respaldo local
       const np: Patient = {
-        id: Date.now(), name:data.name||'Nuevo paciente', doc:data.doc, dob:data.dob, phone:data.phone,
-        email:data.email, blood:data.blood as Patient['blood'], eps:data.eps, allergy:data.allergy||'Ninguna',
-        antecedentes:data.antecedentes, city:data.city, status:'active', nextAppt:'', lastVisit:'', balance:0,
+        id: Date.now(),
+        name: `${data.nombres} ${data.apellidos}`.trim(),
+        nombres: data.nombres,
+        apellidos: data.apellidos,
+        tipoDocumento: data.tipoDocumento,
+        doc: data.numeroDocumento,
+        dob: data.fechaNacimiento,
+        phone: data.telefono || 'Sin teléfono',
+        email: data.correo || '',
+        blood: data.tipoSangre as Patient['blood'],
+        eps: data.seguro || 'PARTICULAR',
+        allergy: data.alergias || 'Ninguna',
+        antecedentes: data.antecedentesMedicos || '',
+        city: data.ciudad || 'Lima',
+        status: 'active',
+        nextAppt: '',
+        lastVisit: '',
+        balance: 0,
       }
       setPatients(ps => [np, ...ps])
       setSelId(np.id)
       setShowNewModal(false)
-      setToastMessage(`⚠ Guardado localmente (Backend: ${err.message || 'Sin conexión'})`)
+      setToastMessage(`⚠ Guardado localmente (Backend offline: ${err.message || 'Sin conexión'})`)
       setTimeout(() => setToastMessage(null), 5000)
     } finally {
       setIsSaving(false)

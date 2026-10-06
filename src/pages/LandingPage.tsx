@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useGSAP } from '@gsap/react'
+import { useAuth } from '../contexts/AuthContext'
+import { getDefaultRouteForRole } from '../routes/routeHelpers'
 import coronixLogo from '../imports/coronixlogo.png'
 
 // Registro oficial de plugins GSAP
@@ -312,8 +314,19 @@ function ContactForm() {
 }
 
 export default function LandingPage() {
+  const { isAuthenticated, role, user } = useAuth()
   const navigate = useNavigate()
   const onNavigate = (path: string) => navigate(path)
+
+  // Si ya existe sesión activa, redirigir automáticamente al panel del rol
+  useEffect(() => {
+    const savedRole = typeof window !== 'undefined' ? localStorage.getItem('coronyx_role') : null
+    const currentRole = role || user?.rol || savedRole
+    if ((isAuthenticated || currentRole) && currentRole) {
+      navigate(getDefaultRouteForRole(currentRole as any), { replace: true })
+    }
+  }, [isAuthenticated, role, user, navigate])
+
   const [activeRole, setActiveRole] = useState(0)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -420,7 +433,7 @@ export default function LandingPage() {
           isMobile: '(max-width: 767px) and (prefers-reduced-motion: no-preference)',
           reduceMotion: '(prefers-reduced-motion: reduce)',
         },
-        (context) => {
+        (context: any) => {
           const { isDesktop, isMobile, reduceMotion } = context.conditions!
 
           if (reduceMotion) {

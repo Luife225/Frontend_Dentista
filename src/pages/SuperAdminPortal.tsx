@@ -852,8 +852,11 @@ function SectionLogs() {
 // ── Shell ─────────────────────────────────────────────────────────────────────
 
 export default function SuperAdminPortal() {
-  const { logout: onLogout } = useAuth()
+  const { role, logout: onLogout } = useAuth()
   const [active, setActive] = useState<Section>('overview')
+
+  const savedRole = typeof window !== 'undefined' ? localStorage.getItem('coronyx_role') : null
+  if (!role && !savedRole) return null
 
   const pendingCount = SOLICITUDES_INIT.filter(s => s.status === 'pending').length
 

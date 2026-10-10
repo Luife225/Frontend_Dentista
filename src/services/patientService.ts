@@ -1,6 +1,7 @@
 export interface BackendPatientDto {
   id?: string;
   clinicaId?: string;
+  usuarioId?: string | null;
   nombres: string;
   apellidos: string;
   tipoDocumento?: string;
@@ -50,20 +51,28 @@ export class ApiValidationError extends Error {
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api/v1';
+import { getAuthHeaders, API_BASE_URL } from './apiClient';
 
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-  };
-  const token = typeof window !== 'undefined' ? localStorage.getItem('coronyx_jwt_token') : null;
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
+const DECIMAL_ID_REGEX = /^[1-9]\d*$/;
+
+export function isDecimalId(id?: string | null): boolean {
+  return typeof id === 'string' && DECIMAL_ID_REGEX.test(id.trim());
 }
 
-/** GET /api/v1/patients — Lista todos los pacientes de la clínica */
+function validatePatientContract(patient: BackendPatientDto): BackendPatientDto {
+  if (!patient || !patient.id || !isDecimalId(patient.id)) {
+    throw new Error(`Contrato de API inválido: el paciente no contiene un ID decimal string devuelto por el servidor (${patient?.id})`);
+  }
+  if (patient.clinicaId && !isDecimalId(patient.clinicaId)) {
+    throw new Error(`Contrato de API inválido: clinicaId (${patient.clinicaId}) no es un ID decimal string válido`);
+  }
+  if (patient.usuarioId && !isDecimalId(patient.usuarioId)) {
+    throw new Error(`Contrato de API inválido: usuarioId (${patient.usuarioId}) no es un ID decimal string válido`);
+  }
+  return patient;
+}
+
+/** GET /api/v1/patients — Lista pacientes de la clínica (filtrado por rol en backend) */
 export async function fetchPatientsFromApi(): Promise<BackendPatientDto[]> {
   const response = await fetch(`${API_BASE_URL}/patients`, {
     method: 'GET',
@@ -72,11 +81,29 @@ export async function fetchPatientsFromApi(): Promise<BackendPatientDto[]> {
   if (!response.ok) {
     throw new Error(`Error al obtener pacientes: ${response.statusText}`);
   }
-  return response.json();
+  const list: BackendPatientDto[] = await response.json();
+  return list.map(validatePatientContract);
 }
 
-/** GET /api/v1/patients/{id} — Ficha completa de un paciente por UUID */
+/** GET /api/v1/patients/admin — Proyección estrictamente administrativa de pacientes para ADMIN_CLINICA y RECEPCIONISTA */
+export async function fetchAdministrativePatientsFromApi(): Promise<BackendPatientDto[]> {
+  const response = await fetch(`${API_BASE_URL}/patients/admin`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Error al obtener proyección administrativa: ${response.statusText}`);
+  }
+  const list: BackendPatientDto[] = await response.json();
+  return list.map(validatePatientContract);
+}
+
+/** GET /api/v1/patients/{id} — Ficha completa o administrativa de un paciente por ID decimal string */
 export async function fetchPatientById(id: string): Promise<BackendPatientDto> {
+  if (!isDecimalId(id)) {
+    throw new Error(`Contrato de API inválido: el ID de paciente (${id}) debe ser una cadena decimal positiva`);
+  }
+
   const response = await fetch(`${API_BASE_URL}/patients/${id}`, {
     method: 'GET',
     headers: getAuthHeaders(),
@@ -85,10 +112,11 @@ export async function fetchPatientById(id: string): Promise<BackendPatientDto> {
     const errorText = await response.text();
     throw new Error(`Paciente no encontrado (${response.status}): ${errorText || response.statusText}`);
   }
-  return response.json();
+  const data: BackendPatientDto = await response.json();
+  return validatePatientContract(data);
 }
 
-/** POST /api/v1/patients — Registra un nuevo paciente */
+/** POST /api/v1/patients — Registra un nuevo paciente (ID devuelto por la API) */
 export async function createPatientInApi(patient: Partial<BackendPatientDto>): Promise<BackendPatientDto> {
   const payload = {
     ...patient,
@@ -123,7 +151,8 @@ export async function createPatientInApi(patient: Partial<BackendPatientDto>): P
     throw new ApiValidationError(response.status, message, fieldErrors);
   }
 
-  return response.json();
+  const created: BackendPatientDto = await response.json();
+  return validatePatientContract(created);
 }
 
 /** PUT /api/v1/patients/{id} — Actualiza datos de la ficha del paciente */
@@ -131,6 +160,10 @@ export async function updatePatientInApi(
   id: string,
   updates: Partial<BackendPatientDto>
 ): Promise<BackendPatientDto> {
+  if (!isDecimalId(id)) {
+    throw new Error(`Contrato de API inválido: el ID de paciente (${id}) debe ser una cadena decimal positiva`);
+  }
+
   const payload = {
     ...updates,
     ...(updates.tipoSangre || updates.tipo_sangre ? {
@@ -166,11 +199,16 @@ export async function updatePatientInApi(
     throw new ApiValidationError(response.status, message, fieldErrors);
   }
 
-  return response.json();
+  const updated: BackendPatientDto = await response.json();
+  return validatePatientContract(updated);
 }
 
 /** PATCH /api/v1/patients/{id}/archive — Baja lógica: cambia estado a ARCHIVADO */
 export async function archivePatientInApi(id: string): Promise<BackendPatientDto> {
+  if (!isDecimalId(id)) {
+    throw new Error(`Contrato de API inválido: el ID de paciente (${id}) debe ser una cadena decimal positiva`);
+  }
+
   const response = await fetch(`${API_BASE_URL}/patients/${id}/archive`, {
     method: 'PATCH',
     headers: getAuthHeaders(),
@@ -179,5 +217,101 @@ export async function archivePatientInApi(id: string): Promise<BackendPatientDto
     const errorText = await response.text();
     throw new Error(`Error al archivar paciente (${response.status}): ${errorText || response.statusText}`);
   }
-  return response.json();
+  const archived: BackendPatientDto = await response.json();
+  return validatePatientContract(archived);
 }
+
+/** PATCH /api/v1/patients/{id}/link-user — Vincula o desvincula cuenta de usuario a paciente sin equiparar paciente.id a usuario.id */
+export async function linkPatientUserAccount(id: string, usuarioId: string | null): Promise<BackendPatientDto> {
+  if (!isDecimalId(id)) {
+    throw new Error(`Contrato de API inválido: el ID de paciente (${id}) debe ser una cadena decimal positiva`);
+  }
+  if (usuarioId && !isDecimalId(usuarioId)) {
+    throw new Error(`Contrato de API inválido: el ID de usuario (${usuarioId}) debe ser una cadena decimal positiva`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/patients/${id}/link-user`, {
+    method: 'PATCH',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ usuarioId: usuarioId || null }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let message = `Error al vincular cuenta (${response.status})`;
+    try {
+      const parsed = JSON.parse(errorText);
+      message = parsed.message || message;
+    } catch {
+      message = errorText || message;
+    }
+    throw new ApiValidationError(response.status, message);
+  }
+
+  const linked: BackendPatientDto = await response.json();
+  return validatePatientContract(linked);
+}
+
+export interface UpdateMyProfilePayload {
+  telefono?: string;
+  ciudad?: string;
+  direccion?: string;
+}
+
+/** GET /api/v1/patients/me - Obtiene la ficha de paciente propia del usuario autenticado */
+export async function fetchMyPatientProfile(): Promise<BackendPatientDto> {
+  const response = await fetch(`${API_BASE_URL}/patients/me`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let message = `Error al consultar perfil propio (${response.status})`;
+    try {
+      const parsed = JSON.parse(errorText);
+      message = parsed.message || message;
+    } catch {
+      message = errorText || message;
+    }
+    throw new Error(message);
+  }
+
+  const data: BackendPatientDto = await response.json();
+  return validatePatientContract(data);
+}
+
+/** PUT /api/v1/patients/me - Actualiza campos administrativos propios del paciente sin alterar campos clínicos */
+export async function updateMyPatientProfile(payload: UpdateMyProfilePayload): Promise<BackendPatientDto> {
+  const response = await fetch(`${API_BASE_URL}/patients/me`, {
+    method: 'PUT',
+    headers: {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let message = `Error al actualizar perfil (${response.status})`;
+    let fieldErrors: ApiFieldErrorMap | undefined;
+    try {
+      const parsed = JSON.parse(errorText);
+      message = parsed.message || message;
+      if (parsed.errors && typeof parsed.errors === 'object') {
+        fieldErrors = parsed.errors;
+      }
+    } catch {
+      message = errorText || message;
+    }
+    throw new ApiValidationError(response.status, message, fieldErrors);
+  }
+
+  const updated: BackendPatientDto = await response.json();
+  return validatePatientContract(updated);
+}
+

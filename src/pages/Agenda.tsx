@@ -5,9 +5,12 @@ import {
   updateStatus,
   markAttendance,
   reschedule,
+  getClinicRescheduleRequests,
+  resolveRescheduleRequest,
 } from '../services/appointmentService'
 import { fetchUsersFromApi, UserItem } from '../services/authService'
-import { Appointment } from '../types/appointment'
+import { useAuth } from '../contexts/AuthContext'
+import { Appointment, SolicitudReprogramacion } from '../types/appointment'
 import AgendarCitaModal from '../components/agenda/AgendarCitaModal'
 import {
   getMinDateString,
@@ -20,6 +23,11 @@ import {
   calculateEndTime,
   validateAppointmentSchedule,
   CONFLICT_MESSAGE,
+  toLimaIsoString,
+  formatLimaTime,
+  formatLimaDate,
+  toLimaDateString,
+  getLimaHourMinute,
 } from '../utils/appointmentRules'
 
 // ── Hours configuration ──────────────────────────────────────────────────────
@@ -60,18 +68,7 @@ function Icon({ d, className = 'w-4 h-4' }: { d: string; className?: string }) {
 }
 
 function formatHourMinute(isoStr?: string): string {
-  if (!isoStr) return '--:--'
-  // El backend envía las citas con timestamp ISO clínico (ej: 2026-10-10T08:00:00Z)
-  // Extraemos directamente HH:mm para evitar el desfasaje de 5 horas por UTC-5
-  if (isoStr.length >= 16 && isoStr.includes('T')) {
-    return isoStr.substring(11, 16)
-  }
-  try {
-    const d = new Date(isoStr)
-    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-  } catch {
-    return '--:--'
-  }
+  return formatLimaTime(isoStr)
 }
 
 // ── Side Drawer: Detalle y Acciones del Paciente (Matching Image 1) ───────────
@@ -90,7 +87,7 @@ function PatientPanel({
   onConfirm: (id: string) => Promise<void>
   onStartAttention: (id: string) => Promise<void>
   onFinish: (id: string) => Promise<void>
-  onMarkAttendance: (id: string) => Promise<void>
+  onMarkAttendance: (id: string, asistencia: 'ASISTIO' | 'NO_SHOW') => Promise<void>
   onOpenReprogramar: (c: Appointment) => void
   onOpenCancel: (c: Appointment) => void
 }) {
@@ -106,17 +103,12 @@ function PatientPanel({
     }
   }
 
-  // Parse Date & Time sin desfasaje de zona horaria
+  // Parse Date & Time con zona horaria oficial Lima
   const durationMin = (() => {
     try {
-      if (cita.inicioEn?.includes('T') && cita.finEn?.includes('T')) {
-        const [sH, sM] = cita.inicioEn.substring(11, 16).split(':').map(Number)
-        const [eH, eM] = cita.finEn.substring(11, 16).split(':').map(Number)
-        return (eH * 60 + eM) - (sH * 60 + sM) || 45
-      }
-      const s = new Date(cita.inicioEn)
-      const e = new Date(cita.finEn)
-      return Math.round((e.getTime() - s.getTime()) / 60000) || 45
+      const s = getLimaHourMinute(cita.inicioEn)
+      const e = getLimaHourMinute(cita.finEn)
+      return (e.hour * 60 + e.minute) - (s.hour * 60 + s.minute) || 45
     } catch {
       return 45
     }
@@ -124,10 +116,7 @@ function PatientPanel({
 
   const capitalizedDay = (() => {
     try {
-      const datePart = (cita.inicioEn || '').substring(0, 10)
-      const [y, m, d] = datePart.split('-').map(Number)
-      const dt = new Date(y, m - 1, d)
-      const formatted = dt.toLocaleDateString('es-PE', {
+      const formatted = formatLimaDate(cita.inicioEn, {
         weekday: 'long',
         day: 'numeric',
         month: 'long',
@@ -142,11 +131,13 @@ function PatientPanel({
     Appointment['estado'],
     { label: string; cls: string }
   > = {
-    CONFIRMADA:  { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
-    PROGRAMADA:  { label: 'Programada',   cls: 'bg-amber-100 text-amber-700' },
-    EN_ATENCION: { label: 'En atención',  cls: 'bg-cyan-100 text-cyan-700' },
-    FINALIZADA:  { label: 'Finalizada',   cls: 'bg-slate-100 text-slate-700' },
-    CANCELADA:   { label: 'Cancelada',    cls: 'bg-rose-100 text-rose-700' },
+    CONFIRMADA:   { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
+    PROGRAMADA:   { label: 'Programada',   cls: 'bg-amber-100 text-amber-700' },
+    EN_ATENCION:  { label: 'En atención',  cls: 'bg-cyan-100 text-cyan-700' },
+    FINALIZADA:   { label: 'Finalizada',   cls: 'bg-slate-100 text-slate-700' },
+    REPROGRAMADA: { label: 'Reprogramada', cls: 'bg-purple-100 text-purple-700' },
+    CANCELADA:    { label: 'Cancelada',    cls: 'bg-rose-100 text-rose-700' },
+    NO_ASISTIO:   { label: 'No asistió',   cls: 'bg-slate-200 text-slate-700' },
   }
 
   return (
@@ -288,14 +279,22 @@ function PatientPanel({
         )}
 
         {/* Marcar asistencia */}
-        {cita.estado !== 'CANCELADA' && cita.estadoAsistencia !== 'ASISTIO' && (
-          <button
-            onClick={() => onMarkAttendance(cita.id)}
-            className="w-full py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <Icon d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" className="w-3.5 h-3.5" />
-            Marcar como Asistió
-          </button>
+        {cita.estado !== 'CANCELADA' && !cita.estadoAsistencia && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => onMarkAttendance(cita.id, 'ASISTIO')}
+              className="flex-1 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Icon d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" className="w-3.5 h-3.5" />
+              Asistió
+            </button>
+            <button
+              onClick={() => onMarkAttendance(cita.id, 'NO_SHOW')}
+              className="flex-1 py-2 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              ✕ No asistió
+            </button>
+          </div>
         )}
 
         {/* Reprogramar & Cancelar */}
@@ -320,8 +319,153 @@ function PatientPanel({
   )
 }
 
+// ── Modal Solicitudes de Reprogramación (Staff: Recepción y Admin) ────────────
+function SolicitudesModal({
+  isOpen,
+  onClose,
+  solicitudes,
+  onResolve,
+  isResolving,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  solicitudes: SolicitudReprogramacion[]
+  onResolve: (id: string, accion: 'APROBADA' | 'RECHAZADA', nota?: string) => Promise<void>
+  isResolving: boolean
+}) {
+  const [rejectId, setRejectId] = useState<string | null>(null)
+  const [rejectNota, setRejectNota] = useState('')
+
+  if (!isOpen) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(5px)' }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center font-bold text-sm">
+              🔄
+            </span>
+            <div>
+              <h3 className="font-bold text-slate-900 text-base" style={{ fontFamily: 'Outfit' }}>
+                Solicitudes de Reprogramación
+              </h3>
+              <p className="text-xs text-slate-500">
+                Peticiones registradas por pacientes pendientes de resolución por recepción
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <Icon d="M6 18L18 6M6 6l12 12" className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+          {solicitudes.length === 0 ? (
+            <div className="text-center py-12">
+              <span className="text-3xl">✨</span>
+              <p className="font-bold text-slate-700 text-sm mt-2" style={{ fontFamily: 'Outfit' }}>
+                No hay solicitudes pendientes
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Todas las solicitudes de cambio de horario han sido atendidas.
+              </p>
+            </div>
+          ) : (
+            solicitudes.map(sol => (
+              <div
+                key={sol.id}
+                className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col gap-3"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm" style={{ fontFamily: 'Outfit' }}>
+                      {sol.pacienteNombreCompleto || `Cita #${sol.citaId}`}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      <strong>Nuevo horario deseado:</strong>{' '}
+                      {formatLimaDate(sol.nuevaFechaHoraInicio || sol.nuevoInicioDeseado)} de {formatLimaTime(sol.nuevaFechaHoraInicio || sol.nuevoInicioDeseado)} a {formatLimaTime(sol.nuevaFechaHoraFin || sol.nuevoFinDeseado)}
+                    </p>
+                    {sol.motivo && (
+                      <p className="text-xs text-slate-600 mt-1 italic bg-white p-2 rounded-lg border border-slate-100">
+                        "{sol.motivo}"
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                    Pendiente
+                  </span>
+                </div>
+
+                {rejectId === sol.id ? (
+                  <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl space-y-2">
+                    <p className="text-xs font-semibold text-rose-800">Motivo del rechazo (opcional):</p>
+                    <input
+                      type="text"
+                      value={rejectNota}
+                      onChange={e => setRejectNota(e.target.value)}
+                      placeholder="Ej: Sin disponibilidad en el sillón requerido..."
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-rose-300 rounded-lg focus:outline-none"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setRejectId(null)
+                          setRejectNota('')
+                        }}
+                        className="px-3 py-1 text-xs text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        disabled={isResolving}
+                        onClick={async () => {
+                          await onResolve(sol.id, 'RECHAZADA', rejectNota || 'Rechazado por recepción')
+                          setRejectId(null)
+                          setRejectNota('')
+                        }}
+                        className="px-3 py-1 text-xs font-bold bg-rose-600 text-white rounded-lg hover:bg-rose-500 disabled:opacity-50 cursor-pointer"
+                      >
+                        Confirmar Rechazo
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-end gap-2 pt-1 border-t border-slate-200/50">
+                    <button
+                      disabled={isResolving}
+                      onClick={() => setRejectId(sol.id)}
+                      className="px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors cursor-pointer"
+                    >
+                      Rechazar
+                    </button>
+                    <button
+                      disabled={isResolving}
+                      onClick={() => onResolve(sol.id, 'APROBADA', 'Aprobado por recepción')}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>✓ Aprobar y Reprogramar</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Agenda Component ─────────────────────────────────────────────────────
 export default function Agenda() {
+  const { role, user } = useAuth()
   const [view, setView] = useState<'week' | 'day'>('week')
   const [citas, setCitas] = useState<Appointment[]>([])
   const [doctors, setDoctors] = useState<UserItem[]>([])
@@ -343,6 +487,11 @@ export default function Agenda() {
   const [reprogInicio, setReprogInicio] = useState('10:00')
   const [reprogFin, setReprogFin] = useState('10:45')
   const [reprogError, setReprogError] = useState<string | null>(null)
+
+  // Solicitudes de reprogramación (Staff)
+  const [showRequestsModal, setShowRequestsModal] = useState(false)
+  const [pendingRequests, setPendingRequests] = useState<SolicitudReprogramacion[]>([])
+  const [isResolvingRequest, setIsResolvingRequest] = useState(false)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -421,22 +570,74 @@ export default function Agenda() {
     async function loadDocs() {
       try {
         const users = await fetchUsersFromApi()
-        const odon = users.filter(u => u.rol === 'ODONTOLOGO')
+        const odon = users.filter(u => u.rol === 'ODONTOLOGO' && Boolean(u.usuarioClinicaId))
         setDoctors(odon)
+        if (role === 'ODONTOLOGO' && user?.usuarioClinicaId) {
+          setFilterDoc(user.usuarioClinicaId)
+        }
       } catch (err) {
-        console.warn('Error al cargar doctores:', err)
+        if (role === 'ODONTOLOGO' && user && user.usuarioClinicaId) {
+          setDoctors([{
+            id: user.usuarioId || user.id,
+            usuarioClinicaId: user.usuarioClinicaId,
+            correo: user.correo,
+            nombres: user.nombres,
+            apellidos: user.apellidos,
+            rol: 'ODONTOLOGO',
+            estado: 'ACTIVO',
+          }])
+          setFilterDoc(user.usuarioClinicaId)
+        } else {
+          console.warn('Directorio no autorizado o no disponible para este rol:', err)
+        }
       }
     }
     loadDocs()
-  }, [])
+  }, [role, user])
+
+  // ── Cargar Solicitudes de Reprogramación (Staff: Recepción / Admin) ─────────
+  const loadPendingRequests = async (silent = false) => {
+    if (role !== 'ADMIN_CLINICA' && role !== 'RECEPCIONISTA') return
+    try {
+      const reqs = await getClinicRescheduleRequests('PENDIENTE')
+      setPendingRequests(reqs)
+    } catch (err) {
+      if (!silent) console.warn('Error al cargar solicitudes de reprogramación:', err)
+    }
+  }
+
+  const handleResolveRequest = async (id: string, accion: 'APROBADA' | 'RECHAZADA', nota?: string) => {
+    setIsResolvingRequest(true)
+    try {
+      await resolveRescheduleRequest(id, {
+        estado: accion,
+        motivoResolucion: nota || (accion === 'APROBADA' ? 'Aprobado por recepción' : 'Rechazado por recepción'),
+      })
+      showToast(accion === 'APROBADA' ? '✓ Solicitud aprobada y cita reprogramada' : '✓ Solicitud rechazada')
+      await loadPendingRequests(true)
+      await loadWeekCitas(true)
+    } catch (err: any) {
+      const status = err.status || err.response?.status
+      const msg = err.response?.data?.message || err.message
+      if (status === 409 || msg?.toLowerCase().includes('conflicto') || msg?.toLowerCase().includes('solapa')) {
+        showToast('⚠️ Conflicto 409: El horario ya está ocupado. Se recarga la agenda.')
+        await loadWeekCitas(true)
+        await loadPendingRequests(true)
+      } else {
+        showToast(msg || 'Error al resolver solicitud')
+      }
+    } finally {
+      setIsResolvingRequest(false)
+    }
+  }
 
   // ── Cargar Citas para el rango de la semana (Lunes a Sábado) ───────────────
-  const loadWeekCitas = async () => {
+  const loadWeekCitas = async (silent = false) => {
     if (weekDays.length < 5) return
-    setIsLoading(true)
+    if (!silent) setIsLoading(true)
     try {
-      const desde = `${weekDays[0].dateStr}T00:00:00Z`
-      const hasta = `${weekDays[weekDays.length - 1].dateStr}T23:59:59Z`
+      const desde = toLimaIsoString(weekDays[0].dateStr, '00:00')
+      const hasta = toLimaIsoString(weekDays[weekDays.length - 1].dateStr, '23:59')
 
       let data: Appointment[] = []
       if (filterDoc) {
@@ -446,16 +647,25 @@ export default function Agenda() {
       }
       setCitas(data)
     } catch (err: any) {
-      console.warn('Error al consultar citas de Spring Boot:', err)
-      showToast('Error al conectar con la agenda')
+      if (!silent) {
+        console.warn('Error al consultar citas de Spring Boot:', err)
+        showToast('Error al conectar con la agenda')
+      }
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
 
+  // Sincronización y Sondeo cada 5 segundos (garantiza sincronización <= 10 s entre sesiones)
   useEffect(() => {
     loadWeekCitas()
-  }, [weekDays, filterDoc])
+    loadPendingRequests(true)
+    const interval = setInterval(() => {
+      loadWeekCitas(true)
+      loadPendingRequests(true)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [weekDays, filterDoc, role])
 
   // ── Filtrado por Doctor ────────────────────────────────────────────────────
   const filteredCitas = useMemo(() => {
@@ -526,13 +736,14 @@ export default function Agenda() {
     setShowModal(true)
   }
 
-  // ── Acciones sobre la Cita ─────────────────────────────────────────────────
+  // ── Acciones sobre la Cita con reconsulta inmediata ────────────────────────
   const handleConfirm = async (id: string) => {
     try {
       const updated = await updateStatus(id, 'CONFIRMADA')
       setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
       setSelCita(sc => (sc && sc.id === id ? updated : sc))
       showToast('✓ Cita confirmada exitosamente')
+      await loadWeekCitas(true)
     } catch (err: any) {
       showToast(err.message || 'Error al confirmar')
     }
@@ -544,6 +755,7 @@ export default function Agenda() {
       setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
       setSelCita(sc => (sc && sc.id === id ? updated : sc))
       showToast('✓ Estado: En atención')
+      await loadWeekCitas(true)
     } catch (err: any) {
       showToast(err.message || 'Error al actualizar')
     }
@@ -555,19 +767,21 @@ export default function Agenda() {
       setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
       setSelCita(sc => (sc && sc.id === id ? updated : sc))
       showToast('✓ Cita finalizada')
+      await loadWeekCitas(true)
     } catch (err: any) {
       showToast(err.message || 'Error al finalizar')
     }
   }
 
-  const handleMarkAttendance = async (id: string) => {
+  const handleMarkAttendance = async (id: string, asistencia: 'ASISTIO' | 'NO_SHOW') => {
     try {
-      const updated = await markAttendance(id, 'ASISTIO')
+      const updated = await markAttendance(id, asistencia)
       setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
       setSelCita(sc => (sc && sc.id === id ? updated : sc))
-      showToast('✓ Asistencia registrada (ASISTIÓ)')
+      showToast(asistencia === 'ASISTIO' ? '✓ Asistencia registrada (ASISTIÓ)' : '✓ Inasistencia registrada (NO_SHOW)')
+      await loadWeekCitas(true)
     } catch (err: any) {
-      showToast(err.message || 'Error al marcar asistencia')
+      showToast(err.message || 'Error al registrar asistencia')
     }
   }
 
@@ -583,21 +797,23 @@ export default function Agenda() {
       return
     }
 
-    // Timestamps directos esperados por Spring Boot (ej: 2026-10-10T08:00:00Z)
-    const nuevoInicio = `${reprogFecha}T${reprogInicio}:00Z`
-    const nuevoFin = `${reprogFecha}T${reprogFin}:00Z`
+    // Timestamps ISO oficiales con offset Lima (-05:00)
+    const nuevoInicio = toLimaIsoString(reprogFecha, reprogInicio)
+    const nuevoFin = toLimaIsoString(reprogFecha, reprogFin)
 
     try {
       const updated = await reschedule(reprogramarCita.id, nuevoInicio, nuevoFin)
-      setCitas(cs => cs.map(c => (c.id === reprogramarCita.id ? updated : c)))
+      await loadWeekCitas(true)
       if (selCita?.id === reprogramarCita.id) setSelCita(updated)
       showToast('✓ Cita reprogramada correctamente')
       setReprogramarCita(null)
     } catch (err: any) {
       const status = err.status || err.response?.status
       const msg = err.response?.data?.message || err.message
-      if (status === 409 || msg?.toLowerCase().includes('conflicto')) {
+      if (status === 409 || msg?.toLowerCase().includes('conflicto') || msg?.toLowerCase().includes('solapa')) {
         setReprogError(CONFLICT_MESSAGE)
+        // 409 muestra conflicto y recarga, NO guarda en memoria
+        await loadWeekCitas(true)
       } else if (status === 400) {
         setReprogError(msg || 'Error 400: Datos de reprogramación inválidos según las reglas de la clínica.')
       } else {
@@ -614,6 +830,7 @@ export default function Agenda() {
       if (selCita?.id === cancelCita.id) setSelCita(updated)
       showToast('✓ Cita cancelada')
       setCancelCita(null)
+      await loadWeekCitas(true)
     } catch (err: any) {
       showToast(err.message || 'Error al cancelar')
     }
@@ -713,22 +930,44 @@ export default function Agenda() {
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Selector de Odontólogos */}
-          <select
-            value={filterDoc}
-            onChange={e => setFilterDoc(e.target.value)}
-            className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 text-slate-600 font-medium cursor-pointer"
-          >
-            <option value="">Todos los doctores</option>
-            {doctors.map(d => {
-              const val = d.usuarioClinicaId || d.id
-              return (
-                <option key={val} value={val}>
-                  Dr(a). {d.nombres} {d.apellidos}
-                </option>
-              )
-            })}
-          </select>
+          {/* Botón de Solicitudes de Reprogramación (Recepción y Admin) */}
+          {(role === 'ADMIN_CLINICA' || role === 'RECEPCIONISTA') && (
+            <button
+              onClick={() => setShowRequestsModal(true)}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer"
+            >
+              <span>🔄 Solicitudes</span>
+              {pendingRequests.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-600 text-white text-[10px] font-bold">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Selector de Odontólogos según Rol (D02 Odontólogo ve su agenda clínica autorizada) */}
+          {role === 'ODONTOLOGO' ? (
+            <div className="px-3 py-1.5 text-xs bg-teal-50 text-teal-800 font-semibold rounded-lg border border-teal-200 flex items-center gap-1.5">
+              <span>🩺</span>
+              <span>Dr(a). {user?.nombres} {user?.apellidos} (Mi agenda)</span>
+            </div>
+          ) : (
+            <select
+              value={filterDoc}
+              onChange={e => setFilterDoc(e.target.value)}
+              className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 text-slate-600 font-medium cursor-pointer"
+            >
+              <option value="">Todos los doctores</option>
+              {doctors.map(d => {
+                const val = d.usuarioClinicaId!
+                return (
+                  <option key={val} value={val}>
+                    Dr(a). {d.nombres} {d.apellidos}
+                  </option>
+                )
+              })}
+            </select>
+          )}
 
           {/* Leyenda de Procedimientos (Matching Image 1) */}
           <div className="hidden lg:flex items-center gap-3">
@@ -822,9 +1061,9 @@ export default function Agenda() {
 
                 {/* Day Columns */}
                 {weekDays.map((d) => {
-                  // Filtrar citas que pertenecen a este día
+                  // Filtrar citas que pertenecen a este día según hora Lima
                   const dayCitas = filteredCitas.filter(c => {
-                    const citaDate = c.inicioEn ? c.inicioEn.substring(0, 10) : ''
+                    const citaDate = toLimaDateString(c.inicioEn)
                     return citaDate === d.dateStr && c.estado !== 'CANCELADA'
                   })
 
@@ -867,12 +1106,8 @@ export default function Agenda() {
 
                       {/* Render Appointment Cards directly on grid (Image 1 Style) */}
                       {dayCitas.map(c => {
-                        const [sHStr, sMStr] = (c.inicioEn || '').substring(11, 16).split(':')
-                        const startH = parseInt(sHStr, 10) || 8
-                        const startM = parseInt(sMStr, 10) || 0
-                        const [eHStr, eMStr] = (c.finEn || '').substring(11, 16).split(':')
-                        const endH = parseInt(eHStr, 10) || (startH + 1)
-                        const endM = parseInt(eMStr, 10) || 0
+                        const { hour: startH, minute: startM } = getLimaHourMinute(c.inicioEn)
+                        const { hour: endH, minute: endM } = getLimaHourMinute(c.finEn)
                         const duration = (endH * 60 + endM) - (startH * 60 + startM) || 45
 
                         const topPct =
@@ -1003,17 +1238,12 @@ export default function Agenda() {
                   {filteredCitas
                     .filter(
                       c =>
-                        c.inicioEn &&
-                        c.inicioEn.substring(0, 10) === weekDays[dayIdx]?.dateStr &&
+                        toLimaDateString(c.inicioEn) === weekDays[dayIdx]?.dateStr &&
                         c.estado !== 'CANCELADA'
                     )
                     .map(c => {
-                      const [sHStr, sMStr] = (c.inicioEn || '').substring(11, 16).split(':')
-                      const startH = parseInt(sHStr, 10) || 8
-                      const startM = parseInt(sMStr, 10) || 0
-                      const [eHStr, eMStr] = (c.finEn || '').substring(11, 16).split(':')
-                      const endH = parseInt(eHStr, 10) || (startH + 1)
-                      const endM = parseInt(eMStr, 10) || 0
+                      const { hour: startH, minute: startM } = getLimaHourMinute(c.inicioEn)
+                      const { hour: endH, minute: endM } = getLimaHourMinute(c.finEn)
                       const duration = (endH * 60 + endM) - (startH * 60 + startM) || 45
 
                       const top =
@@ -1070,7 +1300,7 @@ export default function Agenda() {
           onMarkAttendance={handleMarkAttendance}
           onOpenReprogramar={c => {
             setReprogramarCita(c)
-            const citaDateStr = c.inicioEn ? c.inicioEn.substring(0, 10) : getMinDateString()
+            const citaDateStr = toLimaDateString(c.inicioEn) || getMinDateString()
             const validDate = citaDateStr < getMinDateString() ? getMinDateString() : citaDateStr
             setReprogFecha(validDate)
             const initH = formatHourMinute(c.inicioEn)
@@ -1095,9 +1325,23 @@ export default function Agenda() {
           initialDoctorId={filterDoc || undefined}
           onSuccess={nuevaCita => {
             showToast('✓ Cita registrada exitosamente en PostgreSQL')
-            setCitas(prev => [...prev, nuevaCita])
+            loadWeekCitas(true)
             setShowModal(false)
           }}
+          onConflict={() => {
+            loadWeekCitas(true)
+          }}
+        />
+      )}
+
+      {/* ── MODAL SOLICITUDES DE REPROGRAMACIÓN (Staff: Recepción y Admin) ──────── */}
+      {showRequestsModal && (
+        <SolicitudesModal
+          isOpen={showRequestsModal}
+          onClose={() => setShowRequestsModal(false)}
+          solicitudes={pendingRequests}
+          onResolve={handleResolveRequest}
+          isResolving={isResolvingRequest}
         />
       )}
 

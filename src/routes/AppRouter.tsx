@@ -85,11 +85,11 @@ export default function AppRouter() {
           }
         />
 
-        {/* Perfil e historias de pacientes: Odontólogo y Recepcionista */}
+        {/* Perfil e historias de pacientes: Odontólogo, Recepcionista y Administrador de Clínica */}
         <Route
           path="pacientes"
           element={
-            <ProtectedRoute allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}>
+            <ProtectedRoute allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA']}>
               <PacientePerfil />
             </ProtectedRoute>
           }

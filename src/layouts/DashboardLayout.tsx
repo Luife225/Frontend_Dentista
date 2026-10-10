@@ -57,7 +57,7 @@ const ROLE_MODULES: Record<Role, ModuleId[]> = {
   SUPER_ADMIN:   [],
   ODONTOLOGO:    ['dashboard', 'agenda', 'pacientes', 'teleodontologia', 'notificaciones', 'caja'],
   RECEPCIONISTA: ['dashboard', 'agenda', 'pacientes', 'notificaciones', 'inventario'],
-  ADMIN_CLINICA: ['dashboard', 'agenda', 'inventario', 'caja', 'consultorio'],
+  ADMIN_CLINICA: ['dashboard', 'agenda', 'pacientes', 'inventario', 'caja', 'consultorio'],
   PACIENTE:      [],
 }
 
@@ -96,7 +96,7 @@ const ROUTE_TO_MODULE: Record<string, ModuleId> = {
 // ─── Dashboard Layout ─────────────────────────────────────────────────────────
 
 export default function DashboardLayout() {
-  const { role, logout } = useAuth()
+  const { role, logout, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [showAI, setShowAI] = useState(false)
@@ -197,11 +197,11 @@ export default function DashboardLayout() {
           {!collapsed && (
             <>
               <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${meta.avatarBg} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-                {meta.label.split(' ').map(n=>n[0]).join('').slice(0,2)}
+                {(user?.nombreCompleto || meta.label).split(' ').map(n=>n[0]).join('').slice(0,2)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-white/80 text-xs font-medium truncate">{meta.label}</p>
-                <p className="text-white/30 text-xs truncate">{ROLE_LABELS[role]}</p>
+                <p className="text-white/80 text-xs font-medium truncate">{user?.nombreCompleto || meta.label}</p>
+                <p className="text-white/30 text-xs truncate">{ROLE_LABELS[role]} · {user?.clinicaNombre || 'Coronyx Dental'}</p>
               </div>
               <button onClick={logout} className="text-white/25 hover:text-white/60 transition-colors text-xs" title="Cerrar sesión">⏏</button>
             </>
@@ -233,7 +233,7 @@ export default function DashboardLayout() {
             <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
           </button>
           <div className={`w-7 h-7 rounded-full bg-gradient-to-br ${meta.avatarBg} flex items-center justify-center text-white text-xs font-bold cursor-pointer`}>
-            {meta.label.split(' ').map(n=>n[0]).join('').slice(0,2)}
+            {(user?.nombreCompleto || meta.label).split(' ').map(n=>n[0]).join('').slice(0,2)}
           </div>
         </header>
 

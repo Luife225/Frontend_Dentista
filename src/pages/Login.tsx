@@ -12,11 +12,11 @@ type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | '
 
 // ─── Demo credentials fallback ────────────────────────────────────────────────
 const DEMO_ACCOUNTS: { email: string; password: string; role: Role; name: string; label: string; icon: string }[] = [
-  { email: 'dr.herrera@coronyx.co',      password: 'demo1234', role: 'ODONTOLOGO',    name: 'Dr. Herrera',     label: 'Odontólogo',    icon: '🦷' },
-  { email: 'paula.rios@coronyx.co',      password: 'demo1234', role: 'RECEPCIONISTA', name: 'Paula Ríos',      label: 'Recepcionista', icon: '📋' },
-  { email: 'admin@coronyx.co',           password: 'demo1234', role: 'ADMIN_CLINICA', name: 'Administrador',   label: 'Administrador', icon: '⚙️' },
-  { email: 'carlos.rivas@coronyx.co',    password: 'demo1234', role: 'PACIENTE',      name: 'Carlos Rivas',    label: 'Paciente',      icon: '👤' },
-  { email: 'superadmin@coronyx.co',      password: 'demo1234', role: 'SUPER_ADMIN',   name: 'Super Admin',     label: 'Super Admin',   icon: '🌐' },
+  { email: 'odontologo@coronyx.pe',   password: '123456', role: 'ODONTOLOGO',    name: 'Andrés Herrera',     label: 'Odontólogo',    icon: '🦷' },
+  { email: 'recepcion@coronyx.pe',    password: '123456', role: 'RECEPCIONISTA', name: 'Paula Suárez',       label: 'Recepcionista', icon: '📋' },
+  { email: 'admin@coronyx.pe',        password: '123456', role: 'ADMIN_CLINICA', name: 'Carlos Admin',       label: 'Administrador', icon: '⚙️' },
+  { email: 'paciente@coronyx.pe',     password: '123456', role: 'PACIENTE',      name: 'Luis Paciente',      label: 'Paciente',      icon: '👤' },
+  { email: 'superadmin@coronyx.pe',   password: '123456', role: 'SUPER_ADMIN',   name: 'Super Admin',        label: 'Super Admin',   icon: '🌐' },
 ]
 
 // Role feature list for left panel
@@ -29,7 +29,7 @@ const ROLE_FEATURES: { icon: string; label: string; desc: string }[] = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function Login() {
-  const { login: onLogin, loginWithSession } = useAuth()
+  const { loginWithSession } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -175,26 +175,15 @@ export default function Login() {
         : null
 
     try {
-      // 1. Intentar autenticación real contra PostgreSQL con JWT
+      // Autenticación real contra PostgreSQL con JWT
       const session = await loginWithApi(email.trim(), password)
       const destination = targetPath || getDefaultRouteForRole(session.rol)
       loginWithSession(session, destination)
-      navigate(destination, { replace: true })
     } catch (apiErr: any) {
-      // 2. Fallback a credencial demo si no hay conexión al backend
-      const demoAccount = DEMO_ACCOUNTS.find(
-        a => a.email.toLowerCase() === email.trim().toLowerCase() && a.password === password
-      )
-
-      if (demoAccount) {
-        const destination = targetPath || getDefaultRouteForRole(demoAccount.role)
-        onLogin(demoAccount.role, destination)
-        navigate(destination, { replace: true })
-      } else {
-        setError(apiErr?.message || 'Credenciales inválidas. Revisa el email y la contraseña.')
-        shakeInput(emailInputRef.current)
-        shakeInput(passwordInputRef.current)
-      }
+      // Error real de la API o conexión fallida: sin fallback demo
+      setError(apiErr?.message || 'Error de autenticación. Verifique correo y contraseña.')
+      shakeInput(emailInputRef.current)
+      shakeInput(passwordInputRef.current)
     } finally {
       setLoading(false)
     }
@@ -464,22 +453,26 @@ export default function Login() {
               </button>
             </form>
 
-            {/* Mobile: demo credentials hint */}
-            <div className="lg:hidden mt-6 bg-white/3 border border-white/8 rounded-xl p-3">
-              <p className="text-[10px] text-white/30 font-semibold uppercase tracking-widest mb-2" style={{fontFamily:'Outfit'}}>Credenciales demo</p>
+            {/* Helper: cuentas institucionales para llenado rápido (requiere autenticación real al pulsar Ingresar) */}
+            <div className="mt-6 bg-white/3 border border-white/8 rounded-xl p-3">
+              <p className="text-[10px] text-white/40 font-semibold uppercase tracking-widest mb-2" style={{fontFamily:'Outfit'}}>Cuentas institucionales (autocompletar formulario)</p>
               <div className="space-y-1.5">
                 {DEMO_ACCOUNTS.map(a => (
                   <button
                     key={a.email}
+                    type="button"
                     onClick={() => fillCredential(a)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs hover:bg-white/5 transition-colors"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs hover:bg-white/5 transition-colors cursor-pointer"
                   >
                     <span className="text-sm shrink-0">{a.icon}</span>
-                    <span className="text-white/50 truncate">{a.email}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-white/80 block font-medium truncate">{a.label}</span>
+                      <span className="text-white/40 block text-[11px] font-mono truncate">{a.email}</span>
+                    </div>
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-white/20 mt-2">Contraseña: <span className="text-white/35 font-mono">demo1234</span></p>
+              <p className="text-[10px] text-white/30 mt-2">Contraseña común: <span className="text-white/60 font-mono font-semibold">123456</span></p>
             </div>
           </div>
 

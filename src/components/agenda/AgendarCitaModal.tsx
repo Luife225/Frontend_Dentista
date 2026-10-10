@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { fetchPatientsFromApi, BackendPatientDto } from '../../services/patientService'
 import { fetchUsersFromApi, UserItem } from '../../services/authService'
+import { useAuth } from '../../contexts/AuthContext'
 import { createAppointment } from '../../services/appointmentService'
 import { Appointment, CreateAppointmentPayload } from '../../types/appointment'
 import {
@@ -11,12 +12,14 @@ import {
   calculateEndTime,
   validateAppointmentSchedule,
   CONFLICT_MESSAGE,
+  toLimaIsoString,
 } from '../../utils/appointmentRules'
 
 interface AgendarCitaModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: (cita: Appointment) => void
+  onConflict?: () => void
   initialDate?: string
   initialTime?: string
   initialDoctorId?: string
@@ -36,10 +39,12 @@ export default function AgendarCitaModal({
   isOpen,
   onClose,
   onSuccess,
+  onConflict,
   initialDate,
   initialTime,
   initialDoctorId,
 }: AgendarCitaModalProps) {
+  const { role, user } = useAuth()
   const minDate = useMemo(() => getMinDateString(), [])
   const maxDate = useMemo(() => getMaxDateString(), [])
 
@@ -134,23 +139,40 @@ export default function AgendarCitaModal({
 
         setPatients(patientsData || [])
         if (patientsData && patientsData.length > 0 && !pacienteId) {
-          setPacienteId(String(patientsData[0].id))
+          const firstPatientId = patientsData[0].id
+          if (!firstPatientId) {
+            throw new Error('Contrato de API inválido: el primer paciente devuelto no posee ID decimal')
+          }
+          setPacienteId(firstPatientId)
         }
 
-        // Filtrar usuarios con rol ODONTOLOGO
-        const odontologos = usersData.filter(u => u.rol === 'ODONTOLOGO')
+        // Filtrar usuarios con rol ODONTOLOGO que posean membresía activa (usuarioClinicaId)
+        let odontologos = usersData.filter(u => u.rol === 'ODONTOLOGO')
+        if (odontologos.length === 0 && role === 'ODONTOLOGO' && user && user.usuarioClinicaId) {
+          odontologos = [{
+            id: user.usuarioId || user.id,
+            usuarioClinicaId: user.usuarioClinicaId,
+            correo: user.correo,
+            nombres: user.nombres,
+            apellidos: user.apellidos,
+            rol: 'ODONTOLOGO',
+            estado: 'ACTIVO',
+          }]
+        }
+        for (const doc of odontologos) {
+          if (!doc.usuarioClinicaId) {
+            throw new Error(`Contrato de API inválido: el odontólogo ${doc.correo} no posee usuarioClinicaId`)
+          }
+        }
         setDoctors(odontologos)
 
-        // Asignar doctor por defecto
+        // Asignar doctor por defecto usando estrictamente usuarioClinicaId
         if (odontologos.length > 0) {
           const selectedDoc = initialDoctorId
-            ? odontologos.find(d => (d.usuarioClinicaId || d.id) === initialDoctorId)
+            ? odontologos.find(d => d.usuarioClinicaId === initialDoctorId)
             : odontologos[0]
 
-          const docVal = selectedDoc
-            ? (selectedDoc.usuarioClinicaId || selectedDoc.id)
-            : (odontologos[0].usuarioClinicaId || odontologos[0].id)
-
+          const docVal = selectedDoc?.usuarioClinicaId || odontologos[0].usuarioClinicaId!
           setOdontologoId(docVal)
         }
       } catch (err: any) {
@@ -208,10 +230,9 @@ export default function AgendarCitaModal({
       return
     }
 
-    // Construcción de timestamps ISO directos esperados por el Backend (ej: 2026-10-10T08:00:00Z)
-    // Se evita toISOString() para no agregar +5 horas por la zona horaria UTC-5 del navegador
-    const inicioIso = `${fecha}T${horaInicio}:00Z`
-    const finIso = `${fecha}T${horaFin}:00Z`
+    // Construcción de timestamps ISO con zona horaria oficial Lima (-05:00)
+    const inicioIso = toLimaIsoString(fecha, horaInicio)
+    const finIso = toLimaIsoString(fecha, horaFin)
 
     const payload: CreateAppointmentPayload = {
       pacienteId,
@@ -234,8 +255,11 @@ export default function AgendarCitaModal({
       const backendMessage = err.response?.data?.message || err.message
 
       // Regla 5: Error 409 Conflict (cruce de horario de doctor o sillón ocupado)
-      if (status === 409 || backendMessage?.toLowerCase().includes('conflicto')) {
-        setConflictError(CONFLICT_MESSAGE)
+      if (status === 409 || backendMessage?.toLowerCase().includes('conflicto') || backendMessage?.toLowerCase().includes('solapa')) {
+        setConflictError(backendMessage || CONFLICT_MESSAGE)
+        if (onConflict) {
+          onConflict()
+        }
       }
       // Regla 5: Error 400 Bad Request (horario fuera de turno o domingo) -> mensaje exacto del backend
       else if (status === 400) {
@@ -379,7 +403,7 @@ export default function AgendarCitaModal({
             >
               <option value="" disabled>Seleccione un odontólogo...</option>
               {doctors.map(d => {
-                const docId = d.usuarioClinicaId || d.id
+                const docId = d.usuarioClinicaId!
                 return (
                   <option key={docId} value={docId}>
                     Dr(a). {d.nombres} {d.apellidos} ({d.correo})

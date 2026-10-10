@@ -1,147 +1,575 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import {
+  getEncountersByPatient,
+  getEncounterById,
+  createDraftEncounter,
+  updateDraftEncounter,
+  confirmEncounterVersion,
+  createCorrectionVersion,
+  isDecimalId,
+} from '../services/clinicalEncounterService'
+import { fetchPatientsFromApi, type BackendPatientDto } from '../services/patientService'
+import { useAuth } from '../contexts/AuthContext'
+import type {
+  ClinicalEncounterDto,
+  ClinicalVersionDto,
+  SignosVitales,
+  CreateClinicalEncounterPayload,
+  UpdateClinicalDraftPayload,
+  CreateCorrectionVersionPayload,
+} from '../types/clinicalEncounter'
 
-interface Vital { systolic: number; diastolic: number; pulse: number; temp: number; weight: number; height: number; spo2: number }
-export interface Consulta {
-  id: number; date: string; doctor: string; motivo: string; vitals: Vital
-  examen: string; diagnostico: string; procedimientos: string; plan: string; indicaciones: string; proxima: string
-}
-export interface HCPaciente {
-  id: number | string; name: string; doc: string; dob: string; blood: string; allergy: string; antecedentes: string; consultas: Consulta[]
-}
-
-const MOCK_HC: HCPaciente[] = [
-  { id:1, name:'María González', doc:'52.453.121', dob:'1990-07-15', blood:'A+', allergy:'Penicilina', antecedentes:'HTA leve, controlada. Sin cirugías previas.',
-    consultas:[
-      { id:101, date:'2026-08-20', doctor:'Dr. Andrés Herrera', motivo:'Dolor molar inferior derecho',
-        vitals:{ systolic:118, diastolic:76, pulse:72, temp:36.5, weight:62, height:162, spo2:98 },
-        examen:'Molar #47 con movilidad grado 2. Sangrado al sondaje. Bolsa periodontal 5mm.',
-        diagnostico:'Periodontitis crónica localizada #47 — K05.3',
-        procedimientos:'Raspado y alisado radicular cuadrante IV. Irrigación CHX 0.12%.',
-        plan:'Control 4 semanas. Considerar extracción si no hay mejoría.',
-        indicaciones:'Clorhexidina 0.12% enjuague 2x/día × 14 días. Ibuprofeno 400mg SOS.',
-        proxima:'2026-09-17' },
-      { id:102, date:'2026-06-10', doctor:'Dr. Andrés Herrera', motivo:'Revisión de rutina',
-        vitals:{ systolic:115, diastolic:74, pulse:68, temp:36.3, weight:61, height:162, spo2:99 },
-        examen:'Sin hallazgos agudos. Cálculo subgingival en sector anterior inferior.',
-        diagnostico:'Gingivitis crónica generalizada — K05.1',
-        procedimientos:'Profilaxis ultrasónica completa. Fluorización.',
-        plan:'Control anual.', indicaciones:'Técnica de Bass modificada. Hilo interdental 1x/día.', proxima:'2027-06-10' },
-    ]},
-  { id:2, name:'Carlos Rivas', doc:'1.015.672.340', dob:'1988-04-12', blood:'O+', allergy:'Ninguna conocida', antecedentes:'Diabetes tipo 2 controlada con metformina.',
-    consultas:[
-      { id:201, date:'2026-08-23', doctor:'Dr. Andrés Herrera', motivo:'Evaluación prequirúrgica extracción #38',
-        vitals:{ systolic:124, diastolic:80, pulse:76, temp:36.4, weight:78, height:175, spo2:97 },
-        examen:'#38 semierupcionado, angulación mesial. Espacio insuficiente. Folículo visible en Rx.',
-        diagnostico:'Tercer molar inferior izquierdo retenido — K01.1',
-        procedimientos:'Evaluación clínica y radiográfica. Firma de consentimiento informado.',
-        plan:'Cirugía ambulatoria — 28 Ago 2026.',
-        indicaciones:'Ayuno 4 h antes. No anticoagulantes. Presentarse con acompañante.',
-        proxima:'2026-08-28' },
-    ]},
-  { id:3, name:'Sofía Martínez', doc:'43.876.521', dob:'2002-11-30', blood:'B+', allergy:'Latex', antecedentes:'Sin antecedentes relevantes. Brackets desde 2024.',
-    consultas:[
-      { id:301, date:'2026-08-15', doctor:'Dra. Laura Suárez', motivo:'Ajuste mensual de ortodoncia',
-        vitals:{ systolic:110, diastolic:70, pulse:65, temp:36.2, weight:55, height:165, spo2:99 },
-        examen:'Buena higiene periodontal. Leve inflamación gingival sector anterior. Arco 0.019×0.025 SS.',
-        diagnostico:'Ortodoncia fase activa — Z46.4',
-        procedimientos:'Cambio arco inferior 0.019×0.025. Activación resortes. Fotografías de progreso.',
-        plan:'Próximo ajuste 15 Sep. Evaluar uso de elásticos clase II.',
-        indicaciones:'Cepillar después de cada comida. Cera dental si hay irritación. Citas cada 30 días.', proxima:'2026-09-15' },
-    ]},
-  { id:4, name:'Roberto Díaz', doc:'79.654.320', dob:'1975-03-08', blood:'AB-', allergy:'Ninguna', antecedentes:'Fumador 10 cigarrillos/día. Bruxismo nocturno.',
-    consultas:[
-      { id:401, date:'2026-08-10', doctor:'Dr. Andrés Herrera', motivo:'Dolor agudo #16',
-        vitals:{ systolic:135, diastolic:88, pulse:84, temp:36.8, weight:82, height:178, spo2:97 },
-        examen:'#16 con caries profunda, exposición pulpar probable. Prueba al frío: + 10s. Percusión: ++.',
-        diagnostico:'Pulpitis irreversible sintomática #16 — K04.0',
-        procedimientos:'Apertura cameral de urgencia. Cavidad temporal con eugenol.',
-        plan:'Tratamiento de conductos en 2 sesiones. Placa oclusal para bruxismo.',
-        indicaciones:'Amoxicilina 500mg c/8h × 7 días. Ibuprofeno 600mg c/8h × 5 días. Dieta blanda.',
-        proxima:'2026-08-17' },
-    ]},
-]
-
-function fmtDate(iso: string) { return new Date(iso+'T00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}) }
-function calcAge(dob: string) { return Math.floor((Date.now()-new Date(dob+'T00:00').getTime())/31557600000) }
-function Icon({ d, className='w-4 h-4' }: { d: string; className?: string }) {
-  return <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d={d}/></svg>
+function Icon({ d, className = 'w-4 h-4' }: { d: string; className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+      <path d={d} />
+    </svg>
+  )
 }
 
-const BLANK = (): Omit<Consulta,'id'> => ({ date:new Date().toISOString().slice(0,10), doctor:'Dr. Andrés Herrera', motivo:'', vitals:{systolic:120,diastolic:80,pulse:70,temp:36.5,weight:65,height:165,spo2:98}, examen:'', diagnostico:'', procedimientos:'', plan:'', indicaciones:'', proxima:'' })
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso
+    return d.toLocaleDateString('es-PE', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  } catch {
+    return iso
+  }
+}
 
-function ModalConsulta({ consulta, patientName, onSave, onClose }: { consulta?: Consulta; patientName: string; onSave: (c: Omit<Consulta,'id'>) => void; onClose: () => void }) {
-  const [form, setForm] = useState<Omit<Consulta,'id'>>(consulta ? {...consulta} : BLANK())
-  const [dictating, setDictating] = useState<string|null>(null)
+function fmtDateTime(iso?: string | null) {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso
+    return d.toLocaleString('es-PE', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
+}
 
-  function setV(k: keyof Vital, v: string) { setForm(f=>({...f,vitals:{...f.vitals,[k]:parseFloat(v)||0}})) }
-  function dictate(key: string) {
-    setDictating(key)
-    setTimeout(()=>{ setForm(f=>({...f,[key]:(f[key as keyof typeof f] as string||'')+(f[key as keyof typeof f]?'\n':'')+'IA: Sin hallazgos patológicos adicionales. Plan de tratamiento sin cambios.'})); setDictating(null) }, 1800)
+interface FormState {
+  motivoConsulta: string
+  examenClinico: string
+  diagnostico: string
+  procedimientos: string
+  planTratamiento: string
+  recetasPrescripciones: string
+  indicaciones: string
+  evolucion: string
+  proximaCitaSugerida: string
+  vitals: {
+    systolic: string
+    diastolic: string
+    pulse: string
+    temp: string
+    weight: string
+    height: string
+    spo2: string
+  }
+}
+
+const INITIAL_FORM: FormState = {
+  motivoConsulta: '',
+  examenClinico: '',
+  diagnostico: '',
+  procedimientos: '',
+  planTratamiento: '',
+  recetasPrescripciones: '',
+  indicaciones: '',
+  evolucion: '',
+  proximaCitaSugerida: '',
+  vitals: {
+    systolic: '120',
+    diastolic: '80',
+    pulse: '72',
+    temp: '36.5',
+    weight: '65',
+    height: '165',
+    spo2: '98',
+  },
+}
+
+function parseVitals(jsonStr?: string): SignosVitales {
+  if (!jsonStr) return {}
+  try {
+    return JSON.parse(jsonStr)
+  } catch {
+    return {}
+  }
+}
+
+function serializeVitals(vitals: FormState['vitals']): string {
+  const obj: SignosVitales = {
+    systolic: vitals.systolic ? parseFloat(vitals.systolic) : undefined,
+    diastolic: vitals.diastolic ? parseFloat(vitals.diastolic) : undefined,
+    pulse: vitals.pulse ? parseFloat(vitals.pulse) : undefined,
+    temp: vitals.temp ? parseFloat(vitals.temp) : undefined,
+    weight: vitals.weight ? parseFloat(vitals.weight) : undefined,
+    height: vitals.height ? parseFloat(vitals.height) : undefined,
+    spo2: vitals.spo2 ? parseFloat(vitals.spo2) : undefined,
+  }
+  return JSON.stringify(obj)
+}
+
+function versionToForm(v?: ClinicalVersionDto): FormState {
+  if (!v) return INITIAL_FORM
+  const vit = parseVitals(v.signosVitales)
+  return {
+    motivoConsulta: v.motivoConsulta || '',
+    examenClinico: v.examenClinico || '',
+    diagnostico: v.diagnostico || '',
+    procedimientos: v.procedimientos || '',
+    planTratamiento: v.planTratamiento || '',
+    recetasPrescripciones: v.recetasPrescripciones || '',
+    indicaciones: v.indicaciones || '',
+    evolucion: v.evolucion || '',
+    proximaCitaSugerida: v.proximaCitaSugerida || '',
+    vitals: {
+      systolic: vit.systolic != null ? String(vit.systolic) : '120',
+      diastolic: vit.diastolic != null ? String(vit.diastolic) : '80',
+      pulse: vit.pulse != null ? String(vit.pulse) : '72',
+      temp: vit.temp != null ? String(vit.temp) : '36.5',
+      weight: vit.weight != null ? String(vit.weight) : '65',
+      height: vit.height != null ? String(vit.height) : '165',
+      spo2: vit.spo2 != null ? String(vit.spo2) : '98',
+    },
+  }
+}
+
+// ── Modal de Atención / Borrador ──────────────────────────────────────────────
+function ModalEncounterForm({
+  isEditing,
+  patientName,
+  initialData,
+  onSaveDraft,
+  onConfirmDirect,
+  onClose,
+  isSubmitting,
+}: {
+  isEditing: boolean
+  patientName: string
+  initialData?: FormState
+  onSaveDraft: (data: FormState) => Promise<void>
+  onConfirmDirect: (data: FormState) => Promise<void>
+  onClose: () => void
+  isSubmitting: boolean
+}) {
+  const [form, setForm] = useState<FormState>(initialData || INITIAL_FORM)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const setF = (k: keyof Omit<FormState, 'vitals'>) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setForm(f => ({ ...f, [k]: e.target.value }))
+    setErrorMsg(null)
+  }
+
+  const setVit = (k: keyof FormState['vitals']) => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setForm(f => ({ ...f, vitals: { ...f.vitals, [k]: e.target.value } }))
+    setErrorMsg(null)
+  }
+
+  const handleValidate = () => {
+    if (!form.diagnostico.trim() && !form.motivoConsulta.trim()) {
+      setErrorMsg('Debe registrar al menos el motivo de consulta o el diagnóstico')
+      return false
+    }
+    return true
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(0,0,0,0.65)',backdropFilter:'blur(4px)'}}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div>
-            <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>{consulta?'Editar consulta':'Nueva consulta'}</h2>
+            <h2 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
+              {isEditing ? 'Editar borrador de atención clínica' : 'Nueva atención clínica'}
+            </h2>
             <p className="text-xs text-slate-400 mt-0.5">Paciente: {patientName}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5"/></button>
+          <button
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="text-slate-400 hover:text-slate-600 cursor-pointer"
+          >
+            <Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          <div className="grid grid-cols-3 gap-4">
-            {[['Fecha','date','date'],['Doctor','doctor','select'],['Próxima cita','proxima','date']].map(([l,k,t])=>(
-              <div key={k}>
-                <label className="text-xs font-semibold text-slate-500 block mb-1.5">{l}</label>
-                {t==='select'
-                  ? <select value={form[k as keyof typeof form] as string} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
-                      {['Dr. Andrés Herrera','Dra. Laura Suárez','Dr. Carlos Mejía'].map(d=><option key={d}>{d}</option>)}
-                    </select>
-                  : <input type={t} value={form[k as keyof typeof form] as string} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
-                }
-              </div>
-            ))}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {errorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+              <span>⚠</span>
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Motivo & Próxima Cita */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-2">
+              <label className="text-xs font-semibold text-slate-600 block mb-1">
+                Motivo de consulta *
+              </label>
+              <input
+                value={form.motivoConsulta}
+                onChange={setF('motivoConsulta')}
+                placeholder="Ej. Dolor agudo en molar inferior, molestia al masticar..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">
+                Próxima cita sugerida
+              </label>
+              <input
+                type="date"
+                value={form.proximaCitaSugerida}
+                onChange={setF('proximaCitaSugerida')}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-slate-500 block mb-1.5">Motivo de consulta</label>
-            <input value={form.motivo} onChange={e=>setForm(f=>({...f,motivo:e.target.value}))} placeholder="Motivo principal..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3" style={{fontFamily:'Outfit'}}>Signos vitales</p>
-            <div className="grid grid-cols-4 gap-3 bg-slate-50 rounded-2xl p-4">
-              {([['Sistólica (mmHg)','systolic'],['Diastólica (mmHg)','diastolic'],['Pulso (lpm)','pulse'],['Temp (°C)','temp'],['Peso (kg)','weight'],['Talla (cm)','height'],['SpO₂ (%)','spo2']] as [string,keyof Vital][]).map(([l,k])=>(
-                <div key={k}>
-                  <label className="text-[10px] font-semibold text-slate-400 block mb-1">{l}</label>
-                  <input type="number" value={form.vitals[k]} onChange={e=>setV(k,e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+          {/* Signos Vitales */}
+          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2.5" style={{ fontFamily: 'Outfit' }}>
+              Signos vitales
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+              {[
+                ['Sistólica', 'systolic', 'mmHg'],
+                ['Diastólica', 'diastolic', 'mmHg'],
+                ['Pulso', 'pulse', 'lpm'],
+                ['Temp', 'temp', '°C'],
+                ['Peso', 'weight', 'kg'],
+                ['Talla', 'height', 'cm'],
+                ['SpO₂', 'spo2', '%'],
+              ].map(([lbl, key, unit]) => (
+                <div key={key}>
+                  <label className="text-[10px] text-slate-400 block mb-0.5">{lbl}</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="any"
+                      value={form.vitals[key as keyof FormState['vitals']]}
+                      onChange={setVit(key as keyof FormState['vitals'])}
+                      className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+                    />
+                    <span className="absolute right-1.5 top-2 text-[9px] text-slate-400 pointer-events-none">{unit}</span>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {(['examen','diagnostico','procedimientos','plan','indicaciones'] as const).map(key=>(
-            <div key={key}>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-500 capitalize">{key.replace('diagnostico','Diagnóstico (CIE-10)').replace('procedimientos','Procedimientos realizados').replace('indicaciones','Indicaciones al paciente').replace('examen','Examen clínico').replace('plan','Plan de tratamiento')}</label>
-                <button onClick={()=>dictate(key)} className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg transition-all ${dictating===key?'bg-rose-100 text-rose-600':'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}>
-                  {dictating===key?<><span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"/>Dictando...</>:<><Icon d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 016 0v6a3 3 0 01-3 3z" className="w-3 h-3"/>Dictar con IA</>}
-                </button>
-              </div>
-              <textarea value={form[key]} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} rows={2}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-400/50"/>
+          {/* Diagnóstico */}
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">
+              Diagnóstico (CIE-10 / Diagnóstico Odontológico) *
+            </label>
+            <input
+              value={form.diagnostico}
+              onChange={setF('diagnostico')}
+              placeholder="Ej. K02.1 Caries de la dentina en pieza 36, Pulpitis irreversible..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 font-medium text-slate-800"
+            />
+          </div>
+
+          {/* Examen Clínico */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Examen clínico intraoral / extraoral</label>
+            <textarea
+              value={form.examenClinico}
+              onChange={setF('examenClinico')}
+              rows={2}
+              placeholder="Hallazgos clínicos, percusión, movilidad, estado periodontal..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            />
+          </div>
+
+          {/* Procedimientos */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Procedimientos realizados</label>
+            <textarea
+              value={form.procedimientos}
+              onChange={setF('procedimientos')}
+              rows={2}
+              placeholder="Apertura cavitaria, grabado ácido, colocación de resina, curetaje..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            />
+          </div>
+
+          {/* Plan de Tratamiento */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Plan de tratamiento</label>
+            <textarea
+              value={form.planTratamiento}
+              onChange={setF('planTratamiento')}
+              rows={2}
+              placeholder="Fases posteriores, controles, profilaxis..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            />
+          </div>
+
+          {/* Recetas & Indicaciones */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Recetas / Prescripciones</label>
+              <textarea
+                value={form.recetasPrescripciones}
+                onChange={setF('recetasPrescripciones')}
+                rows={2}
+                placeholder="Fármacos, posología y duración..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              />
             </div>
-          ))}
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Indicaciones al paciente</label>
+              <textarea
+                value={form.indicaciones}
+                onChange={setF('indicaciones')}
+                rows={2}
+                placeholder="Cuidados post-operatorios, dieta, higiene..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              />
+            </div>
+          </div>
+
+          {/* Evolución */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Evolución clínica</label>
+            <textarea
+              value={form.evolucion}
+              onChange={setF('evolucion')}
+              rows={2}
+              placeholder="Respuesta del paciente, tolerancia a anestesia, comentarios de evolución..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            />
+          </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 flex gap-2 justify-end shrink-0">
-          <button onClick={onClose} className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-          <button onClick={()=>onSave(form)} className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500">
-            {consulta?'Guardar cambios':'Registrar consulta'}
+        {/* Footer con dos acciones distintas: Guardar borrador vs Confirmar y firmar */}
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+          <p className="text-[11px] text-slate-400">
+            Un borrador puede editarse libremente. Al confirmar, la versión queda inmutable.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                if (handleValidate()) onSaveDraft(form)
+              }}
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+            >
+              <Icon d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" className="w-3.5 h-3.5" />
+              Guardar Borrador
+            </button>
+            <button
+              onClick={() => {
+                if (handleValidate()) onConfirmDirect(form)
+              }}
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+            >
+              <Icon d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" className="w-3.5 h-3.5" />
+              Confirmar y Firmar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal de Corrección (D06 - Nueva Versión Inmutable) ────────────────────────
+function ModalCorrectionForm({
+  encounter,
+  onSaveCorrection,
+  onClose,
+  isSubmitting,
+}: {
+  encounter: ClinicalEncounterDto
+  onSaveCorrection: (payload: CreateCorrectionVersionPayload) => Promise<void>
+  onClose: () => void
+  isSubmitting: boolean
+}) {
+  const previousVersion = encounter.versionActual
+  const [form, setForm] = useState<FormState>(versionToForm(previousVersion))
+  const [confirmarInmediatamente, setConfirmarInmediatamente] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  const setF = (k: keyof Omit<FormState, 'vitals'>) => (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setForm(f => ({ ...f, [k]: e.target.value }))
+    setErrorMsg(null)
+  }
+
+  const handleValidate = () => {
+    if (!form.diagnostico.trim() && !form.motivoConsulta.trim()) {
+      setErrorMsg('Debe registrar al menos el motivo de consulta o el diagnóstico')
+      return false
+    }
+    return true
+  }
+
+  const handleSubmit = () => {
+    if (!handleValidate()) return
+    const payload: CreateCorrectionVersionPayload = {
+      motivoConsulta: form.motivoConsulta,
+      examenClinico: form.examenClinico,
+      diagnostico: form.diagnostico,
+      procedimientos: form.procedimientos,
+      planTratamiento: form.planTratamiento,
+      recetasPrescripciones: form.recetasPrescripciones,
+      indicaciones: form.indicaciones,
+      evolucion: form.evolucion,
+      proximaCitaSugerida: form.proximaCitaSugerida || undefined,
+      signosVitales: serializeVitals(form.vitals),
+      confirmarInmediatamente,
+    }
+    onSaveCorrection(payload)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h2 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
+              Crear Versión de Corrección (v{(previousVersion?.numeroVersion || 1) + 1})
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              La versión v{previousVersion?.numeroVersion || 1} original se conservará inmutable en el historial de auditoría.
+            </p>
+          </div>
+          <button onClick={onClose} disabled={isSubmitting} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+            <Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div className="p-3 bg-cyan-50 border border-cyan-200 text-cyan-800 text-xs rounded-xl flex items-center gap-2">
+            <span>ℹ</span>
+            <span>
+              Está redactando una enmienda oficial sobre la atención #{encounter.id}. Los cambios quedarán trazados con su autor y fecha.
+            </span>
+          </div>
+
+          {errorMsg && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+              <span>⚠</span>
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Diagnóstico corregido *</label>
+            <input
+              value={form.diagnostico}
+              onChange={setF('diagnostico')}
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 font-medium"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Procedimientos corregidos / complementarios</label>
+            <textarea
+              value={form.procedimientos}
+              onChange={setF('procedimientos')}
+              rows={2}
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Nota de evolución y justificación de la corrección</label>
+            <textarea
+              value={form.evolucion}
+              onChange={setF('evolucion')}
+              rows={2}
+              placeholder="Describa el motivo o precisión clínica de esta nueva versión..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Recetas actualizadas</label>
+              <textarea
+                value={form.recetasPrescripciones}
+                onChange={setF('recetasPrescripciones')}
+                rows={2}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Indicaciones actualizadas</label>
+              <textarea
+                value={form.indicaciones}
+                onChange={setF('indicaciones')}
+                rows={2}
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="confirmImmediate"
+              checked={confirmarInmediatamente}
+              onChange={e => setConfirmarInmediatamente(e.target.checked)}
+              className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+            />
+            <label htmlFor="confirmImmediate" className="text-xs text-slate-700 font-medium cursor-pointer">
+              Confirmar y firmar digitalmente esta nueva versión de inmediato
+            </label>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0 bg-slate-50/50">
+          <button
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="px-5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+          >
+            <Icon d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className="w-3.5 h-3.5" />
+            Registrar Versión {(previousVersion?.numeroVersion || 1) + 1}
           </button>
         </div>
       </div>
@@ -149,40 +577,103 @@ function ModalConsulta({ consulta, patientName, onSave, onClose }: { consulta?: 
   )
 }
 
-function ModalImprimir({ consulta, patient, onClose }: { consulta: Consulta; patient: HCPaciente; onClose: () => void }) {
+// ── Modal de Impresión / Vista Previa ─────────────────────────────────────────
+function ModalImprimir({
+  encounter,
+  version,
+  patientName,
+  patientDoc,
+  onClose,
+}: {
+  encounter: ClinicalEncounterDto
+  version?: ClinicalVersionDto
+  patientName: string
+  patientDoc?: string
+  onClose: () => void
+}) {
+  const v = version || encounter.versionActual
+  const vitals = parseVitals(v?.signosVitales)
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{backgroundColor:'rgba(0,0,0,0.65)',backdropFilter:'blur(4px)'}}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>Vista previa de impresión</h2>
+          <h2 className="font-bold text-slate-800 text-sm" style={{ fontFamily: 'Outfit' }}>
+            Vista previa de impresión oficial · Versión v{v?.numeroVersion || 1}
+          </h2>
           <div className="flex gap-2">
-            <button onClick={()=>window.print()} className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500">
-              <Icon d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" className="w-4 h-4"/>
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 text-white rounded-xl text-xs font-semibold hover:bg-cyan-500 cursor-pointer"
+            >
+              <Icon d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" className="w-3.5 h-3.5" />
               Imprimir
             </button>
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2"><Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5"/></button>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+              <Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5" />
+            </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
-          <div className="text-center border-b-2 border-slate-800 pb-4">
-            <p className="font-black text-xl tracking-widest" style={{fontFamily:'Outfit',color:'#0B3D3A'}}>CORONYX · SISTEMA DENTAL</p>
-            <p className="text-xs text-slate-500 mt-1">Historia Clínica Odontológica</p>
+
+        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4 text-xs">
+          <div className="text-center border-b-2 border-slate-800 pb-3">
+            <p className="font-black text-lg tracking-widest text-teal-900" style={{ fontFamily: 'Outfit' }}>
+              CORONYX · SISTEMA DENTAL
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Historia Clínica Odontológica Oficial · Atención #{encounter.id} (v{v?.numeroVersion || 1})
+            </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 border border-slate-200 rounded-xl p-4 text-sm">
-            {[['Paciente',patient.name],['Documento',patient.doc],['Fecha de nacimiento',fmtDate(patient.dob)],['Edad',`${calcAge(patient.dob)} años`],['Grupo sanguíneo',patient.blood],['Alergias',patient.allergy]].map(([l,v])=>(
-              <div key={l} className="flex gap-2"><span className="text-slate-500">{l}:</span><span className="font-semibold text-slate-800">{v}</span></div>
-            ))}
+
+          <div className="grid grid-cols-2 gap-3 border border-slate-200 rounded-xl p-3 bg-slate-50/50">
+            <div><span className="text-slate-400">Paciente:</span> <strong className="text-slate-800">{patientName}</strong></div>
+            <div><span className="text-slate-400">Documento:</span> <strong className="text-slate-800">{patientDoc || encounter.pacienteNumeroDocumento || '—'}</strong></div>
+            <div><span className="text-slate-400">Fecha de Registro:</span> <strong className="text-slate-800">{fmtDateTime(v?.fechaRegistro)}</strong></div>
+            <div><span className="text-slate-400">Estado:</span> <strong className={v?.estaConfirmado ? 'text-emerald-700' : 'text-amber-700'}>{v?.estaConfirmado ? 'CONFIRMADO' : 'BORRADOR'}</strong></div>
+            <div><span className="text-slate-400">Odontólogo Autor:</span> <strong className="text-slate-800">{encounter.odontologoNombreCompleto}</strong></div>
+            <div><span className="text-slate-400">Firmado Por:</span> <strong className="text-slate-800">{v?.firmadoPorNombre || 'Pendiente de firma'}</strong></div>
           </div>
-          <div className="flex justify-between text-xs text-slate-500 pb-2 border-b border-slate-100">
-            <span>Fecha: <strong className="text-slate-700">{fmtDate(consulta.date)}</strong></span>
-            <span>Doctor: <strong className="text-slate-700">{consulta.doctor}</strong></span>
-          </div>
-          {[['Motivo',consulta.motivo],['Examen clínico',consulta.examen],['Diagnóstico',consulta.diagnostico],['Procedimientos',consulta.procedimientos],['Plan de tratamiento',consulta.plan],['Indicaciones',consulta.indicaciones]].filter(([,v])=>v).map(([l,v])=>(
-            <div key={l}><p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-0.5">{l}</p><p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{v}</p></div>
+
+          {vitals && Object.keys(vitals).length > 0 && (
+            <div className="border border-slate-100 rounded-xl p-3">
+              <p className="font-bold text-slate-700 text-[10px] uppercase tracking-wider mb-1.5">Signos Vitales</p>
+              <div className="grid grid-cols-4 gap-2 text-slate-600">
+                {vitals.systolic && <div>P.A.: {vitals.systolic}/{vitals.diastolic} mmHg</div>}
+                {vitals.pulse && <div>Pulso: {vitals.pulse} lpm</div>}
+                {vitals.temp && <div>Temp: {vitals.temp} °C</div>}
+                {vitals.spo2 && <div>SpO₂: {vitals.spo2} %</div>}
+              </div>
+            </div>
+          )}
+
+          {[
+            ['Motivo de consulta', v?.motivoConsulta],
+            ['Examen clínico', v?.examenClinico],
+            ['Diagnóstico dental', v?.diagnostico],
+            ['Procedimientos realizados', v?.procedimientos],
+            ['Plan de tratamiento', v?.planTratamiento],
+            ['Recetas y prescripciones', v?.recetasPrescripciones],
+            ['Indicaciones al paciente', v?.indicaciones],
+            ['Evolución clínica', v?.evolucion],
+          ].filter(([, val]) => val).map(([label, val]) => (
+            <div key={label} className="border-b border-slate-100 pb-2">
+              <p className="font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-0.5">{label}</p>
+              <p className="text-slate-800 leading-relaxed whitespace-pre-line">{val}</p>
+            </div>
           ))}
-          <div className="mt-8 pt-6 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-xs text-slate-400">
-            <div><div className="h-12 border-b border-slate-300 mb-1"/><p>Firma y sello del profesional</p></div>
-            <div><div className="h-12 border-b border-slate-300 mb-1"/><p>Firma del paciente</p></div>
+
+          <div className="mt-8 pt-6 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-[10px] text-slate-400">
+            <div>
+              <div className="h-10 border-b border-slate-300 mb-1" />
+              <p>Firma y sello de Dr(a). {v?.firmadoPorNombre || encounter.odontologoNombreCompleto}</p>
+            </div>
+            <div>
+              <div className="h-10 border-b border-slate-300 mb-1" />
+              <p>Firma del paciente / tutor</p>
+            </div>
           </div>
         </div>
       </div>
@@ -190,129 +681,588 @@ function ModalImprimir({ consulta, patient, onClose }: { consulta: Consulta; pat
   )
 }
 
-export default function HistoriaClinica({ initialPatientId }: { initialPatientId?: number | string }) {
-  const [patients, setPatients] = useState(MOCK_HC)
-  const selId = initialPatientId ?? MOCK_HC[0].id
-  const [selConsultaId, setSelConsultaId] = useState<number|null>(null)
-  const [modal, setModal] = useState<'new'|'edit'|'print'|null>(null)
-  const [editTarget, setEditTarget] = useState<Consulta|undefined>()
-  const [printTarget, setPrintTarget] = useState<Consulta|null>(null)
+// ── Componente Principal: HistoriaClinica ─────────────────────────────────────
+export default function HistoriaClinica({
+  initialPatientId,
+  patientName: propPatientName,
+  patientDoc: propPatientDoc,
+}: {
+  initialPatientId?: string
+  patientName?: string
+  patientDoc?: string
+}) {
+  const { role } = useAuth()
+  const isOdontologo = role === 'ODONTOLOGO'
 
-  const patient = patients.find(p=>p.id===selId) || patients[0]
-  const activeC = selConsultaId ? patient?.consultas.find(c=>c.id===selConsultaId) ?? patient?.consultas[0] : patient?.consultas[0]
+  // Lista de pacientes para selector (si no se proveyó uno por props)
+  const [patientList, setPatientList] = useState<BackendPatientDto[]>([])
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(initialPatientId || '')
 
-  function save(data: Omit<Consulta,'id'>) {
-    setPatients(ps=>ps.map(p=>{
-      if(p.id!==selId) return p
-      if(editTarget) return {...p,consultas:p.consultas.map(c=>c.id===editTarget.id?{...data,id:editTarget.id}:c)}
-      return {...p,consultas:[{...data,id:Date.now()},...p.consultas]}
-    }))
-    setModal(null); setEditTarget(undefined)
+  // Atenciones clínicas reales desde F05-A
+  const [encounters, setEncounters] = useState<ClinicalEncounterDto[]>([])
+  const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(null)
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
+
+  // Estados de interfaz y modales
+  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [modal, setModal] = useState<'new' | 'edit' | 'correct' | 'print' | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Cargar lista de pacientes si no viene initialPatientId
+  useEffect(() => {
+    if (!initialPatientId) {
+      fetchPatientsFromApi()
+        .then(pts => {
+          setPatientList(pts)
+          if (pts.length > 0 && !selectedPatientId) {
+            setSelectedPatientId(String(pts[0].id))
+          }
+        })
+        .catch(err => {
+          console.warn('Error cargando lista de pacientes:', err)
+        })
+    } else {
+      setSelectedPatientId(initialPatientId)
+    }
+  }, [initialPatientId])
+
+  // Cargar atenciones clínicas del paciente seleccionado
+  const loadEncounters = async (patientId: string) => {
+    if (!isDecimalId(patientId)) return
+    setLoading(true)
+    setErrorMsg(null)
+    try {
+      const list = await getEncountersByPatient(patientId)
+      setEncounters(list)
+      if (list.length > 0) {
+        // Seleccionar la más reciente o conservar selección si aún existe
+        const existing = list.find(e => e.id === selectedEncounterId)
+        const active = existing || list[0]
+        setSelectedEncounterId(active.id)
+        setSelectedVersionId(active.versionActual?.id || null)
+      } else {
+        setSelectedEncounterId(null)
+        setSelectedVersionId(null)
+      }
+    } catch (err: any) {
+      if (err?.status === 403) {
+        setErrorMsg('Acceso restringido: Solo odontólogos autorizados pueden acceder a la historia clínica.')
+      } else {
+        setErrorMsg(err?.message || 'Error al cargar las atenciones clínicas del paciente.')
+      }
+      setEncounters([])
+    } finally {
+      setLoading(false)
+    }
   }
 
-  if (!patient) {
+  useEffect(() => {
+    if (selectedPatientId && isOdontologo) {
+      loadEncounters(selectedPatientId)
+    }
+  }, [selectedPatientId, isOdontologo])
+
+  // Encuentro clínico activo seleccionado
+  const activeEncounter = useMemo(() => {
+    return encounters.find(e => e.id === selectedEncounterId) || encounters[0] || null
+  }, [encounters, selectedEncounterId])
+
+  // Versión específica seleccionada dentro del encuentro activo (para auditoría)
+  const activeVersion = useMemo(() => {
+    if (!activeEncounter) return undefined
+    if (selectedVersionId) {
+      const found = activeEncounter.versiones.find(v => v.id === selectedVersionId)
+      if (found) return found
+    }
+    return activeEncounter.versionActual
+  }, [activeEncounter, selectedVersionId])
+
+  // Nombre y documento del paciente actual
+  const currentPatientName = useMemo(() => {
+    if (propPatientName) return propPatientName
+    const p = patientList.find(pt => String(pt.id) === selectedPatientId)
+    if (p) return `${p.nombres} ${p.apellidos}`
+    return activeEncounter?.pacienteNombreCompleto || 'Paciente'
+  }, [propPatientName, patientList, selectedPatientId, activeEncounter])
+
+  const currentPatientDoc = useMemo(() => {
+    if (propPatientDoc) return propPatientDoc
+    const p = patientList.find(pt => String(pt.id) === selectedPatientId)
+    return p?.numeroDocumento || activeEncounter?.pacienteNumeroDocumento || ''
+  }, [propPatientDoc, patientList, selectedPatientId, activeEncounter])
+
+  // ── Handlers de Negocio F05-A ───────────────────────────────────────────────
+
+  // 1. Crear nuevo borrador
+  const handleCreateDraft = async (form: FormState) => {
+    setIsSubmitting(true)
+    setErrorMsg(null)
+    try {
+      const payload: CreateClinicalEncounterPayload = {
+        pacienteId: selectedPatientId,
+        motivoConsulta: form.motivoConsulta,
+        examenClinico: form.examenClinico,
+        diagnostico: form.diagnostico,
+        procedimientos: form.procedimientos,
+        planTratamiento: form.planTratamiento,
+        recetasPrescripciones: form.recetasPrescripciones,
+        indicaciones: form.indicaciones,
+        evolucion: form.evolucion,
+        proximaCitaSugerida: form.proximaCitaSugerida || undefined,
+        signosVitales: serializeVitals(form.vitals),
+      }
+      const created = await createDraftEncounter(payload)
+      await loadEncounters(selectedPatientId)
+      setSelectedEncounterId(created.id)
+      setSelectedVersionId(created.versionActual?.id || null)
+      setModal(null)
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al guardar el borrador de atención')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // 2. Crear y confirmar directamente en 1 paso
+  const handleCreateAndConfirm = async (form: FormState) => {
+    setIsSubmitting(true)
+    setErrorMsg(null)
+    try {
+      const payload: CreateClinicalEncounterPayload = {
+        pacienteId: selectedPatientId,
+        motivoConsulta: form.motivoConsulta,
+        examenClinico: form.examenClinico,
+        diagnostico: form.diagnostico,
+        procedimientos: form.procedimientos,
+        planTratamiento: form.planTratamiento,
+        recetasPrescripciones: form.recetasPrescripciones,
+        indicaciones: form.indicaciones,
+        evolucion: form.evolucion,
+        proximaCitaSugerida: form.proximaCitaSugerida || undefined,
+        signosVitales: serializeVitals(form.vitals),
+      }
+      const created = await createDraftEncounter(payload)
+      const confirmed = await confirmEncounterVersion(created.id, { numeroVersion: 1 })
+      await loadEncounters(selectedPatientId)
+      setSelectedEncounterId(confirmed.id)
+      setSelectedVersionId(confirmed.versionActual?.id || null)
+      setModal(null)
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al registrar y confirmar la atención')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // 3. Modificar borrador existente
+  const handleUpdateDraft = async (form: FormState) => {
+    if (!activeEncounter) return
+    setIsSubmitting(true)
+    setErrorMsg(null)
+    try {
+      const payload: UpdateClinicalDraftPayload = {
+        motivoConsulta: form.motivoConsulta,
+        examenClinico: form.examenClinico,
+        diagnostico: form.diagnostico,
+        procedimientos: form.procedimientos,
+        planTratamiento: form.planTratamiento,
+        recetasPrescripciones: form.recetasPrescripciones,
+        indicaciones: form.indicaciones,
+        evolucion: form.evolucion,
+        proximaCitaSugerida: form.proximaCitaSugerida || undefined,
+        signosVitales: serializeVitals(form.vitals),
+      }
+      const updated = await updateDraftEncounter(activeEncounter.id, payload)
+      await loadEncounters(selectedPatientId)
+      setSelectedEncounterId(updated.id)
+      setModal(null)
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al actualizar el borrador')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // 4. Confirmar versión exacta de un encuentro activo
+  const handleConfirmActiveEncounter = async () => {
+    if (!activeEncounter) return
+    setIsSubmitting(true)
+    setErrorMsg(null)
+    try {
+      const targetVersion = activeEncounter.versionActual
+      const confirmed = await confirmEncounterVersion(activeEncounter.id, {
+        versionId: targetVersion?.id,
+        numeroVersion: targetVersion?.numeroVersion,
+      })
+      await loadEncounters(selectedPatientId)
+      setSelectedEncounterId(confirmed.id)
+      setSelectedVersionId(confirmed.versionActual?.id || null)
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al confirmar y firmar la atención')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // 5. Registrar versión de corrección (D06)
+  const handleSaveCorrection = async (payload: CreateCorrectionVersionPayload) => {
+    if (!activeEncounter) return
+    setIsSubmitting(true)
+    setErrorMsg(null)
+    try {
+      const corrected = await createCorrectionVersion(activeEncounter.id, payload)
+      await loadEncounters(selectedPatientId)
+      setSelectedEncounterId(corrected.id)
+      setSelectedVersionId(corrected.versionActual?.id || null)
+      setModal(null)
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error al registrar la versión de corrección')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Seguridad: si el usuario no es odontólogo, mostrar advertencia de rol
+  if (!isOdontologo) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-400 h-full">
-        <div className="text-center">
-          <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-10 h-10 mx-auto mb-3 opacity-30"/>
-          <p className="text-sm">Paciente no encontrado</p>
+      <div className="flex-1 flex items-center justify-center p-8 bg-slate-50 h-full">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-6 text-center shadow-xs">
+          <span className="text-3xl">🔒</span>
+          <p className="font-bold text-slate-800 text-sm mt-3" style={{ fontFamily: 'Outfit' }}>
+            Acceso Restringido a Historia Clínica
+          </p>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            La historia clínica técnica y las atenciones odontológicas están reservadas exclusivamente para odontólogos autorizados de la clínica.
+          </p>
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="flex h-full">
-      {(modal==='new'||modal==='edit')&&<ModalConsulta consulta={editTarget} patientName={patient.name} onSave={save} onClose={()=>{setModal(null);setEditTarget(undefined)}}/>}
-      {modal==='print'&&printTarget&&<ModalImprimir consulta={printTarget} patient={patient} onClose={()=>{setModal(null);setPrintTarget(null)}}/>}
+  const activeVitals = parseVitals(activeVersion?.signosVitales)
 
-      {/* Consulta list — only consultations for the current patient */}
-      <div className="w-56 shrink-0 flex flex-col border-r border-slate-200 bg-white">
-        <div className="px-4 py-3 border-b border-slate-100">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-slate-800 uppercase tracking-widest" style={{fontFamily:'Outfit'}}>Consultas</p>
-            <button onClick={()=>setModal('new')} className="w-7 h-7 bg-cyan-600 text-white rounded-lg flex items-center justify-center hover:bg-cyan-500 transition-colors" title="Nueva consulta">
-              <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5"/>
-            </button>
+  return (
+    <div className="flex h-full w-full overflow-hidden bg-slate-50">
+      {/* Modales */}
+      {modal === 'new' && (
+        <ModalEncounterForm
+          isEditing={false}
+          patientName={currentPatientName}
+          onSaveDraft={handleCreateDraft}
+          onConfirmDirect={handleCreateAndConfirm}
+          onClose={() => setModal(null)}
+          isSubmitting={isSubmitting}
+        />
+      )}
+
+      {modal === 'edit' && activeEncounter && (
+        <ModalEncounterForm
+          isEditing={true}
+          patientName={currentPatientName}
+          initialData={versionToForm(activeEncounter.versionActual)}
+          onSaveDraft={handleUpdateDraft}
+          onConfirmDirect={async form => {
+            await handleUpdateDraft(form)
+            await handleConfirmActiveEncounter()
+          }}
+          onClose={() => setModal(null)}
+          isSubmitting={isSubmitting}
+        />
+      )}
+
+      {modal === 'correct' && activeEncounter && (
+        <ModalCorrectionForm
+          encounter={activeEncounter}
+          onSaveCorrection={handleSaveCorrection}
+          onClose={() => setModal(null)}
+          isSubmitting={isSubmitting}
+        />
+      )}
+
+      {modal === 'print' && activeEncounter && (
+        <ModalImprimir
+          encounter={activeEncounter}
+          version={activeVersion}
+          patientName={currentPatientName}
+          patientDoc={currentPatientDoc}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {/* Barra Lateral Izquierda: Selector de Paciente (opcional) y Lista de Atenciones */}
+      <div className="w-64 shrink-0 flex flex-col border-r border-slate-200 bg-white h-full">
+        {/* Selector de paciente si no vino prefijado por props */}
+        {!initialPatientId && patientList.length > 0 && (
+          <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">
+              Seleccionar Paciente
+            </label>
+            <select
+              value={selectedPatientId}
+              onChange={e => setSelectedPatientId(e.target.value)}
+              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl text-xs bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            >
+              {patientList.map(pt => (
+                <option key={pt.id} value={String(pt.id)}>
+                  {pt.nombres} {pt.apellidos} ({pt.numeroDocumento || 'DNI'})
+                </option>
+              ))}
+            </select>
           </div>
-          <p className="text-[10px] text-slate-400">{patient.consultas.length} registro{patient.consultas.length!==1?'s':''} encontrado{patient.consultas.length!==1?'s':''}</p>
+        )}
+
+        {/* Encabezado de la lista */}
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-800 uppercase tracking-wider" style={{ fontFamily: 'Outfit' }}>
+              Atenciones Clínicas
+            </p>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              {encounters.length} registro{encounters.length !== 1 ? 's' : ''} encontrado{encounters.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <button
+            onClick={() => setModal('new')}
+            className="w-7 h-7 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center transition-colors shadow-xs cursor-pointer"
+            title="Nueva atención clínica"
+          >
+            <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5" />
+          </button>
         </div>
+
+        {/* Lista de encuentros */}
         <div className="flex-1 overflow-y-auto">
-          {patient.consultas.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-8 h-8 mx-auto mb-2 text-slate-300"/>
-              <p className="text-xs text-slate-400 mb-2">Sin consultas</p>
-              <button onClick={()=>setModal('new')} className="text-xs text-cyan-600 hover:text-cyan-700 font-semibold">+ Primera consulta</button>
+          {loading ? (
+            <div className="p-6 text-center text-xs text-slate-400">
+              <span className="inline-block animate-spin mr-1.5">⏳</span> Cargando historial...
             </div>
-          ) : patient.consultas.map(c=>(
-            <button key={c.id} onClick={()=>setSelConsultaId(c.id)}
-              className={`w-full text-left px-4 py-3 border-b border-slate-50 transition-all ${activeC?.id===c.id?'bg-cyan-50 border-l-2 border-l-cyan-500':'hover:bg-slate-50'}`}>
-              <div className="flex items-center gap-2 mb-0.5">
-                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeC?.id===c.id?'bg-cyan-500':'bg-slate-300'}`}/>
-                <p className={`text-xs font-semibold ${activeC?.id===c.id?'text-cyan-700':'text-slate-700'}`}>{fmtDate(c.date)}</p>
-              </div>
-              <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2 pl-3.5">{c.motivo}</p>
-              <p className="text-[10px] text-slate-300 mt-0.5 pl-3.5">{c.doctor}</p>
-            </button>
-          ))}
+          ) : encounters.length === 0 ? (
+            <div className="px-4 py-10 text-center">
+              <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+              <p className="text-xs text-slate-400 mb-2">Sin atenciones registradas</p>
+              <button
+                onClick={() => setModal('new')}
+                className="text-xs text-cyan-600 hover:text-cyan-700 font-semibold cursor-pointer"
+              >
+                + Registrar primera atención
+              </button>
+            </div>
+          ) : (
+            encounters.map(e => {
+              const isActive = activeEncounter?.id === e.id
+              const isConfirmado = e.estado === 'CONFIRMADO'
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => {
+                    setSelectedEncounterId(e.id)
+                    setSelectedVersionId(e.versionActual?.id || null)
+                  }}
+                  className={`w-full text-left px-4 py-3 border-b border-slate-50 transition-all cursor-pointer ${
+                    isActive ? 'bg-cyan-50/80 border-l-2 border-l-cyan-600' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-xs font-bold text-slate-700">
+                      {fmtDate(e.fechaCreacion)}
+                    </span>
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        isConfirmado ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {isConfirmado ? '✓ Confirmado' : 'Borrador'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-700 font-medium line-clamp-1">
+                    {e.versionActual?.motivoConsulta || e.versionActual?.diagnostico || 'Atención odontológica'}
+                  </p>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                    <span className="truncate max-w-[120px]">{e.odontologoNombreCompleto}</span>
+                    <span className="font-mono text-cyan-700 bg-cyan-100/50 px-1 rounded">
+                      v{e.totalVersiones}
+                    </span>
+                  </div>
+                </button>
+              )
+            })
+          )}
         </div>
       </div>
 
-      {/* Detail */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50">
-        {activeC ? (
+      {/* Panel Principal: Detalle de la Atención Activa */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {errorMsg && (
+          <div className="p-3 bg-rose-50 border-b border-rose-200 text-rose-700 text-xs flex items-center justify-between px-5">
+            <span>⚠ {errorMsg}</span>
+            <button onClick={() => setErrorMsg(null)} className="text-rose-500 hover:text-rose-700">✕</button>
+          </div>
+        )}
+
+        {activeEncounter ? (
           <>
-            <div className="bg-white border-b border-slate-100 px-5 py-3.5 flex items-center justify-between shrink-0">
-              <div>
-                <p className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>{activeC.motivo}</p>
-                <p className="text-xs text-slate-400">{fmtDate(activeC.date)} · {activeC.doctor}</p>
+            {/* Header del Encuentro Activo */}
+            <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-2xs">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-slate-800 text-base truncate" style={{ fontFamily: 'Outfit' }}>
+                    {activeVersion?.motivoConsulta || activeVersion?.diagnostico || 'Atención Clínica'}
+                  </h3>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      activeEncounter.estado === 'CONFIRMADO'
+                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-100 text-amber-800 border border-amber-200'
+                    }`}
+                  >
+                    {activeEncounter.estado === 'CONFIRMADO' ? '✓ CONFIRMADO' : 'BORRADOR PENDIENTE'}
+                  </span>
+                  <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
+                    Versión {activeVersion?.numeroVersion || 1} de {activeEncounter.totalVersiones}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Atención #{activeEncounter.id} · Creado el {fmtDateTime(activeEncounter.fechaCreacion)} por {activeEncounter.odontologoNombreCompleto}
+                  {activeVersion?.firmadoPorNombre && (
+                    <span className="text-emerald-700 font-medium ml-1">
+                      · Firmado por {activeVersion.firmadoPorNombre} ({fmtDateTime(activeVersion.fechaConfirmacion)})
+                    </span>
+                  )}
+                </p>
               </div>
-              <div className="flex gap-2">
-                <button onClick={()=>{setPrintTarget(activeC);setModal('print')}} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium hover:bg-slate-50">
-                  <Icon d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" className="w-3.5 h-3.5"/>Imprimir
-                </button>
-                <button onClick={()=>{setEditTarget(activeC);setModal('edit')}} className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 text-white rounded-lg text-xs font-semibold hover:bg-cyan-500">
-                  <Icon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" className="w-3.5 h-3.5"/>Editar
-                </button>
+
+              {/* Botones de Acción */}
+              <div className="flex items-center gap-2 shrink-0">
+                {activeEncounter.estado === 'BORRADOR' ? (
+                  <>
+                    <button
+                      onClick={() => setModal('edit')}
+                      className="px-3.5 py-1.5 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Icon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" className="w-3.5 h-3.5 text-cyan-600" />
+                      Editar borrador
+                    </button>
+                    <button
+                      onClick={handleConfirmActiveEncounter}
+                      disabled={isSubmitting}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Icon d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" className="w-3.5 h-3.5" />
+                      Confirmar y firmar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setModal('correct')}
+                      className="px-3.5 py-1.5 border border-cyan-200 text-cyan-700 bg-cyan-50/70 hover:bg-cyan-100 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Icon d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className="w-3.5 h-3.5 text-cyan-600" />
+                      Corregir / Nueva versión
+                    </button>
+                    <button
+                      onClick={() => setModal('print')}
+                      className="px-3.5 py-1.5 border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Icon d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" className="w-3.5 h-3.5 text-slate-500" />
+                      Imprimir
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div className="grid grid-cols-7 gap-2">
-                {([
-                  ['P.A.',`${activeC.vitals.systolic}/${activeC.vitals.diastolic}`,'mmHg',activeC.vitals.systolic<130],
-                  ['Pulso',`${activeC.vitals.pulse}`,'lpm',activeC.vitals.pulse<100],
-                  ['Temp',`${activeC.vitals.temp}`,'°C',activeC.vitals.temp<37.5],
-                  ['Peso',`${activeC.vitals.weight}`,'kg',true],
-                  ['Talla',`${activeC.vitals.height}`,'cm',true],
-                  ['SpO₂',`${activeC.vitals.spo2}`,'%',activeC.vitals.spo2>=95],
-                ] as [string,string,string,boolean][]).map(([l,v,u,ok])=>(
-                  <div key={l} className={`rounded-xl p-3 text-center ${ok?'bg-emerald-50':'bg-rose-50'}`}>
-                    <p className="text-[10px] font-semibold text-slate-400 mb-1">{l}</p>
-                    <p className={`font-bold text-sm ${ok?'text-emerald-700':'text-rose-600'}`}>{v}</p>
-                    <p className="text-[9px] text-slate-400">{u}</p>
+
+            {/* Selector de versiones históricas si hay más de 1 versión */}
+            {activeEncounter.versiones.length > 1 && (
+              <div className="bg-white border-b border-slate-100 px-6 py-2 flex items-center gap-2 overflow-x-auto">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest shrink-0">
+                  Historial de auditoría:
+                </span>
+                {activeEncounter.versiones.map(v => {
+                  const isSel = (activeVersion?.id === v.id)
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedVersionId(v.id)}
+                      className={`px-3 py-1 text-xs rounded-xl font-semibold transition-all cursor-pointer shrink-0 ${
+                        isSel
+                          ? 'bg-cyan-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      v{v.numeroVersion} {v.estaConfirmado ? '✓' : '(Borrador)'}
+                      {v.versionAnteriorId ? ` ↰ v${v.numeroVersion - 1}` : ''}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Cuerpo del contenido clínico */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Signos Vitales */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                {[
+                  ['P.A.', activeVitals.systolic ? `${activeVitals.systolic}/${activeVitals.diastolic}` : '—', 'mmHg', true],
+                  ['Pulso', activeVitals.pulse ? `${activeVitals.pulse}` : '—', 'lpm', true],
+                  ['Temp', activeVitals.temp ? `${activeVitals.temp}` : '—', '°C', true],
+                  ['Peso', activeVitals.weight ? `${activeVitals.weight}` : '—', 'kg', true],
+                  ['Talla', activeVitals.height ? `${activeVitals.height}` : '—', 'cm', true],
+                  ['SpO₂', activeVitals.spo2 ? `${activeVitals.spo2}` : '—', '%', true],
+                ].map(([label, val, unit]) => (
+                  <div key={label as string} className="bg-white border border-slate-100 rounded-2xl p-3 text-center shadow-2xs">
+                    <p className="text-[10px] font-semibold text-slate-400 mb-0.5">{label as string}</p>
+                    <p className="font-bold text-sm text-slate-800" style={{ fontFamily: 'Outfit' }}>{val as string}</p>
+                    <p className="text-[9px] text-slate-400">{unit as string}</p>
                   </div>
                 ))}
               </div>
-              {([['Examen clínico',activeC.examen,'#7C3AED'],['Diagnóstico',activeC.diagnostico,'#DC2626'],['Procedimientos realizados',activeC.procedimientos,'#1E8C82'],['Plan de tratamiento',activeC.plan,'#D97706'],['Indicaciones al paciente',activeC.indicaciones,'#0369A1']] as [string,string,string][]).filter(([,v])=>v).map(([l,v,c])=>(
-                <div key={l} className="bg-white rounded-2xl border border-slate-100 p-4">
-                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{color:c,fontFamily:'Outfit'}}>{l}</p>
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{v}</p>
+
+              {/* Secciones Clínicas Principales */}
+              {[
+                { title: 'Motivo de Consulta', content: activeVersion?.motivoConsulta, color: '#0B3D3A' },
+                { title: 'Diagnóstico Dental (CIE-10)', content: activeVersion?.diagnostico, color: '#DC2626' },
+                { title: 'Examen Clínico', content: activeVersion?.examenClinico, color: '#7C3AED' },
+                { title: 'Procedimientos Realizados', content: activeVersion?.procedimientos, color: '#1E8C82' },
+                { title: 'Plan de Tratamiento', content: activeVersion?.planTratamiento, color: '#D97706' },
+                { title: 'Recetas y Prescripciones', content: activeVersion?.recetasPrescripciones, color: '#0369A1' },
+                { title: 'Indicaciones al Paciente', content: activeVersion?.indicaciones, color: '#2563EB' },
+                { title: 'Evolución Clínica', content: activeVersion?.evolucion, color: '#475569' },
+              ].filter(item => item.content).map(item => (
+                <div key={item.title} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-2xs">
+                  <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: item.color, fontFamily: 'Outfit' }}>
+                    {item.title}
+                  </p>
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line font-normal">
+                    {item.content}
+                  </p>
                 </div>
               ))}
-              {activeC.proxima&&(
+
+              {/* Próxima Cita Sugerida */}
+              {activeVersion?.proximaCitaSugerida && (
                 <div className="flex items-center gap-3 bg-cyan-50 rounded-2xl p-4 border border-cyan-100">
-                  <Icon d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" className="w-4 h-4 text-cyan-600"/>
-                  <p className="text-sm text-cyan-700"><span className="font-semibold">Próxima cita:</span> {fmtDate(activeC.proxima)}</p>
+                  <Icon d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" className="w-4 h-4 text-cyan-600 shrink-0" />
+                  <p className="text-sm text-cyan-800">
+                    <span className="font-semibold">Próxima cita de control sugerida:</span> {fmtDate(activeVersion.proximaCitaSugerida)}
+                  </p>
                 </div>
               )}
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400">
+          <div className="flex-1 flex items-center justify-center text-slate-400 p-8">
             <div className="text-center">
-              <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-10 h-10 mx-auto mb-3 opacity-30"/>
-              <p className="text-sm">Sin consultas registradas</p>
-              <button onClick={()=>setModal('new')} className="mt-2 text-xs text-cyan-600 hover:text-cyan-700 font-semibold">+ Registrar primera consulta</button>
+              <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm font-medium">Seleccione o registre una atención clínica</p>
+              <button
+                onClick={() => setModal('new')}
+                className="mt-3 px-4 py-2 bg-cyan-600 text-white rounded-xl text-xs font-semibold hover:bg-cyan-500 transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5" />
+                Registrar Atención Clínica
+              </button>
             </div>
           </div>
         )}

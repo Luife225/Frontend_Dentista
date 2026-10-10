@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom'
-import { useAuth, type Role } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/AuthContext'
 import { getDefaultRouteForRole } from './routeHelpers'
 
 interface Props {
@@ -8,24 +8,25 @@ interface Props {
 
 /**
  * PublicRoute (Guest Guard)
- * Evita que usuarios ya autenticados accedan a rutas de invitados/públicas
- * (como la Landing Page o el Formulario de Login).
- *
- * Si el usuario ya tiene sesión activa:
- *   - Lo redirige de inmediato con `replace: true` al panel de su rol.
- * Si no está autenticado:
- *   - Renderiza el contenido público (`children` o `<Outlet />`).
+ * Evita que usuarios con sesión activa ingresen a páginas de login o landing pública.
+ * Solo redirige si hay una sesión autenticada real con token verificado.
  */
 export default function PublicRoute({ children }: Props) {
-  const { isAuthenticated, role, user } = useAuth()
+  const { isAuthenticated, role, user, isRestoringSession } = useAuth()
 
-  // Detectar rol activo desde contexto o almacenamiento persistente
-  const savedRole = typeof window !== 'undefined' ? (localStorage.getItem('coronyx_role') as Role | null) : null
-  const currentRole: Role | null = (role || user?.rol || savedRole) as Role | null
-  const isUserAuthenticated = isAuthenticated || Boolean(currentRole)
+  if (isRestoringSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin" />
+          <p className="text-xs text-white/50 font-medium tracking-wide">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
 
-  if (isUserAuthenticated && currentRole) {
-    const destination = getDefaultRouteForRole(currentRole)
+  if (isAuthenticated && role && user) {
+    const destination = getDefaultRouteForRole(role)
     return <Navigate to={destination} replace />
   }
 

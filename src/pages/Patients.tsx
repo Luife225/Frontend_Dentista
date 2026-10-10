@@ -279,8 +279,12 @@ export default function Patients() {
         estado: 'ACTIVO',
       })
 
+      if (!created.id) {
+        throw new Error('Contrato de API inválido: el paciente creado carece de ID')
+      }
+
       const newItem: PatientItem = {
-        id: created.id || Date.now(),
+        id: created.id,
         name: `${created.nombres} ${created.apellidos || ''}`.trim(),
         age: created.fechaNacimiento ? Math.floor((Date.now() - new Date(created.fechaNacimiento).getTime()) / 31557600000) : 30,
         phone: created.telefono || 'Sin teléfono',

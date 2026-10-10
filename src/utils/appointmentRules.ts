@@ -242,3 +242,68 @@ export function validateAppointmentSchedule(
 }
 
 export const CONFLICT_MESSAGE = 'Conflicto: El doctor o el sillón seleccionado ya tienen una cita en ese horario.'
+
+export const LIMA_TIMEZONE_OFFSET = '-05:00'
+
+/** Formatea fecha YYYY-MM-DD y hora HH:mm en ISO 8601 con offset oficial de Lima (-05:00) */
+export function toLimaIsoString(dateStr: string, timeStr: string): string {
+  const [h, m] = timeStr.split(':')
+  return `${dateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00-05:00`
+}
+
+/** Formatea una fecha ISO a hora HH:mm en zona horaria America/Lima */
+export function formatLimaTime(isoStr?: string): string {
+  if (!isoStr) return '--:--'
+  try {
+    const d = new Date(isoStr)
+    return new Intl.DateTimeFormat('es-PE', {
+      timeZone: 'America/Lima',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(d)
+  } catch {
+    return '--:--'
+  }
+}
+
+/** Formatea una fecha ISO a fecha legible en zona horaria America/Lima */
+export function formatLimaDate(isoStr?: string, options?: Intl.DateTimeFormatOptions): string {
+  if (!isoStr) return '—'
+  try {
+    const d = new Date(isoStr)
+    return new Intl.DateTimeFormat('es-PE', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      ...options,
+    }).format(d)
+  } catch {
+    return '—'
+  }
+}
+
+/** Extrae fecha YYYY-MM-DD en zona horaria America/Lima evitando desfasajes UTC */
+export function toLimaDateString(isoStr?: string): string {
+  if (!isoStr) return ''
+  try {
+    const d = new Date(isoStr)
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d)
+  } catch {
+    return ''
+  }
+}
+
+/** Extrae hora y minuto en zona horaria America/Lima */
+export function getLimaHourMinute(isoStr?: string): { hour: number; minute: number; timeStr: string } {
+  if (!isoStr) return { hour: 0, minute: 0, timeStr: '00:00' }
+  const timeStr = formatLimaTime(isoStr)
+  const [h, m] = timeStr.split(':').map(Number)
+  return { hour: isNaN(h) ? 0 : h, minute: isNaN(m) ? 0 : m, timeStr }
+}

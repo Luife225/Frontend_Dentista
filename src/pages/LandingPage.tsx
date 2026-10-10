@@ -12,12 +12,12 @@ gsap.registerPlugin(ScrollTrigger)
 
 // ── Stats data config ────────────────────────────────────────────────────────
 // NOTA: Valores demostrativos actuales de la landing page.
-// Modificar aquí si se conectan a métricas reales o dinámicas.
+// Cifras técnicas y arquitectónicas sustentadas en la plataforma real
 const STATS_DATA = [
-  { target: 2400, prefix: '', suffix: '+', decimals: 0, label: 'Pacientes gestionados', sub: 'en clínicas activas', formatThousand: true },
-  { target: 11,   prefix: '', suffix: '',  decimals: 0, label: 'Módulos clínicos',      sub: 'integrados en 1 plataforma', formatThousand: false },
-  { target: 5,    prefix: '', suffix: '',  decimals: 0, label: 'Roles de usuario',      sub: 'control granular de acceso', formatThousand: false },
-  { target: 99.9, prefix: '', suffix: '%', decimals: 1, label: 'Uptime garantizado',    sub: 'SLA Enterprise', formatThousand: false },
+  { target: 100, prefix: '', suffix: '%', decimals: 0, label: 'Trazabilidad y auditoría', sub: 'en cada registro clínico', formatThousand: false },
+  { target: 8,   prefix: '', suffix: '',  decimals: 0, label: 'Módulos clínicos activos', sub: 'integrados con API real', formatThousand: false },
+  { target: 5,    prefix: '', suffix: '',  decimals: 0, label: 'Roles autorizados (RBAC)', sub: 'aislamiento por clínica', formatThousand: false },
+  { target: 100, prefix: '', suffix: '%', decimals: 0, label: 'Control de disponibilidad', sub: 'sin solapamiento de citas', formatThousand: false },
 ]
 
 // ── Logo ──────────────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ function DashboardMockup() {
                 { label: 'Citas hoy', val: '14', color: '#1E8C82' },
                 { label: 'Pacientes', val: '287', color: '#7C3AED' },
                 { label: 'Pendientes', val: '3', color: '#D97706' },
-                { label: 'Ingresos', val: '$4.2M', color: '#059669' },
+                { label: 'Atendidas', val: '11', color: '#059669' },
               ].map((s, i) => (
                 <div key={i} className="mockup-stat-card rounded-lg p-2 border border-white/5" style={{ background: '#112220' }}>
                   <p className="text-[8px] text-white/40 mb-0.5">{s.label}</p>

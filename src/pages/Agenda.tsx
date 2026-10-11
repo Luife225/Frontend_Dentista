@@ -7,6 +7,7 @@ import {
   reschedule,
   getClinicRescheduleRequests,
   resolveRescheduleRequest,
+  fetchClinicOdontologos,
 } from '../services/appointmentService'
 import { fetchUsersFromApi, UserItem } from '../services/authService'
 import { useAuth } from '../contexts/AuthContext'
@@ -569,7 +570,12 @@ export default function Agenda() {
   useEffect(() => {
     async function loadDocs() {
       try {
-        const users = await fetchUsersFromApi()
+        let users: UserItem[] = []
+        try {
+          users = await fetchClinicOdontologos()
+        } catch {
+          users = await fetchUsersFromApi()
+        }
         const odon = users.filter(u => u.rol === 'ODONTOLOGO' && Boolean(u.usuarioClinicaId))
         setDoctors(odon)
         if (role === 'ODONTOLOGO' && user?.usuarioClinicaId) {

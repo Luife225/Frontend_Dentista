@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { fetchPatientsFromApi, BackendPatientDto } from '../../services/patientService'
 import { fetchUsersFromApi, UserItem } from '../../services/authService'
 import { useAuth } from '../../contexts/AuthContext'
-import { createAppointment } from '../../services/appointmentService'
+import { createAppointment, fetchClinicOdontologos } from '../../services/appointmentService'
 import { Appointment, CreateAppointmentPayload } from '../../types/appointment'
 import {
   CONSULTORIOS,
@@ -132,7 +132,9 @@ export default function AgendarCitaModal({
       try {
         const [patientsData, usersData] = await Promise.all([
           fetchPatientsFromApi().catch(() => []),
-          fetchUsersFromApi().catch(() => []),
+          fetchClinicOdontologos().catch(async () => {
+            return fetchUsersFromApi().catch(() => [])
+          }),
         ])
 
         if (!active) return

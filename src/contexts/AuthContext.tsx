@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { type LoginResponse, getMeFromApi } from '../services/authService'
+import { type LoginResponse, getMeFromApi, isOperativeRole, validateOperativeSession } from '../services/authService'
 import { getJwtToken, clearAuthStorage } from '../services/apiClient'
 import { getDefaultRouteForRole } from '../routes/routeHelpers'
 
@@ -106,6 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function loginWithSession(session: LoginResponse, targetRoute?: string) {
+    validateOperativeSession(session)
+    if (!session.token) throw new Error('No se recibió un token de sesión válido')
     setUser(session)
     setRole(session.rol)
     if (session.token) {
@@ -127,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // El acceso requiere tener usuario real con token y rol verificado
-  const isAuthenticated = Boolean(user && user.token && role)
+  const isAuthenticated = Boolean(user && user.token && isOperativeRole(role))
 
   return (
     <AuthContext.Provider value={{ role, user, isAuthenticated, isRestoringSession, loginWithSession, logout }}>

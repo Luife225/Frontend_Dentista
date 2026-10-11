@@ -214,7 +214,7 @@ function ModalCrearUsuario({ onClose, onCreated }: ModalCrearProps) {
           {isPaciente && (
             <div>
               <label className="text-xs font-semibold text-slate-500 block mb-1">
-                ID Decimal de Paciente a Vincular (Opcional)
+                Expediente de paciente a vincular (opcional)
               </label>
               <input
                 value={form.pacienteId || ''}
@@ -223,7 +223,7 @@ function ModalCrearUsuario({ onClose, onCreated }: ModalCrearProps) {
                 placeholder="Ej: 1 (Ficha de paciente en PostgreSQL)"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                Vincula la cuenta de acceso directamente con su ficha clínica.
+                El expediente debe pertenecer a tu clínica y estar sin cuenta. Si lo dejas vacío, vincúlalo después para habilitar el portal.
               </p>
             </div>
           )}

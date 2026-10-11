@@ -4,7 +4,7 @@
  * e invalidación automática de sesiones expiradas o manipuladas.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api/v1';
+export const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8081/api/v1';
 
 export class ApiError extends Error {
   status: number;
@@ -88,11 +88,14 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
 
   // Intercepción centralizada de 401: token inválido, expirado o usuario deshabilitado en BD
   if (response.status === 401) {
-    triggerUnauthorized();
+    // Credenciales rechazadas al entrar deben mostrarse en el formulario.
+    // Un 401 de una operación autenticada sí revoca la sesión local.
+    const isLoginRequest = options.method?.toUpperCase() === 'POST' && url.split('?')[0].endsWith('/auth/login');
+    if (!isLoginRequest) triggerUnauthorized();
     let errMessage = 'Sesión expirada o credenciales no autorizadas (401)';
     try {
       const errJson = await response.json();
-      errMessage = errJson.message || errJson.error || errMessage;
+      errMessage = errJson.message || errJson.detail || errJson.error || errMessage;
     } catch {
       // Ignorar fallo de parseo
     }

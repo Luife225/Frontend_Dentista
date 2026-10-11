@@ -711,9 +711,10 @@ function ModalVincularCuenta({
     if (role === 'ADMIN_CLINICA') {
       fetchClinicUsers()
         .then(users => {
-          setClinicUsers(users.filter(u => u.rol === 'PACIENTE'))
+          setClinicUsers(users.filter(u => u.rol === 'PACIENTE' && u.estado === 'ACTIVO'
+            && (!u.pacienteId || u.pacienteId === patient.id)))
         })
-        .catch(() => {})
+        .catch(err => setErrorMsg(err.message || 'No se pudieron cargar las cuentas disponibles'))
     }
   }, [role])
 
@@ -813,7 +814,7 @@ function ModalVincularCuenta({
             className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-cyan-400/50"
           />
           <p className="text-[11px] text-slate-400 mt-1">
-            Ingresa el identificador decimal positivo de la cuenta de usuario.
+            Usa una cuenta PACIENTE activa de esta clínica. Si pertenece a otro expediente, desvincúlala primero.
           </p>
         </div>
 

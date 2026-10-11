@@ -51,7 +51,7 @@ export class ApiValidationError extends Error {
   }
 }
 
-import { getAuthHeaders, API_BASE_URL } from './apiClient';
+import { apiClient, getAuthHeaders, API_BASE_URL } from './apiClient';
 
 const DECIMAL_ID_REGEX = /^[1-9]\d*$/;
 
@@ -230,28 +230,10 @@ export async function linkPatientUserAccount(id: string, usuarioId: string | nul
     throw new Error(`Contrato de API inválido: el ID de usuario (${usuarioId}) debe ser una cadena decimal positiva`);
   }
 
-  const response = await fetch(`${API_BASE_URL}/patients/${id}/link-user`, {
+  const linked = await apiClient<BackendPatientDto>(`/patients/${id}/link-user`, {
     method: 'PATCH',
-    headers: {
-      ...getAuthHeaders(),
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({ usuarioId: usuarioId || null }),
   });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    let message = `Error al vincular cuenta (${response.status})`;
-    try {
-      const parsed = JSON.parse(errorText);
-      message = parsed.message || message;
-    } catch {
-      message = errorText || message;
-    }
-    throw new ApiValidationError(response.status, message);
-  }
-
-  const linked: BackendPatientDto = await response.json();
   return validatePatientContract(linked);
 }
 

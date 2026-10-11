@@ -8,7 +8,7 @@ import { getDefaultRouteForRole } from '../routes/routeHelpers'
 import coronixLogo from '../imports/coronixlogo.png'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Role = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
+type Role = 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
 
 // ─── Demo credentials fallback ────────────────────────────────────────────────
 const DEMO_ACCOUNTS: { email: string; password: string; role: Role; name: string; label: string; icon: string }[] = [
@@ -16,7 +16,6 @@ const DEMO_ACCOUNTS: { email: string; password: string; role: Role; name: string
   { email: 'recepcion@coronyx.pe',    password: '123456', role: 'RECEPCIONISTA', name: 'Paula Suárez',       label: 'Recepcionista', icon: '📋' },
   { email: 'admin@coronyx.pe',        password: '123456', role: 'ADMIN_CLINICA', name: 'Carlos Admin',       label: 'Administrador', icon: '⚙️' },
   { email: 'paciente@coronyx.pe',     password: '123456', role: 'PACIENTE',      name: 'Luis Paciente',      label: 'Paciente',      icon: '👤' },
-  { email: 'superadmin@coronyx.pe',   password: '123456', role: 'SUPER_ADMIN',   name: 'Super Admin',        label: 'Super Admin',   icon: '🌐' },
 ]
 
 // Role feature list for left panel

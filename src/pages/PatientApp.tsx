@@ -8,6 +8,7 @@ import {
   getMyRescheduleRequests,
   cancelRescheduleRequest,
   updateStatus,
+  fetchClinicOdontologos,
 } from '../services/appointmentService'
 import { fetchUsersFromApi, UserItem } from '../services/authService'
 import { Appointment, SolicitudReprogramacion } from '../types/appointment'
@@ -260,7 +261,12 @@ function ModalCita({
     async function loadDocs() {
       setLoadingDoctors(true)
       try {
-        const users = await fetchUsersFromApi()
+        let users: UserItem[] = []
+        try {
+          users = await fetchClinicOdontologos()
+        } catch {
+          users = await fetchUsersFromApi()
+        }
         const odon = users.filter(u => u.rol === 'ODONTOLOGO' && Boolean(u.usuarioClinicaId))
         setDoctors(odon)
         if (odon.length > 0) {

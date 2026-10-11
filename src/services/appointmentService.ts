@@ -8,6 +8,7 @@ import {
 } from '../types/appointment'
 
 import { getAuthHeaders, triggerUnauthorized, API_BASE_URL } from './apiClient'
+import { UserItem } from './authService'
 
 export class AppointmentApiError extends Error {
   status: number
@@ -403,4 +404,17 @@ export async function cancelRescheduleRequest(solicitudId: string): Promise<Soli
   )
 
   return handleResponse<SolicitudReprogramacion>(response)
+}
+
+/**
+ * GET /api/v1/citas/odontologos
+ * Catálogo asistencial de odontólogos activos de la clínica (permitido para Recepcionista, Odontólogo, Paciente y Admin)
+ */
+export async function fetchClinicOdontologos(): Promise<UserItem[]> {
+  const response = await fetch(`${API_BASE_URL}/citas/odontologos`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  })
+
+  return handleResponse<UserItem[]>(response)
 }

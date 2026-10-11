@@ -1,5 +1,8 @@
 import { apiClient, setJwtToken, getJwtToken, clearAuthStorage, ApiError } from './apiClient';
 
+import { isDecimalId, validateOperativeSession, type OperativeRole } from './sessionContract';
+export { isDecimalId, isOperativeRole, validateOperativeSession } from './sessionContract';
+
 export interface LoginResponse {
   id: string; // ID decimal string (usuario.id)
   usuarioId: string; // ID decimal string (usuario.id)
@@ -10,7 +13,7 @@ export interface LoginResponse {
   nombres: string;
   apellidos: string;
   nombreCompleto: string;
-  rol: 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE';
+  rol: OperativeRole;
   clinicaNombre?: string;
   token?: string | null;
   tipoToken?: string;
@@ -27,12 +30,6 @@ export interface UserItem {
   estado: string;
 }
 
-const DECIMAL_ID_REGEX = /^[1-9]\d*$/;
-
-export function isDecimalId(id?: string | null): boolean {
-  return typeof id === 'string' && DECIMAL_ID_REGEX.test(id);
-}
-
 /**
  * Autenticación real contra PostgreSQL con BCrypt y emisión de JWT.
  * Exige respuesta con IDs decimal string positivos y almacena el token de forma segura.
@@ -43,29 +40,15 @@ export async function loginWithApi(correo: string, clave: string): Promise<Login
     body: JSON.stringify({ correo: correo.trim().toLowerCase(), clave }),
   });
 
-  // Validación estricta de contrato F01-A/B
-  const rawId = data.id || data.usuarioId;
-  if (!rawId || !isDecimalId(rawId)) {
-    throw new Error(`Contrato de API inválido: el usuario recibido (${data.correo}) no posee un ID decimal string válido`);
-  }
-  data.id = String(rawId);
-  data.usuarioId = String(rawId);
-
-  if (data.usuarioClinicaId && !isDecimalId(data.usuarioClinicaId)) {
-    throw new Error(`Contrato de API inválido: usuarioClinicaId (${data.usuarioClinicaId}) no es un ID decimal string válido`);
+  try {
+    validateOperativeSession(data);
+    if (!data.token) throw new Error('El servidor no devolvió un token de sesión');
+  } catch (error) {
+    clearAuthStorage();
+    throw error;
   }
 
-  if (data.clinicaId && !isDecimalId(data.clinicaId)) {
-    throw new Error(`Contrato de API inválido: clinicaId (${data.clinicaId}) no es un ID decimal string válido`);
-  }
-
-  if (data.pacienteId && !isDecimalId(data.pacienteId)) {
-    throw new Error(`Contrato de API inválido: pacienteId (${data.pacienteId}) no es un ID decimal string válido`);
-  }
-
-  if (data.token) {
-    setJwtToken(data.token);
-  }
+  setJwtToken(data.token!);
 
   return data;
 }
@@ -80,19 +63,11 @@ export async function getMeFromApi(): Promise<LoginResponse> {
     method: 'GET',
   });
 
-  const rawId = data.id || data.usuarioId;
-  if (!rawId || !isDecimalId(rawId)) {
-    throw new Error(`Contrato de API inválido: /auth/me no retornó un usuarioId decimal string válido`);
-  }
-  data.id = String(rawId);
-  data.usuarioId = String(rawId);
-
-  if (data.usuarioClinicaId && !isDecimalId(data.usuarioClinicaId)) {
-    throw new Error(`Contrato de API inválido: usuarioClinicaId (${data.usuarioClinicaId}) no es decimal string`);
-  }
-
-  if (data.clinicaId && !isDecimalId(data.clinicaId)) {
-    throw new Error(`Contrato de API inválido: clinicaId (${data.clinicaId}) no es decimal string`);
+  try {
+    validateOperativeSession(data);
+  } catch (error) {
+    clearAuthStorage();
+    throw error;
   }
 
   // Conservar el token activo en el objeto de sesión

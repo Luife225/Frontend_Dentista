@@ -12,3 +12,15 @@ logs/
 .claude-replay.*
 .tmp-*
 cls
+
+# Tests & Temporary Scripts
+test_*.mjs
+*.test.mjs
+tests/
+*.ps1
+tmp/
+
+# External Deliverables & Planning
+Entregables_Avance_2/
+Entregables_Sprints_Corregidos/
+Planificacion_CORONYX/

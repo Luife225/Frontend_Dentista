@@ -10,20 +10,12 @@ import coronixLogo from '../imports/coronixLogoData'
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Role = 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'
 
-// ─── Demo credentials fallback ────────────────────────────────────────────────
-const DEMO_ACCOUNTS: { email: string; password: string; role: Role; name: string; label: string; icon: string }[] = [
-  { email: 'odontologo@coronyx.pe',   password: '123456', role: 'ODONTOLOGO',    name: 'Andrés Herrera',     label: 'Odontólogo',    icon: '🦷' },
-  { email: 'recepcion@coronyx.pe',    password: '123456', role: 'RECEPCIONISTA', name: 'Paula Suárez',       label: 'Recepcionista', icon: '📋' },
-  { email: 'admin@coronyx.pe',        password: '123456', role: 'ADMIN_CLINICA', name: 'Carlos Admin',       label: 'Administrador', icon: '⚙️' },
-  { email: 'paciente@coronyx.pe',     password: '123456', role: 'PACIENTE',      name: 'Luis Paciente',      label: 'Paciente',      icon: '👤' },
-]
-
-// Role feature list for left panel
+// Role feature list for left panel (describiendo funcionalidades reales existentes)
 const ROLE_FEATURES: { icon: string; label: string; desc: string }[] = [
-  { icon: '🦷', label: 'Odontólogo',    desc: 'Historia clínica, pacientes, IA' },
-  { icon: '📋', label: 'Recepcionista', desc: 'Agenda, citas, inventario' },
-  { icon: '⚙️', label: 'Administrador', desc: 'Configuración, usuarios, reportes' },
-  { icon: '👤', label: 'Paciente',      desc: 'App móvil — mis citas y avances' },
+  { icon: '🦷', label: 'Odontólogo',    desc: 'Historia clínica, odontograma, atenciones' },
+  { icon: '📋', label: 'Recepcionista', desc: 'Gestión de agenda, citas y pacientes' },
+  { icon: '⚙️', label: 'Administrador', desc: 'Sedes, personal, horarios y métricas' },
+  { icon: '👤', label: 'Paciente',      desc: 'Portal de citas y documentos médicos' },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -192,13 +184,6 @@ export default function Login() {
     if (e.key === 'Enter') handleLogin()
   }
 
-  // Fill fields with a demo credential when clicked (mobile hint)
-  function fillCredential(account: typeof DEMO_ACCOUNTS[0]) {
-    setEmail(account.email)
-    setPassword(account.password)
-    setError('')
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
   // ANIMATION HELPERS
   // ─────────────────────────────────────────────────────────────────────────
@@ -336,12 +321,12 @@ export default function Login() {
 
           {/* Title */}
           <h1 ref={titleRef} className="text-white text-3xl font-bold leading-tight mb-4" style={{fontFamily:'Outfit'}}>
-            Gestión clínica inteligente
+            Gestión clínica odontológica
           </h1>
 
           {/* Paragraph */}
           <p ref={paraRef} className="text-white/40 text-sm leading-relaxed mb-8">
-            Plataforma SaaS para clínicas odontológicas con asistente IA, análisis ML de radiografías y teleodontología integrada.
+            Plataforma integral para gestión odontológica: agenda clínica, expedientes de pacientes, historia médica inmutable, odontograma interactivo y documentos de atención.
           </p>
 
           {/* Role list */}
@@ -377,7 +362,7 @@ export default function Login() {
 
           <div className="bg-slate-900 border border-white/8 rounded-2xl p-8 shadow-2xl">
             <h2 className="text-white text-2xl font-semibold mb-1" style={{fontFamily:'Outfit'}}>Bienvenido</h2>
-            <p className="text-white/40 text-sm mb-7">Ingresa con tu cuenta institucional</p>
+            <p className="text-white/40 text-sm mb-7">Ingresa con tu correo y contraseña</p>
 
             <form onSubmit={handleLogin} className="space-y-4" onKeyDown={handleKeyDown}>
 
@@ -387,13 +372,15 @@ export default function Login() {
                 <input
                   ref={emailInputRef}
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={e => { setEmail(e.target.value); setError('') }}
                   onFocus={() => handleInputFocus(emailInputRef.current)}
                   onBlur={() => handleInputBlur(emailInputRef.current)}
                   className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none transition-colors"
-                  placeholder="usuario@coronyx.co"
+                  placeholder="usuario@coronyx.pe"
                 />
               </div>
 
@@ -403,6 +390,8 @@ export default function Login() {
                 <input
                   ref={passwordInputRef}
                   type="password"
+                  name="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={e => { setPassword(e.target.value); setError('') }}
@@ -451,28 +440,6 @@ export default function Login() {
                 ) : 'Ingresar'}
               </button>
             </form>
-
-            {/* Helper: cuentas institucionales para llenado rápido (requiere autenticación real al pulsar Ingresar) */}
-            <div className="mt-6 bg-white/3 border border-white/8 rounded-xl p-3">
-              <p className="text-[10px] text-white/40 font-semibold uppercase tracking-widest mb-2" style={{fontFamily:'Outfit'}}>Cuentas institucionales (autocompletar formulario)</p>
-              <div className="space-y-1.5">
-                {DEMO_ACCOUNTS.map(a => (
-                  <button
-                    key={a.email}
-                    type="button"
-                    onClick={() => fillCredential(a)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-xs hover:bg-white/5 transition-colors cursor-pointer"
-                  >
-                    <span className="text-sm shrink-0">{a.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-white/80 block font-medium truncate">{a.label}</span>
-                      <span className="text-white/40 block text-[11px] font-mono truncate">{a.email}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-white/30 mt-2">Contraseña común: <span className="text-white/60 font-mono font-semibold">123456</span></p>
-            </div>
           </div>
 
           <p className="text-center text-xs text-white/15 mt-5">

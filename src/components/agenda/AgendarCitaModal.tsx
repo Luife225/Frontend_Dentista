@@ -293,7 +293,7 @@ export default function AgendarCitaModal({
                 + Agendar Nueva Cita
               </h2>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Validación de horarios, turnos y sillones sincronizada con PostgreSQL
+                Programación y asignación de consultorios en tiempo real
               </p>
             </div>
           </div>
@@ -357,7 +357,7 @@ export default function AgendarCitaModal({
             {loadingData ? (
               <div className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-400 bg-slate-50 flex items-center gap-2">
                 <span className="animate-spin w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full" />
-                Cargando pacientes desde PostgreSQL...
+                Cargando lista de pacientes...
               </div>
             ) : patients.length === 0 ? (
               <div className="p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-xs text-slate-500">
@@ -562,7 +562,7 @@ export default function AgendarCitaModal({
                 ))}
               </select>
               <p className="text-[10px] text-slate-400 mt-1">
-                Validado contra cruces de sillón en el Backend
+                Sillón clínico asignado para la atención
               </p>
             </div>
 
@@ -676,7 +676,7 @@ export default function AgendarCitaModal({
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
               )}
-              {isSubmitting ? 'Verificando con PostgreSQL...' : 'Agendar Cita'}
+              {isSubmitting ? 'Guardando cita...' : 'Agendar Cita'}
             </button>
           </div>
         </div>

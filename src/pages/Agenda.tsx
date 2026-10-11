@@ -1330,7 +1330,7 @@ export default function Agenda() {
           initialTime={prefill.time || '10:00'}
           initialDoctorId={filterDoc || undefined}
           onSuccess={nuevaCita => {
-            showToast('✓ Cita registrada exitosamente en PostgreSQL')
+            showToast('✓ Cita agendada exitosamente')
             loadWeekCitas(true)
             setShowModal(false)
           }}

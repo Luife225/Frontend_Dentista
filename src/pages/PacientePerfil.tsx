@@ -105,7 +105,7 @@ const DOC_CONFIG: Record<string, { maxLen: number; label: string; placeholder: s
 
 const BLOOD_TYPES = ['POR DETERMINAR', 'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 const INSURANCE_OPTIONS = ['PARTICULAR', 'EsSalud', 'SIS', 'Rímac EPS', 'Pacífico EPS', 'Mapfre EPS', 'Sanitas EPS', 'Otro']
-const CITY_OPTIONS = ['Lima', 'Callao', 'Arequipa', 'Trujillo', 'Chiclayo', 'Piura', 'Cusco', 'Otra']
+const CITY_OPTIONS = ['Trujillo']
 
 function getTodayIsoDate() {
   const today = new Date()
@@ -140,7 +140,7 @@ const BLANK_FORM = (): PatientFormData => ({
   fechaNacimiento: '',
   telefono: '',
   correo: '',
-  ciudad: 'Lima',
+  ciudad: 'Trujillo',
   seguro: 'PARTICULAR',
   tipoSangre: 'POR DETERMINAR',
   alergias: '',
@@ -293,7 +293,7 @@ function ModalNuevoPaciente({
             </h2>
             <p className="text-[11px] text-cyan-700 font-medium flex items-center gap-1 mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-600 animate-pulse"></span>
-              {isOdontologo ? 'Incluye antecedentes clínicos y odontológicos' : 'Control G02: Datos demográficos y administrativos exclusivamente'}
+              {isOdontologo ? 'Incluye antecedentes clínicos y odontológicos' : 'Datos demográficos y de contacto exclusivamente'}
             </p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
@@ -423,16 +423,6 @@ function ModalNuevoPaciente({
               </select>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">ID Cuenta Usuario (Opcional)</label>
-              <input
-                value={form.usuarioId || ''}
-                onChange={setField('usuarioId')}
-                className={`${inputCls} font-mono border-slate-200 focus:ring-2 focus:ring-cyan-400/50`}
-                placeholder="Ej: 4 (Vincular cuenta)"
-              />
-            </div>
-
             {/* Campos clínicos exclusivos para Odontólogo */}
             {isOdontologo ? (
               <>
@@ -471,7 +461,7 @@ function ModalNuevoPaciente({
             ) : (
               <div className="col-span-2 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
                 <p className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <span>🔒</span> Campos clínicos restringidos (Control G02)
+                  <span>🔒</span> Campos clínicos reservados para odontología
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                   Por política de seguridad institucional, los antecedentes clínicos, alergias y prescripciones son registrados y actualizados únicamente por el odontólogo tratante.
@@ -498,7 +488,7 @@ function ModalNuevoPaciente({
             className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-cyan-600/20 cursor-pointer"
           >
             {isSaving && <Icon d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className="w-3.5 h-3.5 animate-spin" />}
-            {isSaving ? 'Guardando en PostgreSQL...' : 'Registrar paciente'}
+            {isSaving ? 'Guardando...' : 'Registrar paciente'}
           </button>
         </div>
       </div>
@@ -586,7 +576,7 @@ function ModalActualizarPaciente({
             <h2 className="font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>
               {isOdontologo ? 'Actualizar Ficha de Paciente (Clínica)' : 'Actualizar Ficha de Paciente (Administrativa)'}
             </h2>
-            <p className="text-[11px] text-cyan-700 font-mono mt-0.5">PUT /api/v1/patients/{patient.id}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Actualización de datos generales del paciente</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
             <Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5" />
@@ -624,7 +614,7 @@ function ModalActualizarPaciente({
             <div>
               <label className="text-xs font-semibold text-slate-600 block mb-1">Ciudad</label>
               <select value={form.ciudad} onChange={set('ciudad')} className={`${inputCls} bg-white`}>
-                {CITY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                {Array.from(new Set(['Trujillo', form.ciudad].filter(Boolean))).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
@@ -667,7 +657,7 @@ function ModalActualizarPaciente({
             ) : (
               <div className="col-span-2 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
                 <p className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                  <span>🔒</span> Campos clínicos restringidos (Control G02)
+                  <span>🔒</span> Campos clínicos reservados para odontología
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                   Los datos clínicos no se modifican desde la ficha administrativa.
@@ -681,7 +671,7 @@ function ModalActualizarPaciente({
               Cancelar
             </button>
             <button type="submit" disabled={isSaving} className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-cyan-600/20 cursor-pointer">
-              {isSaving ? 'Guardando en PostgreSQL...' : 'Guardar cambios (PUT)'}
+              {isSaving ? 'Guardando...' : 'Guardar cambios'}
             </button>
           </div>
         </form>
@@ -759,10 +749,10 @@ function ModalVincularCuenta({
 
         <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-3 text-xs text-cyan-800 space-y-1">
           <p className="font-semibold flex items-center gap-1.5">
-            <span>🔗</span> Vinculación Explícita (F03-A / F03-B)
+            <span>🔗</span> Vinculación de Cuenta de Usuario
           </p>
           <p className="text-[11px] leading-relaxed text-cyan-700">
-            Vincula la ficha médica del paciente con su cuenta de autenticación de forma explícita sin equiparar <code>paciente.id</code> con <code>usuario.id</code>.
+            Permite que el paciente pueda acceder a su portal personal utilizando sus credenciales institucionales.
           </p>
         </div>
 
@@ -806,7 +796,7 @@ function ModalVincularCuenta({
 
         {/* Ingreso manual de ID decimal de usuario */}
         <div>
-          <label className="text-xs font-semibold text-slate-600 block mb-1">ID Decimal de Cuenta de Usuario</label>
+          <label className="text-xs font-semibold text-slate-600 block mb-1">Código de Usuario</label>
           <input
             value={usuarioIdInput}
             onChange={e => setUsuarioIdInput(e.target.value.replace(/\D/g, ''))}
@@ -882,10 +872,10 @@ function ModalDetallePaciente({
               <div className="flex items-center gap-2">
                 <h2 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>Ficha del Paciente</h2>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
-                  🐘 PostgreSQL Live
+                  Activo
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-mono">GET /api/v1/patients/{patient.id}</p>
+              <p className="text-xs text-slate-500">Expediente general del paciente</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
@@ -896,7 +886,7 @@ function ModalDetallePaciente({
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
             <div className="min-w-0 pr-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">ID Decimal String (PostgreSQL BIGINT)</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Código de Expediente</span>
               <code className="text-xs font-mono text-cyan-700 font-semibold truncate block">#{patient.id}</code>
             </div>
             <button
@@ -934,7 +924,7 @@ function ModalDetallePaciente({
                 patient.status === 'active' ? 'bg-emerald-100 text-emerald-700' :
                 patient.status === 'archived' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
               }`}>
-                {patient.status === 'active' ? 'ACTIVO' : patient.status === 'archived' ? 'ARCHIVADO (Baja lógica)' : 'INACTIVO'}
+                {patient.status === 'active' ? 'ACTIVO' : patient.status === 'archived' ? 'ARCHIVADO' : 'INACTIVO'}
               </span>
             </div>
             <div className="p-3 rounded-xl border border-slate-100 bg-white">
@@ -957,7 +947,7 @@ function ModalDetallePaciente({
                   <span>🔒</span> Datos Clínicos (Excluidos de Ficha Administrativa)
                 </span>
                 <span className="text-[10px] font-semibold bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-full">
-                  Control G02
+                  Perfil Administrativo
                 </span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
@@ -985,7 +975,7 @@ function ModalDetallePaciente({
 
           {/* Audit Trail */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/70">
-            <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Trazabilidad y Auditoría (Spring Data JPA)</h4>
+            <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Trazabilidad y Auditoría</h4>
             <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
               <div>
                 <span className="text-slate-400 block text-[11px]">Fecha Creación:</span>
@@ -1006,7 +996,7 @@ function ModalDetallePaciente({
             className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-white disabled:opacity-50 transition-colors shadow-sm"
           >
             <Icon d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className={`w-3.5 h-3.5 text-cyan-600 ${isReloading ? 'animate-spin' : ''}`} />
-            {isReloading ? 'Consultando GET /api/v1/patients/{id}...' : 'Refrescar desde PostgreSQL'}
+            {isReloading ? 'Actualizando datos...' : 'Actualizar ficha'}
           </button>
           <button
             onClick={onClose}
@@ -1056,10 +1046,10 @@ function ModalArchivarPaciente({
         </div>
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-1">
           <p className="font-semibold flex items-center gap-1.5">
-            <span>🛡️</span> Borrado lógico garantizado
+            <span>🛡️</span> Archivo de expediente
           </p>
           <p className="text-[11px] leading-relaxed text-amber-700">
-            Se ejecutará <code>PATCH /api/v1/patients/{patient.id}/archive</code> cambiando el estado a <strong>ARCHIVADO</strong> en PostgreSQL.
+            El expediente del paciente pasará a estado <strong>ARCHIVADO</strong> y no se mostrará en la agenda activa ni en búsquedas regulares.
           </p>
         </div>
         <div className="flex gap-2 justify-end pt-2">
@@ -1515,7 +1505,7 @@ function PatientDetail({
 
           <button
             onClick={() => setModal('detalle')}
-            title="Consultar ficha completa y auditoría (GET /api/v1/patients/{id})"
+            title="Consultar ficha completa y auditoría"
             className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 bg-white rounded-xl text-xs font-semibold hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
           >
             <Icon d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" className="w-3.5 h-3.5 text-cyan-600" />
@@ -1524,7 +1514,7 @@ function PatientDetail({
 
           <button
             onClick={() => setModal('editar')}
-            title="Actualizar datos del paciente (PUT /api/v1/patients/{id})"
+            title="Actualizar datos del paciente"
             className="flex items-center gap-1.5 px-3 py-1.5 border border-cyan-200 text-cyan-700 bg-cyan-50/70 rounded-xl text-xs font-semibold hover:bg-cyan-100/70 transition-colors shadow-sm cursor-pointer"
           >
             <Icon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" className="w-3.5 h-3.5 text-cyan-600" />
@@ -1533,7 +1523,7 @@ function PatientDetail({
 
           <button
             onClick={() => setModal('archivar')}
-            title="Baja lógica del paciente (PATCH /api/v1/patients/{id}/archive)"
+            title="Archivar expediente del paciente"
             className="flex items-center gap-1.5 px-3 py-1.5 border border-rose-200 text-rose-700 bg-rose-50/70 rounded-xl text-xs font-semibold hover:bg-rose-100/70 transition-colors shadow-sm cursor-pointer"
           >
             <Icon d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" className="w-3.5 h-3.5 text-rose-600" />
@@ -1627,7 +1617,7 @@ function PatientDetail({
             ) : (
               <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
                 <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <span>🔒</span> Ficha Administrativa Protegida (Control G02)
+                  <span>🔒</span> Ficha Administrativa Protegida
                 </p>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                   Los registros de historial clínico, alergias y prescripciones están reservados exclusivamente para el odontólogo autorizado.
@@ -1741,7 +1731,7 @@ export default function PacientePerfil() {
       }
     } catch (err: any) {
       console.error('Error al consultar /api/v1/patients:', err)
-      setFetchError(err.message || 'Error al conectar con la base de datos de pacientes')
+      setFetchError(err.message || 'Error al cargar la lista de pacientes')
     } finally {
       setIsLoading(false)
     }
@@ -1824,7 +1814,7 @@ export default function PacientePerfil() {
 
       setPatients(ps => [np, ...ps])
       setSelId(np.id)
-      showToast(`✓ Paciente registrado en PostgreSQL (ID: #${created.id})`)
+      showToast(`✓ Paciente registrado exitosamente (ID: #${created.id})`)
       setShowNewModal(false)
     } catch (err: any) {
       console.error('Error al registrar paciente:', err)
@@ -1858,7 +1848,7 @@ export default function PacientePerfil() {
           }
         })
       )
-      showToast(`✓ Paciente actualizado exitosamente en PostgreSQL (PUT /${id})`)
+      showToast(`✓ Paciente actualizado exitosamente`)
     } catch (err: any) {
       console.error(err)
       showToast(`⚠ Error al actualizar: ${err.message}`)
@@ -1879,7 +1869,7 @@ export default function PacientePerfil() {
           }
         })
       )
-      showToast(`✓ Paciente archivado en PostgreSQL (PATCH /${id}/archive)`)
+      showToast(`✓ Paciente archivado exitosamente`)
     } catch (err: any) {
       console.error(err)
       showToast(`⚠ Error al archivar: ${err.message}`)
@@ -1913,7 +1903,7 @@ export default function PacientePerfil() {
           }
         })
       )
-      showToast(`✓ Ficha recargada desde PostgreSQL (GET /${id})`)
+      showToast(`✓ Ficha actualizada exitosamente`)
     } catch (err: any) {
       console.error(err)
       showToast(`⚠ Error al recargar: ${err.message}`)
@@ -1949,7 +1939,7 @@ export default function PacientePerfil() {
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Pacientes</span>
           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            PostgreSQL Live
+            En línea
           </span>
         </div>
 
@@ -2023,7 +2013,7 @@ export default function PacientePerfil() {
               >
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-700 flex items-center justify-center text-white text-xs font-bold shrink-0 relative">
                   {p.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border border-white rounded-full" title="PostgreSQL Live"></span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border border-white rounded-full" title="En línea"></span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1">
@@ -2043,7 +2033,7 @@ export default function PacientePerfil() {
 
         <div className="px-4 py-2 border-t border-slate-100">
           <p className="text-[10px] text-slate-400">
-            {visible.length} de {patients.length} pacientes · {isOdontologo ? 'Proyección clínica autorizada' : 'Proyección administrativa (G02)'}
+            {visible.length} de {patients.length} pacientes · {isOdontologo ? 'Ficha clínica' : 'Ficha administrativa'}
           </p>
         </div>
       </aside>

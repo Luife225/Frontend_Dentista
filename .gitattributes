@@ -4,7 +4,7 @@
 # ---------------------------------------------------------------------------
 # Images & Graphics
 # ---------------------------------------------------------------------------
-*.png                filter=lfs diff=lfs merge=lfs -text
+# *.png is tracked as standard git binary for compatibility with cloud builders
 *.jpg                filter=lfs diff=lfs merge=lfs -text
 *.jpeg               filter=lfs diff=lfs merge=lfs -text
 *.gif                filter=lfs diff=lfs merge=lfs -text

@@ -41,12 +41,14 @@ export default function Dashboard() {
 
   // Formato de fecha en zona horaria Lima
   const todayFormatted = summary?.fechaHoyLima
-    ? new Date(summary.fechaHoyLima + 'T00:00:00').toLocaleDateString('es-PE', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
+    ? (summary.fechaHoyLima.includes(' de ')
+        ? summary.fechaHoyLima
+        : new Date(summary.fechaHoyLima + 'T00:00:00').toLocaleDateString('es-PE', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          }))
     : new Date().toLocaleDateString('es-PE', {
         weekday: 'long',
         day: 'numeric',

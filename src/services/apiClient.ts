@@ -51,6 +51,7 @@ export function triggerUnauthorized(): void {
 /** Construye cabeceras HTTP incluyendo Authorization: Bearer <token> si existe */
 export function getAuthHeaders(customHeaders: Record<string, string> = {}): HeadersInit {
   const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
     'Accept': 'application/json',
     ...customHeaders,
   };
@@ -59,7 +60,6 @@ export function getAuthHeaders(customHeaders: Record<string, string> = {}): Head
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-
   return headers;
 }
 
@@ -71,8 +71,10 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
   
   const headers = getAuthHeaders((options.headers as Record<string, string>) || {});
   
-  // Agregar Content-Type: application/json si hay body y no es FormData
-  if (options.body && !(options.body instanceof FormData) && !(headers as Record<string, string>)['Content-Type']) {
+  // Si el body es FormData, remover Content-Type para que el navegador genere boundary multipart automáticamente
+  if (options.body && options.body instanceof FormData) {
+    delete (headers as Record<string, string>)['Content-Type'];
+  } else if (options.body && !(headers as Record<string, string>)['Content-Type']) {
     (headers as Record<string, string>)['Content-Type'] = 'application/json';
   }
 

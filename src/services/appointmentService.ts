@@ -41,7 +41,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
     triggerUnauthorized()
   }
   if (!res.ok) {
-    let message = `Error ${res.status}: ${res.statusText}`
+    let message = res.statusText ? `Error ${res.status}: ${res.statusText}` : `Error HTTP ${res.status} al procesar la solicitud`
     let errors: Record<string, string> | undefined = undefined
     try {
       const errData = await res.json()
@@ -188,7 +188,7 @@ export async function createAppointment(payload: CreateAppointmentPayload): Prom
 
   const response = await fetch(`${API_BASE_URL}/citas`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   })
 
@@ -211,7 +211,7 @@ export async function updateStatus(
 
   const response = await fetch(`${API_BASE_URL}/citas/${encodeURIComponent(id)}/estado`, {
     method: 'PATCH',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       estado,
       motivoCancelacion: motivoCancelacion || undefined,
@@ -236,7 +236,7 @@ export async function markAttendance(
 
   const response = await fetch(`${API_BASE_URL}/citas/${encodeURIComponent(id)}/asistencia`, {
     method: 'PATCH',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       estadoAsistencia,
     }),
@@ -299,7 +299,7 @@ export async function createMyAppointment(payload: PatientAppointmentRequestPayl
 
   const response = await fetch(`${API_BASE_URL}/me/citas`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   })
 
@@ -321,7 +321,7 @@ export async function requestReschedule(
 
   const response = await fetch(`${API_BASE_URL}/citas/${encodeURIComponent(citaId)}/solicitar-reprogramacion`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   })
 
@@ -378,7 +378,7 @@ export async function resolveRescheduleRequest(
     `${API_BASE_URL}/citas/solicitudes-reprogramacion/${encodeURIComponent(solicitudId)}/resolver`,
     {
       method: 'PATCH',
-      headers: getAuthHeaders(),
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
     }
   )

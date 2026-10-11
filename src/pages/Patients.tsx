@@ -47,7 +47,7 @@ const DOC_CONFIG: Record<string, { maxLen: number; label: string; placeholder: s
 
 const BLOOD_TYPES = ['POR DETERMINAR', 'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 const INSURANCE_OPTIONS = ['PARTICULAR', 'EsSalud', 'SIS', 'Rímac EPS', 'Pacífico EPS', 'Mapfre EPS', 'Sanitas EPS', 'Otro']
-const CITY_OPTIONS = ['Lima', 'Callao', 'Arequipa', 'Trujillo', 'Chiclayo', 'Piura', 'Cusco', 'Otra']
+const CITY_OPTIONS = ['Trujillo']
 
 function getDobLimits() {
   const today = new Date()
@@ -81,7 +81,7 @@ export default function Patients() {
     correo: '',
     tipoSangre: 'POR DETERMINAR',
     seguro: 'PARTICULAR',
-    ciudad: 'Lima',
+    ciudad: 'Trujillo',
     alergias: '',
     antecedentesMedicos: '',
   })
@@ -310,7 +310,7 @@ export default function Patients() {
         correo: '',
         tipoSangre: 'POR DETERMINAR',
         seguro: 'PARTICULAR',
-        ciudad: 'Lima',
+        ciudad: 'Trujillo',
         alergias: '',
         antecedentesMedicos: '',
       })

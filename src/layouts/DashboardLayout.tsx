@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, type Role } from '../contexts/AuthContext'
+import { getUnreadCount } from '../services/notificationService'
 import AIAssistant from '../components/features/AIAssistant'
 import coronixLogo from '../imports/coronixLogoData'
 
@@ -79,7 +80,7 @@ const TITLES: Record<ModuleId, string> = {
   inventario:'Inventario', caja:'Caja y Reportes', consultorio:'Configuración',
 }
 
-const BADGE: Partial<Record<ModuleId, number>> = { notificaciones:1, inventario:3 }
+const STATIC_BADGES: Partial<Record<ModuleId, number>> = { inventario: 3 }
 
 // Map route path segments to module IDs
 const ROUTE_TO_MODULE: Record<string, ModuleId> = {
@@ -101,6 +102,26 @@ export default function DashboardLayout() {
   const location = useLocation()
   const [showAI, setShowAI] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0)
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const res = await getUnreadCount()
+      setUnreadNotifCount(res?.unreadCount || 0)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 15000)
+    window.addEventListener('coronyx:notifications-read', fetchUnread)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('coronyx:notifications-read', fetchUnread)
+    }
+  }, [fetchUnread, location.pathname])
 
   const savedRole = typeof window !== 'undefined' ? localStorage.getItem('coronyx_role') : null
   if (!role || !savedRole) return null
@@ -150,7 +171,9 @@ export default function DashboardLayout() {
               <div className="space-y-0.5">
                 {navItems.filter(n => n.group === group).map(item => {
                   const isActive = active === item.id
-                  const badge = BADGE[item.id]
+                  const badge = item.id === 'notificaciones'
+                    ? (unreadNotifCount > 0 ? unreadNotifCount : undefined)
+                    : STATIC_BADGES[item.id]
                   return (
                     <button key={item.id}
                       onClick={() => navigate(item.route)}

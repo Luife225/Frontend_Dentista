@@ -105,7 +105,7 @@ const DOC_CONFIG: Record<string, { maxLen: number; label: string; placeholder: s
 
 const BLOOD_TYPES = ['POR DETERMINAR', 'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
 const INSURANCE_OPTIONS = ['PARTICULAR', 'EsSalud', 'SIS', 'Rímac EPS', 'Pacífico EPS', 'Mapfre EPS', 'Sanitas EPS', 'Otro']
-const CITY_OPTIONS = ['Lima', 'Callao', 'Arequipa', 'Trujillo', 'Chiclayo', 'Piura', 'Cusco', 'Otra']
+const CITY_OPTIONS = ['Trujillo']
 
 function getTodayIsoDate() {
   const today = new Date()
@@ -140,7 +140,7 @@ const BLANK_FORM = (): PatientFormData => ({
   fechaNacimiento: '',
   telefono: '',
   correo: '',
-  ciudad: 'Lima',
+  ciudad: 'Trujillo',
   seguro: 'PARTICULAR',
   tipoSangre: 'POR DETERMINAR',
   alergias: '',
@@ -624,7 +624,7 @@ function ModalActualizarPaciente({
             <div>
               <label className="text-xs font-semibold text-slate-600 block mb-1">Ciudad</label>
               <select value={form.ciudad} onChange={set('ciudad')} className={`${inputCls} bg-white`}>
-                {CITY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                {Array.from(new Set(['Trujillo', form.ciudad].filter(Boolean))).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>

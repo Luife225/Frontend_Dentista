@@ -125,7 +125,7 @@ function ModalCrearUsuario({ onClose, onCreated }: ModalCrearProps) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70 shrink-0">
           <div>
             <h2 className="font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Crear nueva cuenta y membresía</h2>
-            <p className="text-[11px] text-cyan-700 font-mono mt-0.5">POST /api/v1/clinic/users</p>
+            <p className="text-xs text-slate-500 mt-0.5">Asigna acceso institucional y credenciales</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
             <Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5" />
@@ -220,7 +220,7 @@ function ModalCrearUsuario({ onClose, onCreated }: ModalCrearProps) {
                 value={form.pacienteId || ''}
                 onChange={setField('pacienteId')}
                 className={inputCls}
-                placeholder="Ej: 1 (Ficha de paciente en PostgreSQL)"
+                placeholder="Ej: 1 (Número de expediente)"
               />
               <p className="text-[11px] text-slate-400 mt-1">
                 El expediente debe pertenecer a tu clínica y estar sin cuenta. Si lo dejas vacío, vincúlalo después para habilitar el portal.
@@ -253,7 +253,7 @@ function ModalCrearUsuario({ onClose, onCreated }: ModalCrearProps) {
           <div className="flex items-start gap-2 bg-cyan-50 rounded-xl p-3 border border-cyan-200">
             <Icon d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" className="w-4 h-4 text-cyan-600 shrink-0 mt-0.5" />
             <p className="text-[11px] text-cyan-800">
-              La cuenta se creará en <code>usuario</code> y se asociará con membresía a su clínica actual en PostgreSQL con contraseña encriptada en BCrypt.
+              La cuenta se creará y se asociará a la clínica con credenciales seguras de acceso.
             </p>
           </div>
 
@@ -355,7 +355,7 @@ function ModalEditarUsuario({ user, onClose, onUpdated }: ModalEditarProps) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70 shrink-0">
           <div>
             <h2 className="font-bold text-slate-800" style={{ fontFamily: 'Outfit' }}>Editar usuario y membresía</h2>
-            <p className="text-[11px] text-cyan-700 font-mono mt-0.5">PUT /api/v1/clinic/users/{user.id}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Actualiza el rol o las credenciales del usuario</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
             <Icon d="M6 18L18 6M6 6l12 12" className="w-5 h-5" />
@@ -501,7 +501,7 @@ function TabUsuarios() {
       setUsers(data)
     } catch (err: any) {
       console.error('Error al cargar cuentas de clínica:', err)
-      setError(err.message || 'Error al conectar con /api/v1/clinic/users')
+      setError(err.message || 'Error al cargar los usuarios del consultorio')
     } finally {
       setIsLoading(false)
     }
@@ -525,8 +525,8 @@ function TabUsuarios() {
       setUsers(prev => prev.map(item => item.id === u.id ? updated : item))
       showToast(
         nextStatus === 'INACTIVO'
-          ? `✓ Cuenta de ${updated.nombres} desactivada en PostgreSQL. Sesión invalidada.`
-          : `✓ Cuenta de ${updated.nombres} activada en PostgreSQL.`
+          ? `✓ Cuenta de ${updated.nombres} desactivada exitosamente.`
+          : `✓ Cuenta de ${updated.nombres} activada exitosamente.`
       )
     } catch (err: any) {
       showToast(err.message || 'Error al cambiar estado de cuenta', 'error')
@@ -643,7 +643,7 @@ function TabUsuarios() {
       {isLoading ? (
         <div className="bg-white rounded-2xl border border-slate-100 p-8 text-center space-y-3">
           <Icon d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" className="w-6 h-6 text-cyan-600 animate-spin mx-auto" />
-          <p className="text-xs text-slate-500 font-medium">Consultando cuentas desde /api/v1/clinic/users en PostgreSQL...</p>
+          <p className="text-xs text-slate-500 font-medium">Cargando usuarios del sistema...</p>
         </div>
       ) : error ? (
         <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center space-y-3">
@@ -801,7 +801,7 @@ function TabClinica() {
     try {
       const updated = await updateClinicProfile(form)
       setClinic(updated)
-      setSuccess('✓ Datos del consultorio actualizados y persistidos en PostgreSQL con éxito.')
+      setSuccess('✓ Datos del consultorio actualizados con éxito.')
     } catch (err: any) {
       setError(err.message || 'Error al guardar los datos del consultorio')
     } finally {
@@ -813,7 +813,7 @@ function TabClinica() {
     return (
       <div className="p-12 text-center text-slate-400 space-y-2">
         <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-xs font-medium">Cargando datos del consultorio desde PostgreSQL...</p>
+        <p className="text-xs font-medium">Cargando datos del consultorio...</p>
       </div>
     )
   }
@@ -1005,7 +1005,7 @@ function TabHorarios() {
     try {
       const updated = await updateClinicSchedule(horarios)
       setHorarios(updated)
-      setSuccess('✓ Horarios de atención actualizados en PostgreSQL. Modifica inmediatamente los huecos disponibles en la agenda y rechaza reservas fuera de rango.')
+      setSuccess('✓ Horarios de atención actualizados con éxito. Los horarios de la agenda se han sincronizado.')
     } catch (err: any) {
       setError(err.message || 'Error al guardar configuración de horarios')
     } finally {

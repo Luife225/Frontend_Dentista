@@ -192,7 +192,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
 
       const updated = await saveOdontogramDraft(patientId, { hallazgos: hallazgosPayload })
       setVersion(updated)
-      showToast('✓ Borrador de odontograma guardado correctamente en PostgreSQL')
+      showToast('✓ Borrador de odontograma guardado correctamente')
     } catch (err: any) {
       showToast(err.message || 'Error al guardar borrador', true)
     } finally {

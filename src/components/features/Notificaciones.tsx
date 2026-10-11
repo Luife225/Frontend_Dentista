@@ -212,7 +212,7 @@ export default function Notificaciones() {
       {/* Loading */}
       {loading && !error && (
         <div className="p-12 text-center text-slate-400 font-medium animate-pulse bg-white rounded-xl border border-slate-100">
-          Consultando notificaciones registradas en la base de datos...
+          Cargando notificaciones...
         </div>
       )}
 

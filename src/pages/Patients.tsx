@@ -314,12 +314,12 @@ export default function Patients() {
         alergias: '',
         antecedentesMedicos: '',
       })
-      setToastMessage(`✓ Paciente guardado en PostgreSQL (ID: ${String(created.id).substring(0, 8)}...)`)
+      setToastMessage('✓ Paciente guardado exitosamente')
       setTimeout(() => setToastMessage(null), 4000)
     } catch (err: any) {
       console.error(err)
       const backendErrors = err.errors || err.response?.data?.errors
-      const msg = err.message || err.response?.data?.message || 'Error al registrar paciente (HTTP 400)'
+      const msg = err.message || err.response?.data?.message || 'Error al registrar paciente'
       if (backendErrors && typeof backendErrors === 'object' && Object.keys(backendErrors).length > 0) {
         setFieldErrors(backendErrors)
       }
@@ -348,18 +348,18 @@ export default function Patients() {
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
               <div>
                 <h2 className="font-bold text-slate-800" style={{fontFamily:'Outfit'}}>+ Nuevo Paciente</h2>
-                <p className="text-xs text-emerald-600 font-medium">Sincronizado con Spring Boot / PostgreSQL</p>
+                <p className="text-xs text-slate-500 font-medium">Ingresa los datos personales del paciente</p>
               </div>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             
             <form onSubmit={handleRegister} className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* API 400 Error banner */}
+              {/* Error banner */}
               {apiError && (
                 <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-rose-700">
                   <span className="text-rose-500 font-bold">⚠</span>
                   <div>
-                    <p className="font-semibold text-rose-800">Error HTTP 400 del Backend</p>
+                    <p className="font-semibold text-rose-800">No se pudo registrar al paciente</p>
                     <p className="mt-0.5">{apiError}</p>
                   </div>
                 </div>
@@ -591,7 +591,7 @@ export default function Patients() {
                   type="submit"
                   className="px-5 py-2 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 disabled:opacity-50"
                 >
-                  {isSaving ? 'Guardando...' : 'Registrar en PostgreSQL'}
+                  {isSaving ? 'Guardando...' : 'Registrar paciente'}
                 </button>
               </div>
             </form>
@@ -607,7 +607,7 @@ export default function Patients() {
               <h1 className="text-xl font-semibold text-slate-900" style={{fontFamily:'Outfit'}}>Pacientes</h1>
               {dbConnected && (
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  PostgreSQL 🐘
+                  En línea
                 </span>
               )}
             </div>
@@ -645,15 +645,12 @@ export default function Patients() {
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center text-white font-semibold text-sm shrink-0 relative" style={{fontFamily:'Outfit'}}>
                   {p.name.split(' ').map(n => n[0]).join('').slice(0,2)}
                   {p.isRealDb && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border border-white rounded-full" title="PostgreSQL"/>
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border border-white rounded-full" title="Paciente verificado"/>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-slate-800 text-sm">{p.name}</p>
-                    {p.isRealDb && (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded">BD</span>
-                    )}
                     <span className="text-xs text-slate-400">{p.age} años</span>
                     {p.status === 'inactive' && <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Inactivo</span>}
                   </div>

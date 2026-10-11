@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import coronixLogo from '../imports/coronixlogo.png'
+import coronixLogo from '../imports/coronixLogoData'
 import {
   getMyAppointments,
   createMyAppointment,

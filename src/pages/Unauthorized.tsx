@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getDefaultRouteForRole, getRoleLabel } from '../routes/routeHelpers'
-import coronixLogo from '../imports/coronixlogo.png'
+import coronixLogo from '../imports/coronixLogoData'
 
 export default function Unauthorized() {
   const { role, user, logout } = useAuth()

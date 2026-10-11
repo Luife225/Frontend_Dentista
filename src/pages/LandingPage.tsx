@@ -5,7 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { useGSAP } from '@gsap/react'
 import { useAuth } from '../contexts/AuthContext'
 import { getDefaultRouteForRole } from '../routes/routeHelpers'
-import coronixLogo from '../imports/coronixlogo.png'
+import coronixLogo from '../imports/coronixLogoData'
 
 // Registro oficial de plugins GSAP
 gsap.registerPlugin(ScrollTrigger)

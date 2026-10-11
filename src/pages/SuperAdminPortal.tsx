@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import coronixLogo from '../imports/coronixlogo.png'
+import coronixLogo from '../imports/coronixLogoData'
 
 
 type Section = 'overview' | 'clinicas' | 'solicitudes' | 'ingresos' | 'logs'

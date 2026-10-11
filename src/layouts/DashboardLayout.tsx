@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, type Role } from '../contexts/AuthContext'
 import AIAssistant from '../components/features/AIAssistant'
-import coronixLogo from '../imports/coronixlogo.png'
+import coronixLogo from '../imports/coronixLogoData'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ import { useGSAP } from '@gsap/react'
 import { useAuth } from '../contexts/AuthContext'
 import { loginWithApi } from '../services/authService'
 import { getDefaultRouteForRole } from '../routes/routeHelpers'
-import coronixLogo from '../imports/coronixlogo.png'
+import coronixLogo from '../imports/coronixLogoData'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Role = 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE'

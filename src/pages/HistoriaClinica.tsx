@@ -153,6 +153,7 @@ function ModalEncounterForm({
   isEditing,
   patientName,
   initialData,
+  citaId,
   onSaveDraft,
   onConfirmDirect,
   onClose,
@@ -161,6 +162,7 @@ function ModalEncounterForm({
   isEditing: boolean
   patientName: string
   initialData?: FormState
+  citaId?: string
   onSaveDraft: (data: FormState) => Promise<void>
   onConfirmDirect: (data: FormState) => Promise<void>
   onClose: () => void
@@ -199,9 +201,16 @@ function ModalEncounterForm({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div>
-            <h2 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
-              {isEditing ? 'Editar borrador de atención clínica' : 'Nueva atención clínica'}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
+                {isEditing ? 'Editar borrador de atención clínica' : 'Nueva atención clínica'}
+              </h2>
+              {citaId && (
+                <span className="text-[10px] font-mono bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-0.5 rounded-full font-bold">
+                  Cita #{citaId}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">Paciente: {patientName}</p>
           </div>
           <button
@@ -282,85 +291,85 @@ function ModalEncounterForm({
           {/* Diagnóstico */}
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
-              Diagnóstico (CIE-10 / Diagnóstico Odontológico) *
+              Diagnóstico Estomatológico (CIE-10 / Diagnóstico Dental) *
             </label>
             <input
               value={form.diagnostico}
               onChange={setF('diagnostico')}
               placeholder="Ej. K02.1 Caries de la dentina en pieza 36, Pulpitis irreversible..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 font-medium text-slate-800"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium text-slate-800"
             />
           </div>
 
           {/* Examen Clínico */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Examen clínico intraoral / extraoral</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Examen Clínico Estomatológico (Intraoral / Extraoral)</label>
             <textarea
               value={form.examenClinico}
               onChange={setF('examenClinico')}
               rows={2}
-              placeholder="Hallazgos clínicos, percusión, movilidad, estado periodontal..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              placeholder="Hallazgos clínicos, percusión, movilidad, estado periodontal, mucosa..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
             />
           </div>
 
           {/* Procedimientos */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Procedimientos realizados</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Procedimientos Realizados y Tratamiento Dental</label>
             <textarea
               value={form.procedimientos}
               onChange={setF('procedimientos')}
               rows={2}
               placeholder="Apertura cavitaria, grabado ácido, colocación de resina, curetaje..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
             />
           </div>
 
           {/* Plan de Tratamiento */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Plan de tratamiento</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Plan de Tratamiento Odontológico</label>
             <textarea
               value={form.planTratamiento}
               onChange={setF('planTratamiento')}
               rows={2}
-              placeholder="Fases posteriores, controles, profilaxis..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              placeholder="Fases posteriores, controles, profilaxis periódica..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
             />
           </div>
 
           {/* Recetas & Indicaciones */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Recetas / Prescripciones</label>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Prescripción Farmacológica (Receta Médica)</label>
               <textarea
                 value={form.recetasPrescripciones}
                 onChange={setF('recetasPrescripciones')}
                 rows={2}
-                placeholder="Fármacos, posología y duración..."
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+                placeholder="Fármacos, posología y duración del tratamiento..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Indicaciones al paciente</label>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Recomendaciones y Cuidados Post-Operatorios</label>
               <textarea
                 value={form.indicaciones}
                 onChange={setF('indicaciones')}
                 rows={2}
-                placeholder="Cuidados post-operatorios, dieta, higiene..."
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+                placeholder="Cuidados post-operatorios, dieta, higiene bucal..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
               />
             </div>
           </div>
 
           {/* Evolución */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Evolución clínica</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Anamnesis y Evolución del Paciente</label>
             <textarea
               value={form.evolucion}
               onChange={setF('evolucion')}
               rows={2}
-              placeholder="Respuesta del paciente, tolerancia a anestesia, comentarios de evolución..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              placeholder="Respuesta del paciente, tolerancia a anestesia, motivo de consulta referido..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
             />
           </div>
         </div>
@@ -491,52 +500,52 @@ function ModalCorrectionForm({
           )}
 
           <div>
-            <label className="text-xs font-semibold text-slate-700 block mb-1">Diagnóstico corregido *</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Diagnóstico Estomatológico Corregido *</label>
             <input
               value={form.diagnostico}
               onChange={setF('diagnostico')}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30 font-medium"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Procedimientos corregidos / complementarios</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Procedimientos Realizados Corregidos / Complementarios</label>
             <textarea
               value={form.procedimientos}
               onChange={setF('procedimientos')}
               rows={2}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Nota de evolución y justificación de la corrección</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Evolución Clínica y Justificación de la Nueva Versión</label>
             <textarea
               value={form.evolucion}
               onChange={setF('evolucion')}
               rows={2}
               placeholder="Describa el motivo o precisión clínica de esta nueva versión..."
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Recetas actualizadas</label>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Prescripción Farmacológica Actualizada</label>
               <textarea
                 value={form.recetasPrescripciones}
                 onChange={setF('recetasPrescripciones')}
                 rows={2}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Indicaciones actualizadas</label>
+              <label className="text-xs font-semibold text-slate-700 block mb-1">Recomendaciones y Cuidados Actualizados</label>
               <textarea
                 value={form.indicaciones}
                 onChange={setF('indicaciones')}
                 rows={2}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none"
+                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/30"
               />
             </div>
           </div>
@@ -650,14 +659,14 @@ function ModalImprimir({
           )}
 
           {[
-            ['Motivo de consulta', v?.motivoConsulta],
-            ['Examen clínico', v?.examenClinico],
-            ['Diagnóstico dental', v?.diagnostico],
-            ['Procedimientos realizados', v?.procedimientos],
-            ['Plan de tratamiento', v?.planTratamiento],
-            ['Recetas y prescripciones', v?.recetasPrescripciones],
-            ['Indicaciones al paciente', v?.indicaciones],
-            ['Evolución clínica', v?.evolucion],
+            ['Motivo de Consulta y Anamnesis', v?.motivoConsulta],
+            ['Examen Clínico Estomatológico', v?.examenClinico],
+            ['Diagnóstico Estomatológico (CIE-10)', v?.diagnostico],
+            ['Procedimientos Realizados y Tratamiento Dental', v?.procedimientos],
+            ['Plan de Tratamiento Odontológico', v?.planTratamiento],
+            ['Prescripción Farmacológica (Receta Médica)', v?.recetasPrescripciones],
+            ['Recomendaciones y Cuidados Post-Operatorios', v?.indicaciones],
+            ['Anamnesis y Evolución del Paciente', v?.evolucion],
           ].filter(([, val]) => val).map(([label, val]) => (
             <div key={label} className="border-b border-slate-100 pb-2">
               <p className="font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-0.5">{label}</p>
@@ -686,10 +695,14 @@ export default function HistoriaClinica({
   initialPatientId,
   patientName: propPatientName,
   patientDoc: propPatientDoc,
+  initialCitaId,
+  autoOpenNew,
 }: {
   initialPatientId?: string
   patientName?: string
   patientDoc?: string
+  initialCitaId?: string
+  autoOpenNew?: boolean
 }) {
   const { role } = useAuth()
   const isOdontologo = role === 'ODONTOLOGO'
@@ -702,6 +715,13 @@ export default function HistoriaClinica({
   const [encounters, setEncounters] = useState<ClinicalEncounterDto[]>([])
   const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(null)
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
+  // Si viene con autoOpenNew o una cita específica, abrir el formulario de atención automáticamente
+
+  useEffect(() => {
+    if (autoOpenNew && isOdontologo) {
+      setModal('new')
+    }
+  }, [autoOpenNew, isOdontologo])
 
   // Estados de interfaz y modales
   const [loading, setLoading] = useState(false)
@@ -736,11 +756,16 @@ export default function HistoriaClinica({
       const list = await getEncountersByPatient(patientId)
       setEncounters(list)
       if (list.length > 0) {
-        // Seleccionar la más reciente o conservar selección si aún existe
+        // Si viene un initialCitaId, priorizar el encuentro que corresponde a esa cita
+        const byCita = initialCitaId ? list.find(e => String(e.citaId) === String(initialCitaId)) : undefined
         const existing = list.find(e => e.id === selectedEncounterId)
-        const active = existing || list[0]
+        const active = byCita || existing || list[0]
         setSelectedEncounterId(active.id)
         setSelectedVersionId(active.versionActual?.id || null)
+
+        if (byCita && byCita.estado === 'BORRADOR' && autoOpenNew) {
+          setModal('edit')
+        }
       } else {
         setSelectedEncounterId(null)
         setSelectedVersionId(null)
@@ -801,6 +826,7 @@ export default function HistoriaClinica({
     try {
       const payload: CreateClinicalEncounterPayload = {
         pacienteId: selectedPatientId,
+        citaId: initialCitaId || undefined,
         motivoConsulta: form.motivoConsulta,
         examenClinico: form.examenClinico,
         diagnostico: form.diagnostico,
@@ -831,6 +857,7 @@ export default function HistoriaClinica({
     try {
       const payload: CreateClinicalEncounterPayload = {
         pacienteId: selectedPatientId,
+        citaId: initialCitaId || undefined,
         motivoConsulta: form.motivoConsulta,
         examenClinico: form.examenClinico,
         diagnostico: form.diagnostico,
@@ -949,6 +976,7 @@ export default function HistoriaClinica({
         <ModalEncounterForm
           isEditing={false}
           patientName={currentPatientName}
+          citaId={initialCitaId}
           onSaveDraft={handleCreateDraft}
           onConfirmDirect={handleCreateAndConfirm}
           onClose={() => setModal(null)}
@@ -960,6 +988,7 @@ export default function HistoriaClinica({
         <ModalEncounterForm
           isEditing={true}
           patientName={currentPatientName}
+          citaId={activeEncounter.citaId ? String(activeEncounter.citaId) : initialCitaId}
           initialData={versionToForm(activeEncounter.versionActual)}
           onSaveDraft={handleUpdateDraft}
           onConfirmDirect={async form => {
@@ -1059,18 +1088,16 @@ export default function HistoriaClinica({
                     setSelectedEncounterId(e.id)
                     setSelectedVersionId(e.versionActual?.id || null)
                   }}
-                  className={`w-full text-left px-4 py-3 border-b border-slate-50 transition-all cursor-pointer ${
-                    isActive ? 'bg-cyan-50/80 border-l-2 border-l-cyan-600' : 'hover:bg-slate-50'
-                  }`}
+                  className={`w-full text-left px-4 py-3 border-b border-slate-50 transition-all cursor-pointer ${isActive ? 'bg-cyan-50/80 border-l-2 border-l-cyan-600' : 'hover:bg-slate-50'
+                    }`}
                 >
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <span className="text-xs font-bold text-slate-700">
                       {fmtDate(e.fechaCreacion)}
                     </span>
                     <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                        isConfirmado ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
-                      }`}
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isConfirmado ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+                        }`}
                     >
                       {isConfirmado ? '✓ Confirmado' : 'Borrador'}
                     </span>
@@ -1110,11 +1137,10 @@ export default function HistoriaClinica({
                     {activeVersion?.motivoConsulta || activeVersion?.diagnostico || 'Atención Clínica'}
                   </h3>
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      activeEncounter.estado === 'CONFIRMADO'
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeEncounter.estado === 'CONFIRMADO'
                         ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                         : 'bg-amber-100 text-amber-800 border border-amber-200'
-                    }`}
+                      }`}
                   >
                     {activeEncounter.estado === 'CONFIRMADO' ? '✓ CONFIRMADO' : 'BORRADOR PENDIENTE'}
                   </span>
@@ -1185,11 +1211,10 @@ export default function HistoriaClinica({
                     <button
                       key={v.id}
                       onClick={() => setSelectedVersionId(v.id)}
-                      className={`px-3 py-1 text-xs rounded-xl font-semibold transition-all cursor-pointer shrink-0 ${
-                        isSel
+                      className={`px-3 py-1 text-xs rounded-xl font-semibold transition-all cursor-pointer shrink-0 ${isSel
                           ? 'bg-cyan-600 text-white shadow-2xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
+                        }`}
                     >
                       v{v.numeroVersion} {v.estaConfirmado ? '✓' : '(Borrador)'}
                       {v.versionAnteriorId ? ` ↰ v${v.numeroVersion - 1}` : ''}
@@ -1221,14 +1246,14 @@ export default function HistoriaClinica({
 
               {/* Secciones Clínicas Principales */}
               {[
-                { title: 'Motivo de Consulta', content: activeVersion?.motivoConsulta, color: '#0B3D3A' },
-                { title: 'Diagnóstico Dental (CIE-10)', content: activeVersion?.diagnostico, color: '#DC2626' },
-                { title: 'Examen Clínico', content: activeVersion?.examenClinico, color: '#7C3AED' },
-                { title: 'Procedimientos Realizados', content: activeVersion?.procedimientos, color: '#1E8C82' },
-                { title: 'Plan de Tratamiento', content: activeVersion?.planTratamiento, color: '#D97706' },
-                { title: 'Recetas y Prescripciones', content: activeVersion?.recetasPrescripciones, color: '#0369A1' },
-                { title: 'Indicaciones al Paciente', content: activeVersion?.indicaciones, color: '#2563EB' },
-                { title: 'Evolución Clínica', content: activeVersion?.evolucion, color: '#475569' },
+                { title: 'Motivo de Consulta y Anamnesis', content: activeVersion?.motivoConsulta, color: '#0B3D3A' },
+                { title: 'Diagnóstico Estomatológico (CIE-10)', content: activeVersion?.diagnostico, color: '#DC2626' },
+                { title: 'Examen Clínico Estomatológico', content: activeVersion?.examenClinico, color: '#7C3AED' },
+                { title: 'Procedimientos Realizados y Tratamiento Dental', content: activeVersion?.procedimientos, color: '#1E8C82' },
+                { title: 'Plan de Tratamiento Odontológico', content: activeVersion?.planTratamiento, color: '#D97706' },
+                { title: 'Prescripción Farmacológica (Receta Médica)', content: activeVersion?.recetasPrescripciones, color: '#0369A1' },
+                { title: 'Recomendaciones y Cuidados Post-Operatorios', content: activeVersion?.indicaciones, color: '#2563EB' },
+                { title: 'Anamnesis y Evolución del Paciente', content: activeVersion?.evolucion, color: '#475569' },
               ].filter(item => item.content).map(item => (
                 <div key={item.title} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-2xs">
                   <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: item.color, fontFamily: 'Outfit' }}>

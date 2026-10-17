@@ -241,52 +241,67 @@ export default function Login() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // FORGOT PASSWORD SCREEN
+  // FORGOT PASSWORD SCREEN (Light Mode)
   // ─────────────────────────────────────────────────────────────────────────
   if (forgot) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm fade-in">
-          <div className="flex items-center gap-3 mb-8">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/20 to-sky-50/40 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="flex items-center gap-3 mb-8 justify-center">
             <img src={coronixLogo} alt="CORONYX" className="w-12 h-12 object-contain shrink-0"/>
             <div>
-              <p className="text-white text-xl font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
-              <p className="text-xs" style={{color:'#5FC9BE'}}>Sistema Dental</p>
+              <p className="text-slate-900 text-xl font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
+              <p className="text-xs font-semibold text-teal-700">Sistema Odontológico</p>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-white/8 rounded-2xl p-8 shadow-2xl">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-8 shadow-xl shadow-slate-200/50">
             {forgotSent ? (
               <div className="text-center">
-                <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
                   </svg>
                 </div>
-                <h2 className="text-white font-semibold text-lg mb-2" style={{fontFamily:'Outfit'}}>Revisa tu correo</h2>
-                <p className="text-white/50 text-sm mb-6">
-                  Enviamos instrucciones a <span className="text-white/80">{email}</span>
+                <h2 className="text-slate-900 font-semibold text-lg mb-2" style={{fontFamily:'Outfit'}}>Revisa tu correo</h2>
+                <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                  Enviamos instrucciones a <span className="text-slate-800 font-medium">{email}</span>
                 </p>
-                <button onClick={() => { setForgot(false); setForgotSent(false) }}
-                  className="w-full py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => { setForgot(false); setForgotSent(false) }}
+                  className="w-full py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-sm cursor-pointer"
+                >
                   Volver al login
                 </button>
               </div>
             ) : (
               <>
-                <h2 className="text-white font-semibold text-xl mb-1" style={{fontFamily:'Outfit'}}>Recuperar contraseña</h2>
-                <p className="text-white/40 text-sm mb-6">Ingresa tu email y te enviaremos el enlace</p>
+                <h2 className="text-slate-900 font-bold text-xl mb-1" style={{fontFamily:'Outfit'}}>Recuperar contraseña</h2>
+                <p className="text-slate-500 text-sm mb-6">Ingresa tu correo y te enviaremos el enlace</p>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-xs text-white/50 font-medium block mb-1.5">Email</label>
-                    <input value={email} onChange={e => setEmail(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50" />
+                    <label className="text-xs text-slate-700 font-semibold block mb-1.5">Correo electrónico</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="usuario@coronyx.pe"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-600 transition-all"
+                    />
                   </div>
-                  <button onClick={() => setForgotSent(true)}
-                    className="w-full py-2.5 bg-cyan-600 text-white rounded-xl text-sm font-semibold hover:bg-cyan-500 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => setForgotSent(true)}
+                    className="w-full py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-sm cursor-pointer"
+                  >
                     Enviar instrucciones
                   </button>
-                  <button onClick={() => setForgot(false)} className="w-full text-center text-sm text-white/40 hover:text-white/70 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => setForgot(false)}
+                    className="w-full text-center text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                  >
                     Volver al login
                   </button>
                 </div>
@@ -299,94 +314,119 @@ export default function Login() {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // MAIN LOGIN SCREEN (Clean Minimal 2-field card from origin/main)
+  // MAIN LOGIN SCREEN (Light Mode Clínico Profesional)
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div ref={containerRef} className="min-h-screen bg-slate-950 flex">
+    <div ref={containerRef} className="min-h-screen bg-gradient-to-br from-slate-50 via-teal-50/15 to-sky-50/25 flex">
 
       {/* ── Left branding panel ──────────────────────────────────────────── */}
       <div
-        className="hidden lg:flex flex-col justify-between w-[340px] border-r border-white/5 p-10 shrink-0"
-        style={{ background: 'linear-gradient(to bottom, #0B3D3A, #062422)' }}
+        className="hidden lg:flex flex-col justify-between w-[380px] p-10 shrink-0 text-white shadow-xl relative overflow-hidden"
+        style={{ background: 'linear-gradient(145deg, #0B3D3A 0%, #082927 50%, #031716 100%)' }}
       >
-        <div>
+        <div className="relative z-10">
           {/* Logo */}
-          <div ref={logoRef} className="flex items-center gap-3 mb-12">
-            <img src={coronixLogo} alt="CORONYX" className="w-14 h-14 object-contain shrink-0"/>
+          <div ref={logoRef} className="flex items-center gap-3 mb-10">
+            <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-xs flex items-center justify-center p-2.5 border border-white/15">
+              <img src={coronixLogo} alt="CORONYX" className="w-full h-full object-contain"/>
+            </div>
             <div>
-              <p className="text-white text-xl font-bold tracking-wide leading-tight" style={{fontFamily:'Outfit'}}>CORONYX</p>
-              <p className="text-xs" style={{color:'#5FC9BE'}}>Sistema Dental</p>
+              <p className="text-white text-2xl font-extrabold tracking-wide leading-tight" style={{fontFamily:'Outfit'}}>CORONYX</p>
+              <p className="text-xs font-medium tracking-wide text-teal-300">Sistema Odontológico</p>
             </div>
           </div>
 
           {/* Title */}
-          <h1 ref={titleRef} className="text-white text-3xl font-bold leading-tight mb-4" style={{fontFamily:'Outfit'}}>
-            Gestión clínica odontológica
+          <h1 ref={titleRef} className="text-white text-3xl font-extrabold leading-snug mb-4" style={{fontFamily:'Outfit'}}>
+            Gestión clínica <br/>y dental integral
           </h1>
 
           {/* Paragraph */}
-          <p ref={paraRef} className="text-white/40 text-sm leading-relaxed mb-8">
-            Plataforma integral para gestión odontológica: agenda clínica, expedientes de pacientes, historia médica inmutable, odontograma interactivo y documentos de atención.
+          <p ref={paraRef} className="text-white/70 text-sm leading-relaxed mb-8 font-normal">
+            Plataforma para consultorios y clínicas dentales: agenda en tiempo real, expedientes seguros, historia clínica inmutable, odontograma interactivo y portal de pacientes.
           </p>
 
           {/* Role list */}
           <div className="space-y-3 mb-10">
             {ROLE_FEATURES.map(r => (
-              <div key={r.label} data-role-item className="flex items-center gap-3 text-sm text-white/40">
-                <span className="text-base">{r.icon}</span>
+              <div
+                key={r.label}
+                data-role-item
+                className="flex items-center gap-3.5 p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+              >
+                <span className="text-xl shrink-0">{r.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <span className="text-white/60">{r.label}</span>
-                  <span className="text-white/30"> — {r.desc}</span>
+                  <span className="text-white font-semibold text-xs block">{r.label}</span>
+                  <span className="text-white/60 text-xs">{r.desc}</span>
                 </div>
               </div>
             ))}
           </div>
-
         </div>
 
-        <p className="text-white/20 text-xs">CORONYX v2.0 · Multi-sede Enterprise</p>
+        <div className="relative z-10 pt-6 border-t border-white/10 flex items-center justify-between text-xs text-white/40">
+          <span>CORONYX Enterprise</span>
+          <span>v2.0 · Multi-sede</span>
+        </div>
       </div>
 
       {/* ── Right form panel ─────────────────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
         <div ref={cardRef} className="w-full max-w-md">
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <img src={coronixLogo} alt="CORONYX" className="w-10 h-10 object-contain shrink-0"/>
+          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
+            <img src={coronixLogo} alt="CORONYX" className="w-12 h-12 object-contain shrink-0"/>
             <div>
-              <p className="text-white text-lg font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
-              <p className="text-xs" style={{color:'#5FC9BE'}}>Sistema Dental</p>
+              <p className="text-slate-900 text-xl font-bold tracking-wide" style={{fontFamily:'Outfit'}}>CORONYX</p>
+              <p className="text-xs font-semibold text-teal-700">Sistema Dental</p>
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-white/8 rounded-2xl p-8 shadow-2xl">
-            <h2 className="text-white text-2xl font-semibold mb-1" style={{fontFamily:'Outfit'}}>Bienvenido</h2>
-            <p className="text-white/40 text-sm mb-7">Ingresa con tu correo y contraseña</p>
+          {/* Form Card */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/50">
+            <div className="mb-8">
+              <span className="inline-block px-3 py-1 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200/60 mb-2">
+                Acceso Clínico Autorizado
+              </span>
+              <h2 className="text-slate-900 text-2xl font-bold tracking-tight" style={{fontFamily:'Outfit'}}>Bienvenido</h2>
+              <p className="text-slate-500 text-sm mt-1">Ingresa tus credenciales para acceder a la plataforma</p>
+            </div>
 
-            <form onSubmit={handleLogin} className="space-y-4" onKeyDown={handleKeyDown}>
+            <form onSubmit={handleLogin} className="space-y-5" onKeyDown={handleKeyDown}>
 
               {/* ── Email input ─────────────────────────────────────────── */}
               <div>
-                <label className="text-xs text-white/50 font-medium block mb-1.5">Correo electrónico</label>
-                <input
-                  ref={emailInputRef}
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={e => { setEmail(e.target.value); setError('') }}
-                  onFocus={() => handleInputFocus(emailInputRef.current)}
-                  onBlur={() => handleInputBlur(emailInputRef.current)}
-                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none transition-colors"
-                  placeholder="usuario@coronyx.pe"
-                />
+                <label className="text-xs text-slate-700 font-semibold block mb-1.5">Correo electrónico</label>
+                <div className="relative">
+                  <input
+                    ref={emailInputRef}
+                    type="email"
+                    name="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError('') }}
+                    onFocus={() => handleInputFocus(emailInputRef.current)}
+                    onBlur={() => handleInputBlur(emailInputRef.current)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-slate-900 text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-600 transition-all shadow-2xs"
+                    placeholder="usuario@coronyx.pe"
+                  />
+                </div>
               </div>
 
               {/* ── Password input ──────────────────────────────────────── */}
               <div>
-                <label className="text-xs text-white/50 font-medium block mb-1.5">Contraseña</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs text-slate-700 font-semibold">Contraseña</label>
+                  <button
+                    type="button"
+                    onClick={() => setForgot(true)}
+                    className="text-xs text-teal-700 hover:text-teal-800 font-medium transition-colors cursor-pointer"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
                 <input
                   ref={passwordInputRef}
                   type="password"
@@ -397,26 +437,20 @@ export default function Login() {
                   onChange={e => { setPassword(e.target.value); setError('') }}
                   onFocus={() => handleInputFocus(passwordInputRef.current)}
                   onBlur={() => handleInputBlur(passwordInputRef.current)}
-                  className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-white/20 focus:outline-none transition-colors"
+                  className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-slate-900 text-sm placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/25 focus:border-teal-600 transition-all shadow-2xs"
                   placeholder="••••••••"
                 />
               </div>
 
               {/* Error message */}
               {error && (
-                <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2.5">
-                  <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center gap-2.5 bg-rose-50 border border-rose-200 rounded-xl px-3.5 py-3 text-rose-700">
+                  <svg className="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
                   </svg>
-                  <p className="text-xs text-rose-300">{error}</p>
+                  <p className="text-xs font-medium">{error}</p>
                 </div>
               )}
-
-              <div className="flex justify-end">
-                <button type="button" onClick={() => setForgot(true)} className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors">
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
 
               {/* ── Login button ────────────────────────────────────────── */}
               <button
@@ -425,7 +459,7 @@ export default function Login() {
                 onMouseEnter={handleBtnEnter}
                 onMouseLeave={handleBtnLeave}
                 disabled={loading}
-                className="w-full py-3 bg-cyan-600 text-white rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2 hover:bg-cyan-500 transition-colors cursor-pointer"
+                className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-semibold text-sm disabled:opacity-60 flex items-center justify-center gap-2 transition-all shadow-md shadow-teal-600/20 hover:shadow-teal-600/30 cursor-pointer"
                 style={{ willChange: 'transform' }}
               >
                 {loading ? (
@@ -435,15 +469,15 @@ export default function Login() {
                       className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                       style={{ willChange: 'transform' }}
                     />
-                    Verificando acceso...
+                    <span>Verificando acceso...</span>
                   </>
-                ) : 'Ingresar'}
+                ) : <span>Ingresar a la Plataforma</span>}
               </button>
             </form>
           </div>
 
-          <p className="text-center text-xs text-white/15 mt-5">
-            CORONYX Enterprise · Multi-sede · v2.0
+          <p className="text-center text-xs text-slate-400 mt-6">
+            CORONYX Dental Enterprise · Sesión Segura y Cifrada
           </p>
         </div>
       </div>

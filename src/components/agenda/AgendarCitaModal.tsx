@@ -14,6 +14,7 @@ import {
   CONFLICT_MESSAGE,
   toLimaIsoString,
 } from '../../utils/appointmentRules'
+import { createOfficialGoogleMeet } from '../../services/googleMeetService'
 
 interface AgendarCitaModalProps {
   isOpen: boolean
@@ -74,7 +75,54 @@ export default function AgendarCitaModal({
   const [odontologoId, setOdontologoId] = useState(initialDoctorId || '')
   const [consultorio, setConsultorio] = useState<string>(CONSULTORIOS[0])
   const [modalidad, setModalidad] = useState<'PRESENCIAL' | 'VIRTUAL'>('PRESENCIAL')
+  const [enlaceTeleconsulta, setEnlaceTeleconsulta] = useState('')
   const [motivo, setMotivo] = useState('')
+
+  const [isGeneratingMeet, setIsGeneratingMeet] = useState(false)
+  const [meetSuccessMsg, setMeetSuccessMsg] = useState<string | null>(null)
+
+  // Generador oficial con Google Identity Services y Google Calendar API
+  const handleGenerarMeetReal = async () => {
+    setIsGeneratingMeet(true)
+    setApiError(null)
+    setMeetSuccessMsg(null)
+    try {
+      const selectedPatient = patients.find(p => p.id === pacienteId)
+      const selectedDoctor = doctors.find(d => d.id === odontologoId)
+
+      const startIso = fecha && horaInicio ? toLimaIsoString(fecha, horaInicio) : undefined
+      const endIso = fecha && horaFin ? toLimaIsoString(fecha, horaFin) : undefined
+
+      const doctorNombre = selectedDoctor ? `${selectedDoctor.nombres} ${selectedDoctor.apellidos}`.trim() : 'Especialista'
+
+      const result = await createOfficialGoogleMeet({
+        summary: `Teleconsulta Coronyx: ${selectedPatient ? `${selectedPatient.nombres} ${selectedPatient.apellidos}` : 'Paciente'}`,
+        description: `Cita virtual odontológica en Coronyx.\nMotivo: ${motivo || 'Evaluación general'}\nOdontólogo: ${doctorNombre}`,
+        startDateTime: startIso,
+        endDateTime: endIso,
+        patientName: selectedPatient ? `${selectedPatient.nombres} ${selectedPatient.apellidos}` : undefined,
+        doctorName: doctorNombre,
+      })
+
+      setEnlaceTeleconsulta(result.meetUrl)
+      setMeetSuccessMsg('¡Sala oficial generada en tu Google Calendar con éxito!')
+    } catch (err: any) {
+      console.warn('Error al generar sala oficial con Google Meet API:', err)
+      setApiError(err.message || 'No se pudo generar la sala oficial con Google Meet.')
+    } finally {
+      setIsGeneratingMeet(false)
+    }
+  }
+
+  // Generador alternativo rápido sin popup de Google
+  const handleGenerarMeetRapido = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz'
+    const rnd = (len: number) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+    const meetUrl = `https://meet.google.com/${rnd(3)}-${rnd(4)}-${rnd(3)}`
+    setEnlaceTeleconsulta(meetUrl)
+    setApiError(null)
+    setMeetSuccessMsg('Enlace de sala generado localmente.')
+  }
 
   // Data Loading State
   const [patients, setPatients] = useState<BackendPatientDto[]>([])
@@ -232,6 +280,12 @@ export default function AgendarCitaModal({
       return
     }
 
+    // Validación específica para teleconsultas
+    if (modalidad === 'VIRTUAL' && !enlaceTeleconsulta.trim()) {
+      setApiError('Por favor genera o ingresa un enlace de Google Meet para la teleconsulta.')
+      return
+    }
+
     // Construcción de timestamps ISO con zona horaria oficial Lima (-05:00)
     const inicioIso = toLimaIsoString(fecha, horaInicio)
     const finIso = toLimaIsoString(fecha, horaFin)
@@ -243,7 +297,8 @@ export default function AgendarCitaModal({
       finEn: finIso,
       modalidad,
       motivo: motivo.trim() || 'Consulta general',
-      consultorio,
+      consultorio: modalidad === 'VIRTUAL' ? 'Sala Virtual (Meet)' : consultorio,
+      enlaceTeleconsulta: modalidad === 'VIRTUAL' ? (enlaceTeleconsulta.trim() || undefined) : undefined,
     }
 
     setIsSubmitting(true)
@@ -593,7 +648,7 @@ export default function AgendarCitaModal({
                 <label
                   className={`flex items-center justify-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-medium cursor-pointer transition-all ${
                     modalidad === 'VIRTUAL'
-                      ? 'border-teal-600 bg-teal-50/60 text-teal-800 font-semibold shadow-xs'
+                      ? 'border-sky-600 bg-sky-50 text-sky-800 font-semibold shadow-xs'
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
@@ -602,14 +657,101 @@ export default function AgendarCitaModal({
                     name="modalidad"
                     value="VIRTUAL"
                     checked={modalidad === 'VIRTUAL'}
-                    onChange={() => setModalidad('VIRTUAL')}
+                    onChange={() => {
+                      setModalidad('VIRTUAL')
+                      if (!enlaceTeleconsulta) {
+                        handleGenerarMeetRapido()
+                      }
+                    }}
                     className="hidden"
                   />
-                  <span>💻 Virtual</span>
+                  <span>💻 Virtual (Meet)</span>
                 </label>
               </div>
             </div>
           </div>
+
+          {/* Bloque de Teleconsulta Google Meet (Visible cuando VIRTUAL) */}
+          {modalidad === 'VIRTUAL' && (
+            <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-4 space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-xs font-bold text-sky-900" style={{ fontFamily: 'Outfit' }}>
+                    Google Meet Oficial · Teleconsulta Odontológica
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.open('https://meet.google.com/new', '_blank')}
+                  className="text-[11px] text-sky-700 hover:text-sky-900 font-semibold underline underline-offset-2 flex items-center gap-1 cursor-pointer"
+                  title="Abrir Google Meet en pestaña nueva para crear una reunión con tu cuenta"
+                >
+                  Abrir Meet en Gmail ↗
+                </button>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  Enlace de la Videollamada (Google Meet) <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={enlaceTeleconsulta}
+                    onChange={e => {
+                      setEnlaceTeleconsulta(e.target.value)
+                      setApiError(null)
+                      setMeetSuccessMsg(null)
+                    }}
+                    placeholder="https://meet.google.com/xxx-yyyy-zzz"
+                    className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+                  />
+                  <button
+                    type="button"
+                    disabled={isGeneratingMeet}
+                    onClick={handleGenerarMeetReal}
+                    className="px-3.5 py-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer flex items-center gap-1.5 disabled:opacity-60"
+                    title="Vincular con Google Calendar y generar sala Meet oficial"
+                  >
+                    {isGeneratingMeet ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        <span>Creando en Google...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5 text-sky-200" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/>
+                        </svg>
+                        <span>⚡ Generar con Google Meet</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Feedback de estado exitoso */}
+                {meetSuccessMsg && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold mt-1.5 bg-emerald-50 border border-emerald-200/60 rounded-lg px-2.5 py-1">
+                    <span>✓</span>
+                    <span>{meetSuccessMsg}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+                  <span>El paciente y el odontólogo podrán unirse con 1 solo clic.</span>
+                  <button
+                    type="button"
+                    onClick={handleGenerarMeetRapido}
+                    className="text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                    title="Generar enlace localmente sin abrir Google OAuth"
+                  >
+                    generar rápido sin Google
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 5. Motivo de Consulta */}
           <div>

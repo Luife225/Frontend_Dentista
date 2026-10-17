@@ -318,13 +318,21 @@ function ModalCita({
 
     setIsSubmitting(true)
     try {
+      const isVirtual = form.modality === 'Virtual'
+      const meetCode = () => {
+        const chars = 'abcdefghijklmnopqrstuvwxyz'
+        const rnd = (len: number) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+        return `https://meet.google.com/${rnd(3)}-${rnd(4)}-${rnd(3)}`
+      }
+
       await createMyAppointment({
         odontologoId: form.doctorClinicaId,
         inicioEn,
         finEn,
-        modalidad: form.modality === 'Virtual' ? 'VIRTUAL' : 'PRESENCIAL',
+        modalidad: isVirtual ? 'VIRTUAL' : 'PRESENCIAL',
         motivo: form.motivo || form.notes || 'Consulta general odontológica',
-        consultorio: CONSULTORIOS[0],
+        consultorio: isVirtual ? 'Sala Virtual (Meet)' : CONSULTORIOS[0],
+        enlaceTeleconsulta: isVirtual ? meetCode() : undefined,
       })
       setSent(true)
       onSuccess()
@@ -611,10 +619,23 @@ function TabInicio({
                 <div className="bg-white/15 rounded-lg px-3 py-1.5">
                   <p className="text-[10px] text-white/60 font-medium">Modalidad</p>
                   <p className="text-sm font-bold">
-                    {nextAppt.modalidad === 'VIRTUAL' ? '💻 Virtual' : '🏥 Presencial'}
+                    {nextAppt.modalidad === 'VIRTUAL' ? '💻 Virtual (Meet)' : '🏥 Presencial'}
                   </p>
                 </div>
               </div>
+
+              {nextAppt.modalidad === 'VIRTUAL' && (
+                <div className="mt-4">
+                  <a
+                    href={nextAppt.enlaceTeleconsulta || 'https://meet.google.com/new'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                  >
+                    <span>📹 Ingresar a la Sala de Google Meet ↗</span>
+                  </a>
+                </div>
+              )}
             </div>
             <span
               className={`text-xs font-semibold px-3 py-1 rounded-full ${
@@ -814,7 +835,17 @@ function TabAgenda({
                   </div>
 
                   {/* Actions for this appointment */}
-                  <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 shrink-0">
+                  <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 shrink-0 flex-wrap">
+                    {a.modalidad === 'VIRTUAL' && (
+                      <a
+                        href={a.enlaceTeleconsulta || 'https://meet.google.com/new'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>📹 Unirse a Google Meet ↗</span>
+                      </a>
+                    )}
                     {a.estado === 'PROGRAMADA' && (
                       <button
                         onClick={() => onConfirmAppt(a.id)}

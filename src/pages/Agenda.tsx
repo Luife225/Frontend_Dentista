@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   getAppointments,
   getAppointmentsByDoctor,
@@ -78,6 +79,7 @@ function PatientPanel({
   onClose,
   onConfirm,
   onStartAttention,
+  onContinueAttention,
   onFinish,
   onMarkAttendance,
   onOpenReprogramar,
@@ -87,6 +89,7 @@ function PatientPanel({
   onClose: () => void
   onConfirm: (id: string) => Promise<void>
   onStartAttention: (id: string) => Promise<void>
+  onContinueAttention: (c: Appointment) => void
   onFinish: (id: string) => Promise<void>
   onMarkAttendance: (id: string, asistencia: 'ASISTIO' | 'NO_SHOW') => Promise<void>
   onOpenReprogramar: (c: Appointment) => void
@@ -229,7 +232,31 @@ function PatientPanel({
           </div>
         </div>
 
-        {cita.consultorio && (
+        {cita.modalidad === 'VIRTUAL' ? (
+          <div className="bg-sky-50 rounded-xl p-3.5 border border-sky-200 text-xs text-sky-900 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center gap-1.5 text-sky-900">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                📹 Teleconsulta Google Meet
+              </span>
+              <span className="text-[10px] font-mono bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full font-bold">
+                Online
+              </span>
+            </div>
+            {cita.enlaceTeleconsulta ? (
+              <a
+                href={cita.enlaceTeleconsulta}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2 px-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer text-center"
+              >
+                <span>🚀 Abrir Sala de Google Meet ↗</span>
+              </a>
+            ) : (
+              <p className="text-[11px] text-sky-600 italic">Enlace de Meet no disponible</p>
+            )}
+          </div>
+        ) : cita.consultorio ? (
           <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-xs text-slate-600 flex items-center gap-2">
             <span className="text-base">🪑</span>
             <div>
@@ -237,7 +264,7 @@ function PatientPanel({
               <p className="text-[11px] text-slate-500">{cita.consultorio}</p>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Action Buttons Footer */}
@@ -269,14 +296,22 @@ function PatientPanel({
           </button>
         )}
 
-        {/* Finalizar cita (when EN_ATENCION) */}
+        {/* Finalizar o Continuar cita (when EN_ATENCION) */}
         {cita.estado === 'EN_ATENCION' && (
-          <button
-            onClick={() => onFinish(cita.id)}
-            className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-indigo-600/20 cursor-pointer"
-          >
-            <span>🏁 Finalizar atención</span>
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => onContinueAttention(cita)}
+              className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-teal-600 hover:bg-teal-500 flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-teal-600/20 cursor-pointer"
+            >
+              <span>🩺 Continuar atención clínica</span>
+            </button>
+            <button
+              onClick={() => onFinish(cita.id)}
+              className="w-full py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            >
+              <span>🏁 Finalizar sin notas</span>
+            </button>
+          </div>
         )}
 
         {/* Marcar asistencia */}
@@ -466,6 +501,7 @@ function SolicitudesModal({
 
 // ── Main Agenda Component ─────────────────────────────────────────────────────
 export default function Agenda() {
+  const navigate = useNavigate()
   const { role, user } = useAuth()
   const [view, setView] = useState<'week' | 'day'>('week')
   const [citas, setCitas] = useState<Appointment[]>([])
@@ -760,11 +796,20 @@ export default function Agenda() {
       const updated = await updateStatus(id, 'EN_ATENCION')
       setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
       setSelCita(sc => (sc && sc.id === id ? updated : sc))
-      showToast('✓ Estado: En atención')
+      showToast('✓ Estado: En atención. Abriendo historia clínica...')
       await loadWeekCitas(true)
+
+      const targetCita = selCita?.id === id ? selCita : citas.find(c => c.id === id)
+      if (targetCita) {
+        navigate(`/app/pacientes?pacienteId=${targetCita.pacienteId}&citaId=${targetCita.id}&tab=historia&atender=true`)
+      }
     } catch (err: any) {
       showToast(err.message || 'Error al actualizar')
     }
+  }
+
+  const handleContinueAttention = (c: Appointment) => {
+    navigate(`/app/pacientes?pacienteId=${c.pacienteId}&citaId=${c.id}&tab=historia&atender=true`)
   }
 
   const handleFinish = async (id: string) => {
@@ -1138,12 +1183,19 @@ export default function Agenda() {
                             }}
                           >
                             <div className="px-1.5 py-1 min-w-0">
-                              <p
-                                className="text-[10px] font-bold leading-tight truncate"
-                                style={{ color }}
-                              >
-                                {c.motivo || 'Consulta general'}
-                              </p>
+                              <div className="flex items-center gap-1">
+                                <p
+                                  className="text-[10px] font-bold leading-tight truncate flex-1"
+                                  style={{ color }}
+                                >
+                                  {c.motivo || 'Consulta general'}
+                                </p>
+                                {c.modalidad === 'VIRTUAL' && (
+                                  <span className="text-[8px] font-bold bg-sky-100 text-sky-700 px-1 py-0.2 rounded shrink-0">
+                                    📹 Meet
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-[9px] text-slate-600 truncate mt-0.5">
                                 {c.pacienteNombreCompleto}
                               </p>
@@ -1274,15 +1326,22 @@ export default function Agenda() {
                           }}
                         >
                           <div className="px-3 py-2">
-                            <p className="text-xs font-bold leading-tight" style={{ color: col }}>
-                              {c.motivo || 'Consulta general'}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-bold leading-tight" style={{ color: col }}>
+                                {c.motivo || 'Consulta general'}
+                              </p>
+                              {c.modalidad === 'VIRTUAL' && (
+                                <span className="text-[9px] font-bold bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                                  📹 Google Meet
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-700 font-medium mt-0.5">
                               {c.pacienteNombreCompleto}
                             </p>
                             <p className="text-[10px] text-slate-400 mt-0.5">
                               {formatHourMinute(c.inicioEn)} - {formatHourMinute(c.finEn)} · {duration} min ·{' '}
-                              Dr. {c.odontologoNombreCompleto || 'Asignado'} · {c.consultorio || 'Sillón'}
+                              Dr. {c.odontologoNombreCompleto || 'Asignado'} · {c.modalidad === 'VIRTUAL' ? 'Teleconsulta Online' : (c.consultorio || 'Sillón')}
                             </p>
                           </div>
                         </button>
@@ -1302,6 +1361,7 @@ export default function Agenda() {
           onClose={() => setSelCita(null)}
           onConfirm={handleConfirm}
           onStartAttention={handleStartAttention}
+          onContinueAttention={handleContinueAttention}
           onFinish={handleFinish}
           onMarkAttendance={handleMarkAttendance}
           onOpenReprogramar={c => {

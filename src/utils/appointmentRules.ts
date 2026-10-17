@@ -23,6 +23,8 @@
  *    - 400 Bad Request: error.response.data.message
  */
 
+import type { HorarioAtencionDto } from '../services/availabilityService'
+
 export const CONSULTORIOS = [
   'Sillón 1',
   'Sillón 2',
@@ -36,6 +38,15 @@ export interface TimeSlot {
   label: string      // '08:00'
   isPast: boolean    // true si la hora ya pasó en el reloj actual de HOY
   endTime: string    // '08:45'
+}
+
+export interface ClinicDaySchedule {
+  isOpen: boolean
+  openTime: string      // '08:00'
+  closeTime: string     // '18:00' o configurable
+  openHour: number      // 8
+  closeHour: number     // 18 o configurable
+  closingReason?: string
 }
 
 /** Formatea una fecha local a string YYYY-MM-DD evitando el desbalance horario de UTC */
@@ -95,6 +106,80 @@ export function calculateEndTime(startTime: string, durationMinutes = 45): strin
   const endH = Math.floor(totalMin / 60)
   const endM = totalMin % 60
   return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
+}
+
+/**
+ * Obtiene la configuración de apertura y cierre para un día específico según el horario configurado en la BD
+ */
+export function getClinicDaySchedule(
+  dateStr: string,
+  clinicSchedule?: HorarioAtencionDto[]
+): ClinicDaySchedule {
+  if (!dateStr) {
+    return { isOpen: true, openTime: '08:00', closeTime: '18:00', openHour: 8, closeHour: 18 }
+  }
+
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  const jsDay = dt.getDay() // 0: Dom, 1: Lun .. 6: Sáb
+  const backendDay = jsDay === 0 ? 7 : jsDay // 1: Lun .. 7: Dom
+
+  if (clinicSchedule && clinicSchedule.length > 0) {
+    const rule = clinicSchedule.find(s => s.diaSemana === backendDay)
+    if (rule) {
+      if (rule.activo === false) {
+        return {
+          isOpen: false,
+          openTime: 'Cerrado',
+          closeTime: 'Cerrado',
+          openHour: 0,
+          closeHour: 0,
+          closingReason: 'Día no laborable según configuración de la clínica',
+        }
+      }
+      const openTime = rule.horaApertura.slice(0, 5)
+      const closeTime = rule.horaCierre.slice(0, 5)
+      const openHour = parseInt(openTime.slice(0, 2), 10)
+      const closeHour = parseInt(closeTime.slice(0, 2), 10)
+      return {
+        isOpen: true,
+        openTime,
+        closeTime,
+        openHour,
+        closeHour,
+      }
+    }
+  }
+
+  // Reglas predeterminadas en caso la clínica aún no tenga configuración en BD
+  if (jsDay === 0) {
+    return {
+      isOpen: false,
+      openTime: 'Cerrado',
+      closeTime: 'Cerrado',
+      openHour: 0,
+      closeHour: 0,
+      closingReason: 'Domingo (clínica cerrada)',
+    }
+  }
+
+  if (jsDay === 6) {
+    return {
+      isOpen: true,
+      openTime: '08:00',
+      closeTime: '13:00',
+      openHour: 8,
+      closeHour: 13,
+    }
+  }
+
+  return {
+    isOpen: true,
+    openTime: '08:00',
+    closeTime: '18:00',
+    openHour: 8,
+    closeHour: 18,
+  }
 }
 
 /**
@@ -181,26 +266,26 @@ export function getAvailableSlots(dateStr: string): {
 }
 
 /**
- * Valida los límites estrictos de horario para una cita
+ * Valida los límites estrictos de horario para una cita sincronizados con la BD
  */
 export function validateAppointmentSchedule(
   dateStr: string,
   startTime: string,
-  endTime: string
+  endTime: string,
+  clinicSchedule?: HorarioAtencionDto[]
 ): { valid: boolean; error?: string } {
   if (!dateStr || !startTime || !endTime) {
     return { valid: false, error: 'Por favor completa la fecha y las horas de inicio y fin.' }
   }
 
-  // Validar domingo
-  if (isSundayDate(dateStr)) {
-    return { valid: false, error: 'La clínica permanece cerrada los domingos.' }
-  }
-
-  // Validar fechas pasadas
   const todayStr = getMinDateString()
   if (dateStr < todayStr) {
     return { valid: false, error: 'No se pueden agendar citas en fechas pasadas.' }
+  }
+
+  const sched = getClinicDaySchedule(dateStr, clinicSchedule)
+  if (!sched.isOpen) {
+    return { valid: false, error: `La clínica permanece cerrada este día (${sched.closingReason || 'No laborable'}).` }
   }
 
   const [sH, sM] = startTime.split(':').map(Number)
@@ -221,20 +306,19 @@ export function validateAppointmentSchedule(
     }
   }
 
-  // Horario de apertura: 08:00
-  if (startMins < 8 * 60) {
-    return { valid: false, error: 'La clínica abre a las 08:00. Selecciona un horario a partir de esa hora.' }
+  const [oH, oM] = sched.openTime.split(':').map(Number)
+  const [cH, cM] = sched.closeTime.split(':').map(Number)
+  const openMins = oH * 60 + oM
+  const closeMins = cH * 60 + cM
+
+  if (startMins < openMins) {
+    return { valid: false, error: `La clínica abre a las ${sched.openTime}. Selecciona un horario a partir de esa hora.` }
   }
 
-  // Horario de cierre según día
-  const isSat = isSaturdayDate(dateStr)
-  const maxEndMins = isSat ? 13 * 60 : 18 * 60
-  const maxEndLabel = isSat ? '13:00' : '18:00'
-
-  if (endMins > maxEndMins) {
+  if (endMins > closeMins) {
     return {
       valid: false,
-      error: `La hora de fin (${endTime}) no puede superar las ${maxEndLabel} (${isSat ? 'horario de sábado' : 'horario regular'}).`,
+      error: `La hora de fin (${endTime}) no puede superar las ${sched.closeTime} según la configuración de la clínica.`,
     }
   }
 

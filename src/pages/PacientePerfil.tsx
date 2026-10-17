@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import HistoriaClinica from './HistoriaClinica'
 import {
   fetchPatientsFromApi,
@@ -1427,18 +1428,30 @@ function PatientDetail({
   onArchive,
   onReload,
   onLinked,
+  initialTab,
+  initialCitaId,
+  autoAtender,
 }: {
   patient: Patient
   onUpdate: (id: string, updates: Partial<BackendPatientDto>) => Promise<void>
   onArchive: (id: string) => Promise<void>
   onReload: (id: string) => Promise<void>
   onLinked: (patient: Patient) => void
+  initialTab?: Tab
+  initialCitaId?: string
+  autoAtender?: boolean
 }) {
   const { role } = useAuth()
   const isOdontologo = role === 'ODONTOLOGO'
   const isAdministrative = role === 'ADMIN_CLINICA' || role === 'RECEPCIONISTA'
-  const [tab, setTab] = useState<Tab>('resumen')
+  const [tab, setTab] = useState<Tab>(initialTab || 'resumen')
   const [modal, setModal] = useState<'cita' | 'detalle' | 'editar' | 'archivar' | 'vincular' | null>(null)
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab)
+    }
+  }, [initialTab])
 
   const allTabs: { id: Tab; label: string }[] = [
     { id: 'resumen', label: 'Resumen' },
@@ -1633,6 +1646,8 @@ function PatientDetail({
               initialPatientId={patient.id}
               patientName={patient.name}
               patientDoc={patient.doc}
+              initialCitaId={initialCitaId}
+              autoOpenNew={autoAtender}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center p-8 bg-slate-50 h-full">
@@ -1669,8 +1684,14 @@ export default function PacientePerfil() {
   const isAdministrative = role === 'ADMIN_CLINICA' || role === 'RECEPCIONISTA'
   const isOdontologo = role === 'ODONTOLOGO'
 
+  const [searchParams] = useSearchParams()
+  const urlPatientId = searchParams.get('pacienteId')
+  const urlCitaId = searchParams.get('citaId')
+  const urlTab = searchParams.get('tab') as Tab | null
+  const urlAtender = searchParams.get('atender') === 'true'
+
   const [patients, setPatients] = useState<Patient[]>([])
-  const [selId, setSelId] = useState<string>('')
+  const [selId, setSelId] = useState<string>(urlPatientId || '')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [showNewModal, setShowNewModal] = useState(false)
@@ -1722,7 +1743,9 @@ export default function PacientePerfil() {
         })
 
         setPatients(mapped)
-        if (!selId || !mapped.some(p => p.id === selId)) {
+        if (urlPatientId && mapped.some(p => p.id === urlPatientId)) {
+          setSelId(urlPatientId)
+        } else if (!selId || !mapped.some(p => p.id === selId)) {
           setSelId(mapped[0].id)
         }
       } else {
@@ -2046,6 +2069,9 @@ export default function PacientePerfil() {
           onArchive={handleArchivePatient}
           onReload={handleReloadPatient}
           onLinked={handlePatientLinked}
+          initialTab={urlTab || undefined}
+          initialCitaId={urlCitaId || undefined}
+          autoAtender={urlAtender}
         />
       ) : (
         <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-400">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getCurrentOdontogram,
   getOdontogramHistory,
@@ -9,6 +9,8 @@ import {
   type HallazgoDto,
 } from '../../services/odontogramService'
 import { useAuth } from '../../contexts/AuthContext'
+import { useOptionalCoroVoz } from '../../contexts/CoroVozContext'
+import type { DentalProposal } from '../../services/coroVozService'
 
 export type FaceCode = 'OCLUSAL' | 'VESTIBULAR' | 'LINGUAL' | 'MESIAL' | 'DISTAL' | 'GENERAL'
 
@@ -59,6 +61,61 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
 
   const isConfirmed = version?.estado === 'CONFIRMADO'
   const isReadOnly = propReadOnly || !isOdontologo || isConfirmed
+  const coroVoz = useOptionalCoroVoz()
+  const registerCoroVoz = coroVoz?.register
+  const [voiceChanges, setVoiceChanges] = useState(false)
+  const findingsRef = useRef(findingsMap)
+  findingsRef.current = findingsMap
+  const canDictate = !isReadOnly && !isLoading && !isSaving && !errorMessage && version?.pacienteId === patientId
+  const canDictateRef = useRef(false)
+  canDictateRef.current = canDictate
+  const saveDraftRef = useRef<(() => Promise<boolean>) | null>(null)
+  const saveVoiceDraft = useCallback(async () => {
+    if (!canDictateRef.current) return false
+    return (await saveDraftRef.current?.()) ?? false
+  }, [])
+
+  const describeVoiceChange = useCallback((proposal: DentalProposal) => {
+    const map = findingsRef.current
+    const affected = proposal.surface === 'GENERAL'
+      ? [...map.keys()].some(key => key.startsWith(`${proposal.piece}:`))
+      : map.has(`${proposal.piece}:${proposal.surface}`) || map.has(`${proposal.piece}:GENERAL`)
+    return affected
+      ? 'Esta propuesta sustituirá marcas existentes de esa pieza o cara. Revisa la condición antes de confirmar.'
+      : 'Se agregará al borrador en pantalla. Después usa Guardar borrador para conservarlo.'
+  }, [])
+
+  const applyVoiceFinding = useCallback((proposal: DentalProposal) => {
+    const validPiece = [...UPPER_ARCH, ...LOWER_ARCH].includes(proposal.piece)
+    const validFace = ['GENERAL', 'OCLUSAL', 'VESTIBULAR', 'LINGUAL', 'MESIAL', 'DISTAL'].includes(proposal.surface)
+    const validCondition = ['CARIES', 'RESTAURADO', 'CORONA', 'EXTRAIDO', 'ENDODONCIA', 'IMPLANTE', 'FRACTURA'].includes(proposal.condition)
+    if (!canDictateRef.current || !validPiece || !validFace || !validCondition) return false
+    const next = new Map(findingsRef.current)
+    if (proposal.surface === 'GENERAL') {
+      for (const face of ['OCLUSAL', 'VESTIBULAR', 'LINGUAL', 'MESIAL', 'DISTAL']) next.delete(`${proposal.piece}:${face}`)
+    } else {
+      next.delete(`${proposal.piece}:GENERAL`)
+    }
+    next.set(`${proposal.piece}:${proposal.surface}`, { condition: proposal.condition, note: proposal.note || undefined })
+    findingsRef.current = next
+    setFindingsMap(next)
+    setSelectedTooth(proposal.piece)
+    setSelectedFace(proposal.surface)
+    setVoiceChanges(true)
+    return true
+  }, [])
+
+  useEffect(() => {
+    if (!registerCoroVoz) return
+    return registerCoroVoz({
+      key: `${patientId}:${version?.id || 'new'}`,
+      patientName: patientName || 'Paciente seleccionado',
+      editable: Boolean(canDictate),
+      describe: describeVoiceChange,
+      apply: applyVoiceFinding,
+      save: saveVoiceDraft,
+    })
+  }, [registerCoroVoz, patientId, patientName, version?.id, canDictate, describeVoiceChange, applyVoiceFinding, saveVoiceDraft])
 
   const showToast = (msg: string, isErr = false) => {
     if (isErr) {
@@ -92,6 +149,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
         }
       }
       setFindingsMap(map)
+      setVoiceChanges(false)
       setSelectedTooth(null)
       setSelectedFace(null)
       setToothNote('')
@@ -176,7 +234,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
 
   // Guardar borrador en el servidor
   const handleSaveDraft = async () => {
-    if (!version || isReadOnly) return
+    if (!version || isReadOnly || isSaving) return false
     setIsSaving(true)
     try {
       const hallazgosPayload: HallazgoDto[] = []
@@ -192,13 +250,18 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
 
       const updated = await saveOdontogramDraft(patientId, { hallazgos: hallazgosPayload })
       setVersion(updated)
+      setVoiceChanges(false)
       showToast('✓ Borrador de odontograma guardado correctamente')
+      return true
     } catch (err: any) {
       showToast(err.message || 'Error al guardar borrador', true)
+      return false
     } finally {
       setIsSaving(false)
     }
   }
+
+  saveDraftRef.current = handleSaveDraft
 
   // Confirmar versión (inmutable)
   const handleConfirmVersion = async () => {
@@ -345,6 +408,11 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
   return (
     <div className="p-5 space-y-5">
       {/* Toast notifications */}
+      {voiceChanges && (
+        <div role="status" className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          CoroVoz agregó cambios al borrador en pantalla. Pulsa <strong>Guardar borrador</strong> para conservarlos.
+        </div>
+      )}
       {errorMessage && (
         <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center justify-between">
           <span>⚠️ {errorMessage}</span>

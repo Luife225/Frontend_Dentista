@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, type Role } from '../contexts/AuthContext'
 import { getUnreadCount } from '../services/notificationService'
 import AIAssistant from '../components/features/AIAssistant'
+import { CoroVozProvider } from '../contexts/CoroVozContext'
 import coronixLogo from '../imports/coronixLogoData'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -97,6 +98,10 @@ const ROUTE_TO_MODULE: Record<string, ModuleId> = {
 // ─── Dashboard Layout ─────────────────────────────────────────────────────────
 
 export default function DashboardLayout() {
+  return <CoroVozProvider><DashboardContent /></CoroVozProvider>
+}
+
+function DashboardContent() {
   const { role, logout, user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -196,16 +201,16 @@ export default function DashboardLayout() {
           ))}
         </nav>
 
-        {/* AI button — only for Odontólogo */}
-        {role === 'ODONTOLOGO' && (
+        {/* CoroVoz general para odontología y recepción */}
+        {(role === 'ODONTOLOGO' || role === 'RECEPCIONISTA') && (
           <div className={`px-3 pb-2 ${collapsed?'flex justify-center':''}`}>
             <button onClick={() => setShowAI(!showAI)}
-              title="Asistente de IA"
+              title="CoroVoz"
               className={`${collapsed?'w-9 h-9':'w-full'} flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all ${
                 showAI ? 'bg-rose-500 text-white shadow-lg shadow-rose-900/50' : 'bg-white/8 text-white/60 hover:bg-white/15 hover:text-white'
               }`}>
               <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2H3v2a9 9 0 008 8.94V23h2v-2.06A9 9 0 0021 12v-2h-2z"/></svg>
-              {!collapsed && <span className="text-sm font-semibold" style={{fontFamily:'Outfit'}}>{showAI?'Cerrar IA':'Asistente IA'}</span>}
+              {!collapsed && <span className="text-sm font-semibold" style={{fontFamily:'Outfit'}}>{showAI?'Cerrar CoroVoz':'CoroVoz'}</span>}
               {showAI && !collapsed && (
                 <span className="ml-auto flex gap-0.5">
                   {[1,2,3].map(i=><span key={i} className="wave-bar w-0.5 h-3 bg-white rounded-full" style={{animationDelay:`${i*0.1}s`}}></span>)}
@@ -268,8 +273,8 @@ export default function DashboardLayout() {
         </main>
       </div>
 
-      {/* AI overlay — Odontólogo only */}
-      {showAI && role === 'ODONTOLOGO' && <AIAssistant onClose={() => setShowAI(false)} />}
+      {/* El asistente aplica los permisos de cada modo */}
+      {showAI && (role === 'ODONTOLOGO' || role === 'RECEPCIONISTA') && <AIAssistant onClose={() => setShowAI(false)} />}
     </div>
   )
 }

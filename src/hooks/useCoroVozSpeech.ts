@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCoroVozStatus, transcribeCoroVoz } from '../services/coroVozService'
 import { encodeCoroVozWav } from '../utils/coroVozAudio'
+import { emptySpeechActivity, shouldAutoSend, updateSpeechActivity } from '../utils/coroVozActivity'
 
-const emptyCapture = () => ({ chunks: [] as Float32Array[], samples: 0, voiced: false, silence: 0 })
+const emptyCapture = () => ({ chunks: [] as Float32Array[], samples: 0, activity: emptySpeechActivity() })
 
 /** Captura estándar getUserMedia; el backend transcribe localmente, también en Brave. */
 export default function useCoroVozSpeech(onText: (text: string, reviewOnly: boolean) => void) {
@@ -65,9 +66,9 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
     const capture = captureRef.current
     const rate = contextRef.current?.sampleRate || 16000
     captureRef.current = emptyCapture()
-    if (capture.samples < rate * 0.2) { setError('Habla cerca del micrófono y espera un instante antes de transcribir.'); return }
+    if (!capture.activity.voiced || capture.samples < rate * 0.2) { setError('No detecté voz en la grabación. Comprueba el micrófono y vuelve a intentarlo.'); return }
     processingRef.current = true
-    setTranscribing(true); setListening(false); setInterim('Transcribiendo voz en el backend…'); setError('')
+    setTranscribing(true); setListening(false); setInterim('Transcribiendo…'); setError('')
     const controller = new AbortController()
     requestRef.current = controller
     const generation = generationRef.current
@@ -96,15 +97,15 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
   const start = useCallback(async () => {
     if (activeRef.current || startingRef.current) return
     if (!window.isSecureContext || typeof navigator.mediaDevices?.getUserMedia !== 'function' || typeof window.AudioContext !== 'function') {
-      setError('El micrófono requiere HTTPS o localhost y permiso de audio en Brave.'); return
+      setError('El micrófono requiere una conexión segura y permiso de acceso.'); return
     }
     const generation = ++generationRef.current
     startingRef.current = true
     setStarting(true); setError('')
     try {
       const status = await getCoroVozStatus()
-      if (status.version < 4) throw new Error('Reinicia el backend para cargar la versión actual de CoroVoz.')
-      if (!status.speechReady) throw new Error('Falta el modelo local de voz. Ejecuta java tools/InstallCoroVozModel.java en Backend_Dentista.')
+      if (status.version < 4) throw new Error('El servicio de voz necesita actualizarse. Contacta al administrador.')
+      if (!status.speechReady) throw new Error('El reconocimiento de voz no está disponible. Contacta al administrador.')
       if (generation !== generationRef.current) return
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
       if (generation !== generationRef.current) { stream.getTracks().forEach(track => track.stop()); return }
@@ -130,14 +131,13 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
         const capture = captureRef.current
         capture.chunks.push(chunk)
         capture.samples += chunk.length
-        if (rms > 0.008) { capture.voiced = true; capture.silence = 0 }
-        else if (capture.voiced) capture.silence += chunk.length
-        if (!capture.voiced) {
+        capture.activity = updateSpeechActivity(capture.activity, rms, chunk.length)
+        if (!capture.activity.voiced) {
           while (capture.samples > context.sampleRate * 0.5 && capture.chunks.length > 1) capture.samples -= capture.chunks.shift()!.length
         } else if (capture.samples > context.sampleRate * 25) {
           // El límite guarda el texto para revisión; no ejecuta una frase cortada.
           void sendCapture(true)
-        } else if (sendModeRef.current === 'pause' && capture.silence > context.sampleRate * 3.5) {
+        } else if (shouldAutoSend(capture.activity, context.sampleRate, sendModeRef.current)) {
           void sendCapture(false)
         }
       }
@@ -154,8 +154,8 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
     } catch (cause) {
       if (generation !== generationRef.current) return
       const messages: Record<string, string> = {
-        NotAllowedError: 'Brave o Windows bloquearon el micrófono. Permite el audio para localhost desde el icono junto a la dirección.',
-        NotFoundError: 'No hay un micrófono conectado o habilitado en Windows.',
+        NotAllowedError: 'No tengo permiso para usar el micrófono. Habilítalo en tu navegador e inténtalo de nuevo.',
+        NotFoundError: 'No se encontró un micrófono disponible.',
         NotReadableError: 'No se puede abrir el micrófono. Revisa si otra aplicación lo está usando.',
       }
       stop()

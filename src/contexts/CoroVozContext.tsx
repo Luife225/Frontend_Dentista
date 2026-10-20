@@ -6,6 +6,7 @@ export interface OdontogramTarget {
   patientName: string
   editable: boolean
   describe: (proposal: DentalProposal) => string
+  select: (piece: number) => boolean
   apply: (proposal: DentalProposal) => boolean
   save: () => Promise<boolean>
 }

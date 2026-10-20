@@ -154,7 +154,7 @@ export default function AIAssistant({ onClose }: { onClose?: () => void }) {
         return
       }
       if (!targetRef.current?.editable) { respond('Abre Pacientes, selecciona al paciente y entra en un odontograma editable.'); return }
-      if (pendingRef.current) { respond('Primero confirma, edita o elimina la propuesta pendiente.'); return }
+      if (pendingRef.current && !/^no (?:no )?era\b/.test(command)) { respond('Primero confirma, edita o elimina la propuesta pendiente.'); return }
       if (fragmentRef.current) text = mergeDentalDictation(fragmentRef.current, text)
     }
     if (!mode) return
@@ -181,7 +181,18 @@ export default function AIAssistant({ onClose }: { onClose?: () => void }) {
       } else {
         const result = await interpretDentalCommand(text, controller.signal)
         if (generation !== generationRef.current || targetKey !== targetRef.current?.key) return
-        if (result.incomplete) {
+        if (result.selectedPiece != null) {
+          clearFragment()
+          if (pendingRef.current && result.correctedFrom !== pendingRef.current.finding.piece) {
+            respond('La pieza que quieres corregir no coincide con la propuesta pendiente. Revisa la pieza y dicta la corrección de nuevo.')
+          } else if (!targetRef.current?.select(result.selectedPiece)) respond('No pude seleccionar esa pieza en el odontograma abierto.')
+          else if (pendingRef.current) {
+            const corrected = { ...pendingRef.current, finding: { ...pendingRef.current.finding, piece: result.selectedPiece } }
+            pendingRef.current = corrected
+            setPending(corrected)
+            respond(`Corregí la propuesta a la pieza ${result.selectedPiece}. Revisa la condición y la cara antes de confirmar.`)
+          } else respond(result.message)
+        } else if (result.incomplete) {
           fragmentRef.current = result.fragment
           setDentalFragment(result.fragment)
           respond(result.message)
@@ -241,14 +252,14 @@ export default function AIAssistant({ onClose }: { onClose?: () => void }) {
               </div>
               <label className="flex items-center justify-between gap-2 text-xs text-slate-600">Enviar dictado
                 <select aria-label="Envío del dictado" value={speech.sendMode} onChange={e => speech.setSendMode(e.target.value as 'manual' | 'pause')} className="rounded-lg border border-slate-300 p-2">
-                  <option value="manual">Cuando pulse Terminé</option><option value="pause">Tras 3,5 segundos de pausa</option>
+                  <option value="manual">Pulsar para terminar</option><option value="pause">Al pausar 3,5 segundos</option>
                 </select>
               </label>
               {speech.speaking && <button onClick={speech.interrupt} className="rounded-lg border border-cyan-300 px-3 py-2 text-sm font-semibold text-cyan-800">Interrumpir respuesta</button>}
-              <p className="text-xs text-slate-500">{speech.starting ? 'Permite el acceso al micrófono cuando Brave lo solicite.' : speech.transcribing ? 'Reconociendo tu voz en el backend local…' : speech.listening ? speech.sendMode === 'manual' ? 'Micrófono activo. Habla a tu ritmo y pulsa Terminé: enviar. Puedes hacer pausas.' : 'Micrófono activo. Envía tras 3,5 segundos de silencio. Puedes terminar con «CoroVoz enviar».' : speech.enabled ? 'Escucha pausada mientras CoroVoz procesa o habla.' : speech.supported ? 'Reconocimiento local, sin API de pago. Pulsa Iniciar escucha para permitir el micrófono.' : 'Abre el sistema por localhost o HTTPS para habilitar el micrófono.'}</p>
+              <p className="text-xs text-slate-500">{speech.starting ? 'Permite el acceso al micrófono para continuar.' : speech.transcribing ? 'Transcribiendo tu mensaje…' : speech.speaking ? 'CoroVoz está respondiendo. Volverá a escucharte al terminar.' : speech.listening ? speech.sendMode === 'manual' ? 'Te escucho. Habla a tu ritmo y pulsa «Terminé» para enviar.' : 'Te escucho. Enviaré tu mensaje después de 3,5 segundos sin hablar.' : speech.enabled ? 'CoroVoz está preparando la respuesta…' : speech.supported ? 'Inicia la escucha para hablar con CoroVoz.' : 'Abre Coronyx desde una conexión segura para usar el micrófono.'}</p>
               {speech.enabled && <div className="flex items-center gap-3">
                 <div role="meter" aria-label="Nivel del micrófono" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(speech.level * 100)} className="h-2 flex-1 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-emerald-500 transition-[width]" style={{ width: `${Math.round(speech.level * 100)}%` }} /></div>
-                <button onClick={() => void speech.finish()} disabled={busy || speech.transcribing || speech.speaking} className="text-xs font-semibold text-cyan-800 underline disabled:opacity-40">Terminé: enviar</button>
+                {speech.sendMode === 'manual' && <button onClick={() => void speech.finish()} disabled={busy || speech.transcribing || speech.speaking} className="text-xs font-semibold text-cyan-800 underline disabled:opacity-40">Terminé: enviar</button>}
               </div>}
               {speech.interim && <p className="rounded-lg bg-slate-50 p-2 text-sm text-slate-500 italic">{speech.interim}</p>}
               {speech.error && <p role="alert" className="text-sm text-rose-700">{speech.error}</p>}

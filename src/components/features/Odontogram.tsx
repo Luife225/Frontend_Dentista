@@ -112,6 +112,12 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
       patientName: patientName || 'Paciente seleccionado',
       editable: Boolean(canDictate),
       describe: describeVoiceChange,
+      select: piece => {
+        if (![...UPPER_ARCH, ...LOWER_ARCH].includes(piece)) return false
+        setSelectedTooth(piece)
+        setSelectedFace(null)
+        return true
+      },
       apply: applyVoiceFinding,
       save: saveVoiceDraft,
     })

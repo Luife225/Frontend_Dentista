@@ -24,6 +24,8 @@ export interface DentalInterpretation {
   proposal: DentalProposal | null
   incomplete: boolean
   fragment: string
+  selectedPiece: number | null
+  correctedFrom: number | null
 }
 
 export function askCoroVoz(text: string, signal?: AbortSignal, patientId?: string | null) {
@@ -45,7 +47,13 @@ export function transcribeCoroVoz(wav: Blob, signal?: AbortSignal) {
 async function corovozRequest<T>(path: string, options?: RequestInit): Promise<T> {
   try { return await apiClient<T>(`/corovoz${path}`, options) }
   catch (error) {
-    if (error instanceof ApiError && error.status === 404) throw new Error('El backend activo todavía no tiene CoroVoz. Reinicia el backend de feature/AlanAguilera y vuelve a intentar.')
+    if (error instanceof ApiError) {
+      if (error.status === 0) throw new Error('No pude conectar con CoroVoz. Revisa tu conexión e inténtalo de nuevo.')
+      if (error.status === 404) throw new Error('CoroVoz no está disponible en este momento. Contacta al administrador.')
+      if (error.status === 403) throw new Error('No tienes permiso para usar esta función de CoroVoz.')
+      if (error.status === 429) throw new Error('CoroVoz está ocupado. Inténtalo de nuevo en un momento.')
+      if (error.status >= 500) throw new Error('CoroVoz no pudo completar la solicitud. Inténtalo de nuevo más tarde.')
+    }
     throw error
   }
 }

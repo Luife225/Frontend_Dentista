@@ -9,6 +9,7 @@
     "build": "vite build",
     "start": "vite preview",
     "typecheck": "tsc --noEmit",
+    "verify:corovoz": "node verification/corovoz-audio.mjs && node verification/corovoz-conversation.mjs && node verification/corovoz-activity.mjs",
     "preview": "vite preview",
     "format": "oxfmt"
   },

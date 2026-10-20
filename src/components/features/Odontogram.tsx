@@ -110,6 +110,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
     return registerCoroVoz({
       key: `${patientId}:${version?.id || 'new'}`,
       patientName: patientName || 'Paciente seleccionado',
+      selectedPiece: selectedTooth,
       editable: Boolean(canDictate),
       describe: describeVoiceChange,
       select: piece => {
@@ -121,7 +122,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
       apply: applyVoiceFinding,
       save: saveVoiceDraft,
     })
-  }, [registerCoroVoz, patientId, patientName, version?.id, canDictate, describeVoiceChange, applyVoiceFinding, saveVoiceDraft])
+  }, [registerCoroVoz, patientId, patientName, version?.id, selectedTooth, canDictate, describeVoiceChange, applyVoiceFinding, saveVoiceDraft])
 
   const showToast = (msg: string, isErr = false) => {
     if (isErr) {

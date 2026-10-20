@@ -179,7 +179,7 @@ export default function AIAssistant({ onClose }: { onClose?: () => void }) {
         else if (result.intent === 'PACIENTE_ELEGIR') setSelectedPatient(null)
         if (readAloud) speech.speak(result.answer)
       } else {
-        const result = await interpretDentalCommand(text, controller.signal)
+        const result = await interpretDentalCommand(text, controller.signal, targetRef.current?.selectedPiece)
         if (generation !== generationRef.current || targetKey !== targetRef.current?.key) return
         if (result.selectedPiece != null) {
           clearFragment()

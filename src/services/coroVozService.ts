@@ -32,8 +32,8 @@ export function askCoroVoz(text: string, signal?: AbortSignal, patientId?: strin
   return corovozRequest<CoroVozAnswer>('/general', { method: 'POST', body: JSON.stringify({ text, patientId }), signal })
 }
 
-export function interpretDentalCommand(text: string, signal?: AbortSignal) {
-  return corovozRequest<DentalInterpretation>('/odontograma/interpretar', { method: 'POST', body: JSON.stringify({ text }), signal })
+export function interpretDentalCommand(text: string, signal?: AbortSignal, contextPiece?: number | null) {
+  return corovozRequest<DentalInterpretation>('/odontograma/interpretar', { method: 'POST', body: JSON.stringify({ text, contextPiece }), signal })
 }
 
 export function getCoroVozStatus() {

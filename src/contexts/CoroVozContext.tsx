@@ -4,6 +4,7 @@ import type { DentalProposal } from '../services/coroVozService'
 export interface OdontogramTarget {
   key: string
   patientName: string
+  selectedPiece: number | null
   editable: boolean
   describe: (proposal: DentalProposal) => string
   select: (piece: number) => boolean

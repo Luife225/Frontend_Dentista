@@ -27,3 +27,9 @@ tmp/
 Entregables_Avance_2/
 Entregables_Sprints_Corregidos/
 Planificacion_CORONYX/
+
+# Pruebas de regresión mantenidas en el repositorio
+!tests/
+tests/*
+!tests/services.test.cjs
+!tests/inventory_teleconsultation.test.cjs

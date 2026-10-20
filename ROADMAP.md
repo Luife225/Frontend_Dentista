@@ -1,4 +1,7 @@
 # 🦷 CORONYX DENTAL SaaS — ROADMAP MAESTRO FULLSTACK
+
+> **Referencia histórica.** El cierre vigente al 18/10/2026 se describe en `../Backend_Dentista/docs/CONTINUIDAD_ANTIGRAVITY.md` y `CIERRE_FUNCIONAL_Y_REQUISITOS.md` de ese mismo directorio. Comprobar versiones en `package.json` y `pom.xml`; las versiones y funciones previstas en este roadmap pueden corresponder a una etapa anterior.
+
 > **Sistema Integral de Gestión Odontológica Multi-Clínica con Asistencia de Inteligencia Artificial**  
 > **Backend:** Spring Boot 3 / Java 21 / PostgreSQL 17 / Flyway  
 > **Frontend:** React 18 / TypeScript / Vite / Tailwind CSS / Lucide Icons  

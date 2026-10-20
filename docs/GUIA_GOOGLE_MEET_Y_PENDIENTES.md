@@ -1,5 +1,9 @@
 # Guía de Integración Google Meet y Tareas Pendientes — Coronyx
 
+> **Decisión posterior del 19/10/2026:** el requisito es videollamada dentro de CORONYX con el historial disponible, alojamiento propio y primera prueba en una computadora. El plan vigente está en `../../Backend_Dentista/docs/PLAN_INVENTARIO_TELECONSULTA_2026-10-19.md`. Esta guía de enlaces externos queda como referencia de la implementación anterior, sin acreditar el requisito nuevo.
+
+> **Nota de continuidad, 18/10/2026:** esta guía conserva información de una implementación anterior. El código actual eliminó el generador local de enlaces y las llamadas/participantes simulados. Una cita virtual sin sala real muestra enlace pendiente; no debe recuperarse ese generador alternativo. La creación con Google y el ingreso de dos participantes siguen pendientes de validación real. Leer el apartado Teleconsulta de `../../Backend_Dentista/docs/CIERRE_FUNCIONAL_Y_REQUISITOS.md` y la guía `CONTINUIDAD_ANTIGRAVITY.md` de ese directorio antes de trabajar.
+
 Este documento detalla el funcionamiento de la integración con **Google Meet** en Coronyx, cómo configurarlo cuando descargues el proyecto en otra computadora y los puntos pendientes para dar por finalizada la funcionalidad al 100%.
 
 ---

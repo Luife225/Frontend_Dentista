@@ -23,71 +23,99 @@
  *    - 400 Bad Request: error.response.data.message
  */
 
-import type { HorarioAtencionDto } from '../services/availabilityService'
+import type { HorarioAtencionDto } from "../services/availabilityService"
 
 export const CONSULTORIOS = [
-  'Sillón 1',
-  'Sillón 2',
-  'Box Quirúrgico',
+  "Sillón 1",
+
+  "Sillón 2",
+
+  "Box Quirúrgico",
 ] as const
 
 export type ConsultorioType = typeof CONSULTORIOS[number]
 
 export interface TimeSlot {
-  time: string       // '08:00'
-  label: string      // '08:00'
-  isPast: boolean    // true si la hora ya pasó en el reloj actual de HOY
-  endTime: string    // '08:45'
+  time: string // '08:00'
+
+  label: string // '08:00'
+
+  isPast: boolean // true si la hora ya pasó en el reloj actual de HOY
+
+  endTime: string // '08:45'
 }
 
 export interface ClinicDaySchedule {
   isOpen: boolean
-  openTime: string      // '08:00'
-  closeTime: string     // '18:00' o configurable
-  openHour: number      // 8
-  closeHour: number     // 18 o configurable
+
+  openTime: string // '08:00'
+
+  closeTime: string // '18:00' o configurable
+
+  openHour: number // 8
+
+  closeHour: number // 18 o configurable
+
   closingReason?: string
 }
 
 /** Formatea una fecha local a string YYYY-MM-DD evitando el desbalance horario de UTC */
+
 export function toLocalDateString(date: Date = new Date()): string {
   const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
+
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+
+  const d = String(date.getDate()).padStart(2, "0")
+
   return `${y}-${m}-${d}`
 }
 
 /** Retorna la fecha mínima permitida (HOY en formato YYYY-MM-DD) */
+
 export function getMinDateString(): string {
-  return toLocalDateString(new Date())
+  return toLimaDateString(new Date().toISOString())
 }
 
 /** Retorna la fecha máxima permitida (HOY + 90 días en formato YYYY-MM-DD) */
+
 export function getMaxDateString(): string {
-  const d = new Date()
-  d.setDate(d.getDate() + 90)
-  return toLocalDateString(d)
+  const d = new Date(`${getMinDateString()}T12:00:00-05:00`)
+
+  d.setUTCDate(d.getUTCDate() + 90)
+
+  return toLimaDateString(d.toISOString())
 }
 
 /** Verifica si la fecha seleccionada corresponde a un Domingo */
+
 export function isSundayDate(dateStr: string): boolean {
   if (!dateStr) return false
-  const [y, m, d] = dateStr.split('-').map(Number)
+
+  const [y, m, d] = dateStr.split("-").map(Number)
+
   const dt = new Date(y, m - 1, d)
+
   return dt.getDay() === 0
 }
 
 /** Verifica si la fecha seleccionada corresponde a un Sábado */
+
 export function isSaturdayDate(dateStr: string): boolean {
   if (!dateStr) return false
-  const [y, m, d] = dateStr.split('-').map(Number)
+
+  const [y, m, d] = dateStr.split("-").map(Number)
+
   const dt = new Date(y, m - 1, d)
+
   return dt.getDay() === 6
 }
 
 /** Verifica si la fecha corresponde al día de hoy */
+
 export function isTodayDate(dateStr: string): boolean {
   if (!dateStr) return false
+
   return dateStr === getMinDateString()
 }
 
@@ -95,89 +123,140 @@ export function isTodayDate(dateStr: string): boolean {
  * Calcula la hora de fin sumando la duración en minutos (default 45 min)
  * Ej: '10:00' -> '10:45', '17:15' -> '18:00'
  */
-export function calculateEndTime(startTime: string, durationMinutes = 45): string {
-  if (!startTime) return ''
-  const [hStr, mStr] = startTime.split(':')
+
+export function calculateEndTime(
+  startTime: string,
+  durationMinutes = 45,
+): string {
+  if (!startTime) return ""
+
+  const [hStr, mStr] = startTime.split(":")
+
   const h = parseInt(hStr, 10)
+
   const m = parseInt(mStr, 10)
-  if (isNaN(h) || isNaN(m)) return ''
+
+  if (isNaN(h) || isNaN(m)) return ""
 
   const totalMin = h * 60 + m + durationMinutes
+
   const endH = Math.floor(totalMin / 60)
+
   const endM = totalMin % 60
-  return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
+
+  return `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`
 }
 
 /**
  * Obtiene la configuración de apertura y cierre para un día específico según el horario configurado en la BD
  */
+
 export function getClinicDaySchedule(
   dateStr: string,
-  clinicSchedule?: HorarioAtencionDto[]
+
+  clinicSchedule?: HorarioAtencionDto[],
 ): ClinicDaySchedule {
   if (!dateStr) {
-    return { isOpen: true, openTime: '08:00', closeTime: '18:00', openHour: 8, closeHour: 18 }
+    return {
+      isOpen: true,
+      openTime: "08:00",
+      closeTime: "18:00",
+      openHour: 8,
+      closeHour: 18,
+    }
   }
 
-  const [y, m, d] = dateStr.split('-').map(Number)
+  const [y, m, d] = dateStr.split("-").map(Number)
+
   const dt = new Date(y, m - 1, d)
+
   const jsDay = dt.getDay() // 0: Dom, 1: Lun .. 6: Sáb
+
   const backendDay = jsDay === 0 ? 7 : jsDay // 1: Lun .. 7: Dom
 
   if (clinicSchedule && clinicSchedule.length > 0) {
-    const rule = clinicSchedule.find(s => s.diaSemana === backendDay)
+    const rule = clinicSchedule.find((s) => s.diaSemana === backendDay)
+
     if (rule) {
       if (rule.activo === false) {
         return {
           isOpen: false,
-          openTime: 'Cerrado',
-          closeTime: 'Cerrado',
+
+          openTime: "Cerrado",
+
+          closeTime: "Cerrado",
+
           openHour: 0,
+
           closeHour: 0,
-          closingReason: 'Día no laborable según configuración de la clínica',
+
+          closingReason: "Día no laborable según configuración de la clínica",
         }
       }
+
       const openTime = rule.horaApertura.slice(0, 5)
+
       const closeTime = rule.horaCierre.slice(0, 5)
+
       const openHour = parseInt(openTime.slice(0, 2), 10)
+
       const closeHour = parseInt(closeTime.slice(0, 2), 10)
+
       return {
         isOpen: true,
+
         openTime,
+
         closeTime,
+
         openHour,
+
         closeHour,
       }
     }
   }
 
   // Reglas predeterminadas en caso la clínica aún no tenga configuración en BD
+
   if (jsDay === 0) {
     return {
       isOpen: false,
-      openTime: 'Cerrado',
-      closeTime: 'Cerrado',
+
+      openTime: "Cerrado",
+
+      closeTime: "Cerrado",
+
       openHour: 0,
+
       closeHour: 0,
-      closingReason: 'Domingo (clínica cerrada)',
+
+      closingReason: "Domingo (clínica cerrada)",
     }
   }
 
   if (jsDay === 6) {
     return {
       isOpen: true,
-      openTime: '08:00',
-      closeTime: '13:00',
+
+      openTime: "08:00",
+
+      closeTime: "13:00",
+
       openHour: 8,
+
       closeHour: 13,
     }
   }
 
   return {
     isOpen: true,
-    openTime: '08:00',
-    closeTime: '18:00',
+
+    openTime: "08:00",
+
+    closeTime: "18:00",
+
     openHour: 8,
+
     closeHour: 18,
   }
 }
@@ -189,78 +268,117 @@ export function getClinicDaySchedule(
  * - Domingo: lista vacía (clínica cerrada)
  * - Si es HOY: marca isPast = true si ya pasó la hora actual
  */
-export function getAvailableSlots(dateStr: string): {
+
+export function getAvailableSlots(
+  dateStr: string,
+): {
   slots: TimeSlot[]
+
   isSunday: boolean
+
   isSaturday: boolean
+
   isToday: boolean
+
   allPassed: boolean
+
   closingTime: string
 } {
   if (!dateStr) {
     return {
       slots: [],
+
       isSunday: false,
+
       isSaturday: false,
+
       isToday: false,
+
       allPassed: false,
-      closingTime: '18:00',
+
+      closingTime: "18:00",
     }
   }
 
-  const [y, m, d] = dateStr.split('-').map(Number)
+  const [y, m, d] = dateStr.split("-").map(Number)
+
   const dateObj = new Date(y, m - 1, d)
+
   const dayOfWeek = dateObj.getDay()
 
   // Domingo
+
   if (dayOfWeek === 0) {
     return {
       slots: [],
+
       isSunday: true,
+
       isSaturday: false,
+
       isToday: false,
+
       allPassed: false,
-      closingTime: 'Cerrado',
+
+      closingTime: "Cerrado",
     }
   }
 
   const isSaturday = dayOfWeek === 6
+
   const isToday = isTodayDate(dateStr)
 
   // Límites según día
+
   // Lun-Vie: 08:00 a 17:15 (cierre 18:00)
+
   // Sábado:  08:00 a 12:15 (cierre 13:00)
+
   const startMin = 8 * 60 // 08:00
+
   const maxStartMin = isSaturday ? 12 * 60 + 15 : 17 * 60 + 15
-  const closingTime = isSaturday ? '13:00' : '18:00'
+
+  const closingTime = isSaturday ? "13:00" : "18:00"
 
   const now = new Date()
+
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
   const slots: TimeSlot[] = []
 
   for (let mins = startMin; mins <= maxStartMin; mins += 15) {
     const h = Math.floor(mins / 60)
+
     const min = mins % 60
-    const timeStr = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+
+    const timeStr = `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`
+
     const isPast = isToday && mins <= currentMinutes
 
     slots.push({
       time: timeStr,
+
       label: timeStr,
+
       isPast,
+
       endTime: calculateEndTime(timeStr, 45),
     })
   }
 
-  const allPassed = isToday && slots.length > 0 && slots.every(s => s.isPast)
+  const allPassed = isToday && slots.length > 0 && slots.every((s) => s.isPast)
 
   return {
     slots,
+
     isSunday: false,
+
     isSaturday,
+
     isToday,
+
     allPassed,
+
     closingTime,
   }
 }
@@ -268,56 +386,90 @@ export function getAvailableSlots(dateStr: string): {
 /**
  * Valida los límites estrictos de horario para una cita sincronizados con la BD
  */
+
 export function validateAppointmentSchedule(
   dateStr: string,
+
   startTime: string,
+
   endTime: string,
-  clinicSchedule?: HorarioAtencionDto[]
-): { valid: boolean; error?: string } {
+
+  clinicSchedule?: HorarioAtencionDto[],
+): { valid: boolean ;error?: string } {
   if (!dateStr || !startTime || !endTime) {
-    return { valid: false, error: 'Por favor completa la fecha y las horas de inicio y fin.' }
-  }
-
-  const todayStr = getMinDateString()
-  if (dateStr < todayStr) {
-    return { valid: false, error: 'No se pueden agendar citas en fechas pasadas.' }
-  }
-
-  const sched = getClinicDaySchedule(dateStr, clinicSchedule)
-  if (!sched.isOpen) {
-    return { valid: false, error: `La clínica permanece cerrada este día (${sched.closingReason || 'No laborable'}).` }
-  }
-
-  const [sH, sM] = startTime.split(':').map(Number)
-  const [eH, eM] = endTime.split(':').map(Number)
-  const startMins = sH * 60 + sM
-  const endMins = eH * 60 + eM
-
-  if (endMins <= startMins) {
-    return { valid: false, error: 'La hora de fin debe ser posterior a la hora de inicio.' }
-  }
-
-  // Si es hoy, verificar que la hora de inicio no haya pasado
-  if (isTodayDate(dateStr)) {
-    const now = new Date()
-    const nowMins = now.getHours() * 60 + now.getMinutes()
-    if (startMins <= nowMins) {
-      return { valid: false, error: 'La hora de inicio seleccionada ya ha pasado en el día de hoy.' }
+    return {
+      valid: false,
+      error: "Por favor completa la fecha y las horas de inicio y fin.",
     }
   }
 
-  const [oH, oM] = sched.openTime.split(':').map(Number)
-  const [cH, cM] = sched.closeTime.split(':').map(Number)
+  const todayStr = getMinDateString()
+
+  if (dateStr < todayStr) {
+    return {
+      valid: false,
+      error: "No se pueden agendar citas en fechas pasadas.",
+    }
+  }
+
+  const sched = getClinicDaySchedule(dateStr, clinicSchedule)
+
+  if (!sched.isOpen) {
+    return {
+      valid: false,
+      error: `La clínica permanece cerrada este día (${sched.closingReason || "No laborable"}).`,
+    }
+  }
+
+  const [sH, sM] = startTime.split(":").map(Number)
+
+  const [eH, eM] = endTime.split(":").map(Number)
+
+  const startMins = sH * 60 + sM
+
+  const endMins = eH * 60 + eM
+
+  if (endMins <= startMins) {
+    return {
+      valid: false,
+      error: "La hora de fin debe ser posterior a la hora de inicio.",
+    }
+  }
+
+  // Si es hoy, verificar que la hora de inicio no haya pasado
+
+  if (isTodayDate(dateStr)) {
+    const now = new Date()
+
+    const nowMins = now.getHours() * 60 + now.getMinutes()
+
+    if (startMins <= nowMins) {
+      return {
+        valid: false,
+        error: "La hora de inicio seleccionada ya ha pasado en el día de hoy.",
+      }
+    }
+  }
+
+  const [oH, oM] = sched.openTime.split(":").map(Number)
+
+  const [cH, cM] = sched.closeTime.split(":").map(Number)
+
   const openMins = oH * 60 + oM
+
   const closeMins = cH * 60 + cM
 
   if (startMins < openMins) {
-    return { valid: false, error: `La clínica abre a las ${sched.openTime}. Selecciona un horario a partir de esa hora.` }
+    return {
+      valid: false,
+      error: `La clínica abre a las ${sched.openTime}. Selecciona un horario a partir de esa hora.`,
+    }
   }
 
   if (endMins > closeMins) {
     return {
       valid: false,
+
       error: `La hora de fin (${endTime}) no puede superar las ${sched.closeTime} según la configuración de la clínica.`,
     }
   }
@@ -325,69 +477,100 @@ export function validateAppointmentSchedule(
   return { valid: true }
 }
 
-export const CONFLICT_MESSAGE = 'Conflicto: El doctor o el sillón seleccionado ya tienen una cita en ese horario.'
+export const CONFLICT_MESSAGE =
+  "Conflicto: El doctor o el sillón seleccionado ya tienen una cita en ese horario."
 
-export const LIMA_TIMEZONE_OFFSET = '-05:00'
+export const LIMA_TIMEZONE_OFFSET = "-05:00"
 
 /** Formatea fecha YYYY-MM-DD y hora HH:mm en ISO 8601 con offset oficial de Lima (-05:00) */
+
 export function toLimaIsoString(dateStr: string, timeStr: string): string {
-  const [h, m] = timeStr.split(':')
-  return `${dateStr}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00-05:00`
+  const [h, m] = timeStr.split(":")
+
+  return `${dateStr}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00-05:00`
 }
 
 /** Formatea una fecha ISO a hora HH:mm en zona horaria America/Lima */
+
 export function formatLimaTime(isoStr?: string): string {
-  if (!isoStr) return '--:--'
+  if (!isoStr) return "--:--"
+
   try {
     const d = new Date(isoStr)
-    return new Intl.DateTimeFormat('es-PE', {
-      timeZone: 'America/Lima',
-      hour: '2-digit',
-      minute: '2-digit',
+
+    return new Intl.DateTimeFormat("es-PE", {
+      timeZone: "America/Lima",
+
+      hour: "2-digit",
+
+      minute: "2-digit",
+
       hour12: false,
     }).format(d)
   } catch {
-    return '--:--'
+    return "--:--"
   }
 }
 
 /** Formatea una fecha ISO a fecha legible en zona horaria America/Lima */
-export function formatLimaDate(isoStr?: string, options?: Intl.DateTimeFormatOptions): string {
-  if (!isoStr) return '—'
+
+export function formatLimaDate(
+  isoStr?: string,
+  options?: Intl.DateTimeFormatOptions,
+): string {
+  if (!isoStr) return "—"
+
   try {
     const d = new Date(isoStr)
-    return new Intl.DateTimeFormat('es-PE', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+
+    return new Intl.DateTimeFormat("es-PE", {
+      timeZone: "America/Lima",
+
+      year: "numeric",
+
+      month: "long",
+
+      day: "numeric",
+
       ...options,
     }).format(d)
   } catch {
-    return '—'
+    return "—"
   }
 }
 
 /** Extrae fecha YYYY-MM-DD en zona horaria America/Lima evitando desfasajes UTC */
+
 export function toLimaDateString(isoStr?: string): string {
-  if (!isoStr) return ''
+  if (!isoStr) return ""
+
   try {
     const d = new Date(isoStr)
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
+
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Lima",
+
+      year: "numeric",
+
+      month: "2-digit",
+
+      day: "2-digit",
     }).format(d)
   } catch {
-    return ''
+    return ""
   }
 }
 
 /** Extrae hora y minuto en zona horaria America/Lima */
-export function getLimaHourMinute(isoStr?: string): { hour: number; minute: number; timeStr: string } {
-  if (!isoStr) return { hour: 0, minute: 0, timeStr: '00:00' }
+
+export function getLimaHourMinute(
+  isoStr?: string,
+): { hour: number ;minute: number ;timeStr: string } {
+  if (!isoStr) return { hour: 0, minute: 0, timeStr: "00:00" }
+
   const timeStr = formatLimaTime(isoStr)
-  const [h, m] = timeStr.split(':').map(Number)
+
+  const [h, m] = timeStr.split(":").map(Number)
+
   return { hour: isNaN(h) ? 0 : h, minute: isNaN(m) ? 0 : m, timeStr }
 }

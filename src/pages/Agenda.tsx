@@ -1,5 +1,16 @@
-import { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import {
+  getClinicSchedule,
+  type HorarioAtencionDto,
+} from "../services/availabilityService"
+
+import useAppointmentSlots from "../hooks/useAppointmentSlots"
+
+import { startAppointmentAttention } from "../services/clinicalEncounterService"
+
+import { useState, useEffect, useMemo } from "react"
+
+import { useNavigate } from "react-router-dom"
+
 import {
   getAppointments,
   getAppointmentsByDoctor,
@@ -9,12 +20,18 @@ import {
   getClinicRescheduleRequests,
   resolveRescheduleRequest,
   fetchClinicOdontologos,
-} from '../services/appointmentService'
-import { fetchUsersFromApi, UserItem } from '../services/authService'
-import { useAuth } from '../contexts/AuthContext'
-import { Appointment, SolicitudReprogramacion } from '../types/appointment'
-import AgendarCitaModal from '../components/agenda/AgendarCitaModal'
+} from "../services/appointmentService"
+
+import { fetchUsersFromApi, UserItem } from "../services/authService"
+
+import { useAuth } from "../contexts/AuthContext"
+
+import { Appointment, SolicitudReprogramacion } from "../types/appointment"
+
+import AgendarCitaModal from "../components/agenda/AgendarCitaModal"
+
 import {
+  getClinicDaySchedule,
   getMinDateString,
   getMaxDateString,
   toLocalDateString,
@@ -30,40 +47,65 @@ import {
   formatLimaDate,
   toLimaDateString,
   getLimaHourMinute,
-} from '../utils/appointmentRules'
+} from "../utils/appointmentRules"
 
 // ── Hours configuration ──────────────────────────────────────────────────────
+
 const HOUR_START = 8
-const HOUR_END   = 19
-const TOTAL_H    = HOUR_END - HOUR_START
-const CELL_H     = 56 // px per hour slot
+
+const HOUR_END = 19
+
+const TOTAL_H = HOUR_END - HOUR_START
+
+const CELL_H = 56 // px per hour slot
 
 // ── Colors matching the clean design from Image 1 ────────────────────────────
+
 const PROC_COLORS: Record<string, string> = {
-  'Ortodoncia':   '#7C3AED', // Purple
-  'Endodoncia':   '#DC2626', // Red
-  'Extracción':   '#D97706', // Orange
-  'Limpieza':     '#1E8C82', // Teal
-  'Restauración': '#0369A1', // Blue
-  'Control':      '#059669', // Emerald
-  'Urgencia':     '#BE123C', // Rose / Crimson
-  'Implante':     '#9333EA', // Violet
-  'Evaluación':   '#0284C7', // Sky
+  Ortodoncia: "#7C3AED", // Purple
+
+  Endodoncia: "#DC2626", // Red
+
+  Extracción: "#D97706", // Orange
+
+  Limpieza: "#1E8C82", // Teal
+
+  Restauración: "#0369A1", // Blue
+
+  Control: "#059669", // Emerald
+
+  Urgencia: "#BE123C", // Rose / Crimson
+
+  Implante: "#9333EA", // Violet
+
+  Evaluación: "#0284C7", // Sky
 }
 
 function getProcedureColor(text?: string): string {
-  if (!text) return '#1E8C82'
+  if (!text) return "#1E8C82"
+
   const lower = text.toLowerCase()
+
   for (const [key, color] of Object.entries(PROC_COLORS)) {
     if (lower.includes(key.toLowerCase())) return color
   }
-  return '#1E8C82'
+
+  return "#1E8C82"
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function Icon({ d, className = 'w-4 h-4' }: { d: string; className?: string }) {
+
+function Icon({ d, className = "w-4 h-4" }: { d: string ;className?: string }) {
   return (
-    <svg className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      viewBox="0 0 24 24"
+    >
       <path d={d} />
     </svg>
   )
@@ -74,32 +116,59 @@ function formatHourMinute(isoStr?: string): string {
 }
 
 // ── Side Drawer: Detalle y Acciones del Paciente (Matching Image 1) ───────────
+
 function PatientPanel({
   cita,
+
   onClose,
+
   onConfirm,
+
   onStartAttention,
+
   onContinueAttention,
+
   onFinish,
+
   onMarkAttendance,
+
   onOpenReprogramar,
+
   onOpenCancel,
 }: {
   cita: Appointment
+
   onClose: () => void
+
   onConfirm: (id: string) => Promise<void>
+
   onStartAttention: (id: string) => Promise<void>
+
   onContinueAttention: (c: Appointment) => void
+
   onFinish: (id: string) => Promise<void>
-  onMarkAttendance: (id: string, asistencia: 'ASISTIO' | 'NO_SHOW') => Promise<void>
+
+  onMarkAttendance: (
+    id: string,
+    asistencia: "ASISTIO" | "NO_SHOW",
+  ) => Promise<void>
+
   onOpenReprogramar: (c: Appointment) => void
+
   onOpenCancel: (c: Appointment) => void
 }) {
+  const { role, user } = useAuth()
+
+  const canAttend =
+    role === "ODONTOLOGO" && user?.usuarioClinicaId === cita.odontologoId
+
   const color = getProcedureColor(cita.motivo)
+
   const [isConfirming, setIsConfirming] = useState(false)
 
   const handleConfirm = async () => {
     setIsConfirming(true)
+
     try {
       await onConfirm(cita.id)
     } finally {
@@ -108,11 +177,14 @@ function PatientPanel({
   }
 
   // Parse Date & Time con zona horaria oficial Lima
+
   const durationMin = (() => {
     try {
       const s = getLimaHourMinute(cita.inicioEn)
+
       const e = getLimaHourMinute(cita.finEn)
-      return (e.hour * 60 + e.minute) - (s.hour * 60 + s.minute) || 45
+
+      return e.hour * 60 + e.minute - (s.hour * 60 + s.minute) || 45
     } catch {
       return 45
     }
@@ -121,27 +193,39 @@ function PatientPanel({
   const capitalizedDay = (() => {
     try {
       const formatted = formatLimaDate(cita.inicioEn, {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
+        weekday: "long",
+
+        day: "numeric",
+
+        month: "long",
       })
+
       return formatted.charAt(0).toUpperCase() + formatted.slice(1)
     } catch {
-      return 'Fecha de cita'
+      return "Fecha de cita"
     }
   })()
 
-  const statusMeta: Record<
-    Appointment['estado'],
-    { label: string; cls: string }
-  > = {
-    CONFIRMADA:   { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
-    PROGRAMADA:   { label: 'Programada',   cls: 'bg-amber-100 text-amber-700' },
-    EN_ATENCION:  { label: 'En atención',  cls: 'bg-cyan-100 text-cyan-700' },
-    FINALIZADA:   { label: 'Finalizada',   cls: 'bg-slate-100 text-slate-700' },
-    REPROGRAMADA: { label: 'Reprogramada', cls: 'bg-purple-100 text-purple-700' },
-    CANCELADA:    { label: 'Cancelada',    cls: 'bg-rose-100 text-rose-700' },
-    NO_ASISTIO:   { label: 'No asistió',   cls: 'bg-slate-200 text-slate-700' },
+  const statusMeta: Record<Appointment["estado"], {
+    label: string
+    cls: string
+  }> = {
+    CONFIRMADA: { label: "Confirmada", cls: "bg-emerald-100 text-emerald-700" },
+
+    PROGRAMADA: { label: "Programada", cls: "bg-amber-100 text-amber-700" },
+
+    EN_ATENCION: { label: "En atención", cls: "bg-cyan-100 text-cyan-700" },
+
+    FINALIZADA: { label: "Finalizada", cls: "bg-slate-100 text-slate-700" },
+
+    REPROGRAMADA: {
+      label: "Reprogramada",
+      cls: "bg-purple-100 text-purple-700",
+    },
+
+    CANCELADA: { label: "Cancelada", cls: "bg-rose-100 text-rose-700" },
+
+    NO_ASISTIO: { label: "No asistió", cls: "bg-slate-200 text-slate-700" },
   }
 
   return (
@@ -149,14 +233,19 @@ function PatientPanel({
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0"
-        style={{ backgroundColor: color + '15' }}
+        style={{ backgroundColor: color + "15" }}
       >
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-slate-800 text-sm truncate" style={{ fontFamily: 'Outfit' }}>
+          <p
+            className="font-bold text-slate-800 text-sm truncate"
+            style={{ fontFamily: "Outfit" }}
+          >
             {cita.pacienteNombreCompleto}
           </p>
           <p className="text-xs text-slate-500 font-mono">
-            {cita.pacienteNumeroDocumento ? `Doc: ${cita.pacienteNumeroDocumento}` : 'Sin documento'}
+            {cita.pacienteNumeroDocumento
+              ? `Doc: ${cita.pacienteNumeroDocumento}`
+              : "Sin documento"}
           </p>
         </div>
         <button
@@ -172,32 +261,54 @@ function PatientPanel({
         {/* Procedure box */}
         <div
           className="rounded-xl p-3.5"
-          style={{ backgroundColor: color + '12', borderLeft: `3px solid ${color}` }}
+          style={{
+            backgroundColor: color + "12",
+            borderLeft: `3px solid ${color}`,
+          }}
         >
           <p className="font-bold text-sm" style={{ color }}>
-            {cita.motivo || 'Consulta general'}
+            {cita.motivo || "Consulta general"}
           </p>
           <p className="text-xs text-slate-600 font-medium mt-1">
-            {capitalizedDay} · {formatHourMinute(cita.inicioEn)} - {formatHourMinute(cita.finEn)}
+            {capitalizedDay} · {formatHourMinute(cita.inicioEn)} -{" "}
+            {formatHourMinute(cita.finEn)}
           </p>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            {durationMin} min · {cita.consultorio || 'Sillón general'}
+            {durationMin} min · {cita.consultorio || "Sillón general"}
           </p>
         </div>
 
         {/* Details list */}
         <div className="space-y-2 text-xs">
           {[
-            ['Doctor', cita.odontologoNombreCompleto ? `Dr. ${cita.odontologoNombreCompleto}` : 'No asignado'],
-            ['Modalidad', cita.modalidad === 'VIRTUAL' ? '💻 Virtual' : '🏥 Presencial'],
-            ['Teléfono', cita.pacienteTelefono || 'No registrado'],
-            ['Email', cita.odontologoCorreo || ''],
+            [
+              "Doctor",
+              cita.odontologoNombreCompleto
+                ? cita.odontologoNombreCompleto
+                : "No asignado",
+            ],
+
+            [
+              "Modalidad",
+              cita.modalidad === "VIRTUAL" ? "💻 Virtual" : "🏥 Presencial",
+            ],
+
+            ["Teléfono", cita.pacienteTelefono || "No registrado"],
+
+            ["Email", cita.odontologoCorreo || ""],
           ]
+
             .filter(([, v]) => v)
+
             .map(([label, val]) => (
-              <div key={label} className="flex justify-between py-1.5 border-b border-slate-50 last:border-0">
+              <div
+                key={label}
+                className="flex justify-between py-1.5 border-b border-slate-50 last:border-0"
+              >
                 <span className="text-slate-500">{label}</span>
-                <span className="font-semibold text-slate-700 text-right max-w-[160px] truncate">{val}</span>
+                <span className="font-semibold text-slate-700 text-right max-w-[160px] truncate">
+                  {val}
+                </span>
               </div>
             ))}
 
@@ -205,7 +316,7 @@ function PatientPanel({
             <span className="text-slate-500">Estado</span>
             <span
               className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                statusMeta[cita.estado]?.cls || 'bg-slate-100 text-slate-600'
+                statusMeta[cita.estado]?.cls || "bg-slate-100 text-slate-600"
               }`}
             >
               {statusMeta[cita.estado]?.label || cita.estado}
@@ -216,23 +327,23 @@ function PatientPanel({
             <span className="text-slate-500">Asistencia</span>
             <span
               className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                cita.estadoAsistencia === 'ASISTIO'
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : cita.estadoAsistencia === 'NO_SHOW'
-                  ? 'bg-slate-100 text-slate-600'
-                  : 'bg-amber-50 text-amber-700'
+                cita.estadoAsistencia === "ASISTIO"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : cita.estadoAsistencia === "NO_SHOW"
+                    ? "bg-slate-100 text-slate-600"
+                    : "bg-amber-50 text-amber-700"
               }`}
             >
-              {cita.estadoAsistencia === 'ASISTIO'
-                ? '✓ Asistió'
-                : cita.estadoAsistencia === 'NO_SHOW'
-                ? 'No asistió (No-show)'
-                : 'Pendiente'}
+              {cita.estadoAsistencia === "ASISTIO"
+                ? "✓ Asistió"
+                : cita.estadoAsistencia === "NO_SHOW"
+                  ? "No asistió (No-show)"
+                  : "Pendiente"}
             </span>
           </div>
         </div>
 
-        {cita.modalidad === 'VIRTUAL' ? (
+        {cita.modalidad === "VIRTUAL" ? (
           <div className="bg-sky-50 rounded-xl p-3.5 border border-sky-200 text-xs text-sky-900 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="font-bold flex items-center gap-1.5 text-sky-900">
@@ -253,7 +364,9 @@ function PatientPanel({
                 <span>🚀 Abrir Sala de Google Meet ↗</span>
               </a>
             ) : (
-              <p className="text-[11px] text-sky-600 italic">Enlace de Meet no disponible</p>
+              <p className="text-[11px] text-sky-600 italic">
+                Enlace de Meet no disponible
+              </p>
             )}
           </div>
         ) : cita.consultorio ? (
@@ -270,24 +383,24 @@ function PatientPanel({
       {/* Action Buttons Footer */}
       <div className="p-4 border-t border-slate-100 space-y-2 bg-slate-50/50 shrink-0">
         {/* Confirmar cita (when PROGRAMADA) */}
-        {cita.estado === 'PROGRAMADA' && (
+        {cita.estado === "PROGRAMADA" && (
           <button
             onClick={handleConfirm}
             disabled={isConfirming}
             className="w-full py-2.5 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-emerald-700/20 disabled:opacity-60 cursor-pointer"
-            style={{ background: 'linear-gradient(135deg, #1E8C82, #0B3D3A)' }}
+            style={{ background: "linear-gradient(135deg, #1E8C82, #0B3D3A)" }}
           >
             {isConfirming ? (
               <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <Icon d="M5 13l4 4L19 7" className="w-4 h-4" />
             )}
-            {isConfirming ? 'Confirmando...' : 'Confirmar cita'}
+            {isConfirming ? "Confirmando..." : "Confirmar cita"}
           </button>
         )}
 
         {/* Iniciar atención (when CONFIRMADA) */}
-        {cita.estado === 'CONFIRMADA' && (
+        {cita.estado === "CONFIRMADA" && canAttend && (
           <button
             onClick={() => onStartAttention(cita.id)}
             className="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 flex items-center justify-center gap-1.5 transition-all shadow-sm shadow-cyan-600/20 cursor-pointer"
@@ -297,7 +410,7 @@ function PatientPanel({
         )}
 
         {/* Finalizar o Continuar cita (when EN_ATENCION) */}
-        {cita.estado === 'EN_ATENCION' && (
+        {cita.estado === "EN_ATENCION" && canAttend && (
           <div className="space-y-2">
             <button
               onClick={() => onContinueAttention(cita)}
@@ -309,32 +422,36 @@ function PatientPanel({
               onClick={() => onFinish(cita.id)}
               className="w-full py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             >
-              <span>🏁 Finalizar sin notas</span>
+              <span>🏁 Completar y firmar atención</span>
             </button>
           </div>
         )}
 
         {/* Marcar asistencia */}
-        {cita.estado !== 'CANCELADA' && !cita.estadoAsistencia && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => onMarkAttendance(cita.id, 'ASISTIO')}
-              className="flex-1 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Icon d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" className="w-3.5 h-3.5" />
-              Asistió
-            </button>
-            <button
-              onClick={() => onMarkAttendance(cita.id, 'NO_SHOW')}
-              className="flex-1 py-2 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              ✕ No asistió
-            </button>
-          </div>
-        )}
+        {["PROGRAMADA", "CONFIRMADA", "REPROGRAMADA"].includes(cita.estado) &&
+          !cita.estadoAsistencia && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => onMarkAttendance(cita.id, "ASISTIO")}
+                className="flex-1 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Icon
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  className="w-3.5 h-3.5"
+                />
+                Asistió
+              </button>
+              <button
+                onClick={() => onMarkAttendance(cita.id, "NO_SHOW")}
+                className="flex-1 py-2 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                ✕ No asistió
+              </button>
+            </div>
+          )}
 
         {/* Reprogramar & Cancelar */}
-        {cita.estado !== 'CANCELADA' && cita.estado !== 'FINALIZADA' && (
+        {["PROGRAMADA", "CONFIRMADA", "REPROGRAMADA"].includes(cita.estado) && (
           <div className="flex gap-2 pt-1">
             <button
               onClick={() => onOpenReprogramar(cita)}
@@ -356,28 +473,45 @@ function PatientPanel({
 }
 
 // ── Modal Solicitudes de Reprogramación (Staff: Recepción y Admin) ────────────
+
 function SolicitudesModal({
   isOpen,
+
   onClose,
+
   solicitudes,
+
   onResolve,
+
   isResolving,
 }: {
   isOpen: boolean
+
   onClose: () => void
+
   solicitudes: SolicitudReprogramacion[]
-  onResolve: (id: string, accion: 'APROBADA' | 'RECHAZADA', nota?: string) => Promise<void>
+
+  onResolve: (
+    id: string,
+    accion: "APROBADA" | "RECHAZADA",
+    nota?: string,
+  ) => Promise<void>
+
   isResolving: boolean
 }) {
   const [rejectId, setRejectId] = useState<string | null>(null)
-  const [rejectNota, setRejectNota] = useState('')
+
+  const [rejectNota, setRejectNota] = useState("")
 
   if (!isOpen) return null
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(5px)' }}
+      style={{
+        backgroundColor: "rgba(15, 23, 42, 0.7)",
+        backdropFilter: "blur(5px)",
+      }}
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -386,11 +520,15 @@ function SolicitudesModal({
               🔄
             </span>
             <div>
-              <h3 className="font-bold text-slate-900 text-base" style={{ fontFamily: 'Outfit' }}>
+              <h3
+                className="font-bold text-slate-900 text-base"
+                style={{ fontFamily: "Outfit" }}
+              >
                 Solicitudes de Reprogramación
               </h3>
               <p className="text-xs text-slate-500">
-                Peticiones registradas por pacientes pendientes de resolución por recepción
+                Peticiones registradas por pacientes pendientes de resolución
+                por recepción
               </p>
             </div>
           </div>
@@ -406,7 +544,10 @@ function SolicitudesModal({
           {solicitudes.length === 0 ? (
             <div className="text-center py-12">
               <span className="text-3xl">✨</span>
-              <p className="font-bold text-slate-700 text-sm mt-2" style={{ fontFamily: 'Outfit' }}>
+              <p
+                className="font-bold text-slate-700 text-sm mt-2"
+                style={{ fontFamily: "Outfit" }}
+              >
                 No hay solicitudes pendientes
               </p>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -414,19 +555,32 @@ function SolicitudesModal({
               </p>
             </div>
           ) : (
-            solicitudes.map(sol => (
+            solicitudes.map((sol) => (
               <div
                 key={sol.id}
                 className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col gap-3"
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-bold text-slate-800 text-sm" style={{ fontFamily: 'Outfit' }}>
+                    <p
+                      className="font-bold text-slate-800 text-sm"
+                      style={{ fontFamily: "Outfit" }}
+                    >
                       {sol.pacienteNombreCompleto || `Cita #${sol.citaId}`}
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      <strong>Nuevo horario deseado:</strong>{' '}
-                      {formatLimaDate(sol.nuevaFechaHoraInicio || sol.nuevoInicioDeseado)} de {formatLimaTime(sol.nuevaFechaHoraInicio || sol.nuevoInicioDeseado)} a {formatLimaTime(sol.nuevaFechaHoraFin || sol.nuevoFinDeseado)}
+                      <strong>Nuevo horario deseado:</strong>{" "}
+                      {formatLimaDate(
+                        sol.nuevaFechaHoraInicio || sol.nuevoInicioDeseado,
+                      )}{" "}
+                      de{" "}
+                      {formatLimaTime(
+                        sol.nuevaFechaHoraInicio || sol.nuevoInicioDeseado,
+                      )}{" "}
+                      a{" "}
+                      {formatLimaTime(
+                        sol.nuevaFechaHoraFin || sol.nuevoFinDeseado,
+                      )}
                     </p>
                     {sol.motivo && (
                       <p className="text-xs text-slate-600 mt-1 italic bg-white p-2 rounded-lg border border-slate-100">
@@ -441,11 +595,13 @@ function SolicitudesModal({
 
                 {rejectId === sol.id ? (
                   <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl space-y-2">
-                    <p className="text-xs font-semibold text-rose-800">Motivo del rechazo (opcional):</p>
+                    <p className="text-xs font-semibold text-rose-800">
+                      Motivo del rechazo (opcional):
+                    </p>
                     <input
                       type="text"
                       value={rejectNota}
-                      onChange={e => setRejectNota(e.target.value)}
+                      onChange={(e) => setRejectNota(e.target.value)}
                       placeholder="Ej: Sin disponibilidad en el sillón requerido..."
                       className="w-full px-3 py-1.5 text-xs bg-white border border-rose-300 rounded-lg focus:outline-none"
                     />
@@ -453,7 +609,8 @@ function SolicitudesModal({
                       <button
                         onClick={() => {
                           setRejectId(null)
-                          setRejectNota('')
+
+                          setRejectNota("")
                         }}
                         className="px-3 py-1 text-xs text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer"
                       >
@@ -462,9 +619,15 @@ function SolicitudesModal({
                       <button
                         disabled={isResolving}
                         onClick={async () => {
-                          await onResolve(sol.id, 'RECHAZADA', rejectNota || 'Rechazado por recepción')
+                          await onResolve(
+                            sol.id,
+                            "RECHAZADA",
+                            rejectNota || "Rechazado por recepción",
+                          )
+
                           setRejectId(null)
-                          setRejectNota('')
+
+                          setRejectNota("")
                         }}
                         className="px-3 py-1 text-xs font-bold bg-rose-600 text-white rounded-lg hover:bg-rose-500 disabled:opacity-50 cursor-pointer"
                       >
@@ -483,7 +646,9 @@ function SolicitudesModal({
                     </button>
                     <button
                       disabled={isResolving}
-                      onClick={() => onResolve(sol.id, 'APROBADA', 'Aprobado por recepción')}
+                      onClick={() =>
+                        onResolve(sol.id, "APROBADA", "Aprobado por recepción")
+                      }
                       className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                     >
                       <span>✓ Aprobar y Reprogramar</span>
@@ -500,173 +665,336 @@ function SolicitudesModal({
 }
 
 // ── Main Agenda Component ─────────────────────────────────────────────────────
+
 export default function Agenda() {
   const navigate = useNavigate()
+
   const { role, user } = useAuth()
-  const [view, setView] = useState<'week' | 'day'>('week')
+
+  const [view, setView] = useState<"week" | "day">("week")
+
   const [citas, setCitas] = useState<Appointment[]>([])
+
   const [doctors, setDoctors] = useState<UserItem[]>([])
-  const [filterDoc, setFilterDoc] = useState<string>('')
+
+  const [filterDoc, setFilterDoc] = useState<string>("")
+
   const [isLoading, setIsLoading] = useState(false)
+
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Current calendar reference date (defaults to current date)
+
   const [refDate, setRefDate] = useState(() => new Date())
+
   const [selCita, setSelCita] = useState<Appointment | null>(null)
 
+  const [clinicSchedule, setClinicSchedule] = useState<HorarioAtencionDto[]>([])
+
+  useEffect(() => {
+    let active = true
+
+    getClinicSchedule()
+      .then((rules) => {
+        if (active) setClinicSchedule(rules)
+      })
+      .catch(() => {})
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const HOUR_START = Math.min(
+    8,
+    ...clinicSchedule
+      .filter((s) => s.activo)
+      .map((s) => Number(s.horaApertura.slice(0, 2))),
+  )
+
+  const HOUR_END = Math.max(
+    19,
+    ...clinicSchedule
+      .filter((s) => s.activo)
+      .map((s) =>
+        Math.ceil(
+          Number(s.horaCierre.slice(0, 2)) +
+            Number(s.horaCierre.slice(3, 5)) / 60,
+        ),
+      ),
+  )
+
+  const TOTAL_H = HOUR_END - HOUR_START
+
+  const closedAt = (date: string, hour: number) => {
+    const schedule = getClinicDaySchedule(date, clinicSchedule)
+
+    const start =
+      Number(schedule.openTime.slice(0, 2)) * 60 +
+      Number(schedule.openTime.slice(3, 5))
+
+    const end =
+      Number(schedule.closeTime.slice(0, 2)) * 60 +
+      Number(schedule.closeTime.slice(3, 5))
+
+    return !schedule.isOpen || hour * 60 + 60 <= start || hour * 60 >= end
+  }
+
   // Modals state
+
   const [showModal, setShowModal] = useState(false)
-  const [prefill, setPrefill] = useState<{ date?: string; time?: string }>({})
+
+  const [prefill, setPrefill] = useState<{ date?: string ;time?: string }>({})
+
   const [cancelCita, setCancelCita] = useState<Appointment | null>(null)
-  const [cancelMotivo, setCancelMotivo] = useState('')
-  const [reprogramarCita, setReprogramarCita] = useState<Appointment | null>(null)
+
+  const [cancelMotivo, setCancelMotivo] = useState("")
+
+  const [reprogramarCita, setReprogramarCita] = useState<Appointment | null>(
+    null,
+  )
+
   const [reprogFecha, setReprogFecha] = useState(getMinDateString())
-  const [reprogInicio, setReprogInicio] = useState('10:00')
-  const [reprogFin, setReprogFin] = useState('10:45')
+
+  const [reprogInicio, setReprogInicio] = useState("10:00")
+
+  const [reprogFin, setReprogFin] = useState("10:45")
+
   const [reprogError, setReprogError] = useState<string | null>(null)
 
   // Solicitudes de reprogramación (Staff)
+
   const [showRequestsModal, setShowRequestsModal] = useState(false)
-  const [pendingRequests, setPendingRequests] = useState<SolicitudReprogramacion[]>([])
+
+  const [pendingRequests, setPendingRequests] =
+    useState<SolicitudReprogramacion[]>([])
+
   const [isResolvingRequest, setIsResolvingRequest] = useState(false)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
+
     setTimeout(() => setToastMessage(null), 4000)
   }
 
   // ── Calculate Week Days (Monday to Saturday, 6 business days) ──────────────
+
   const isSundayToday = useMemo(() => new Date().getDay() === 0, [])
 
   const weekDays = useMemo(() => {
     const d = new Date(refDate)
+
     const day = d.getDay() // 0 = Dom, 1 = Lun, etc.
+
     // Si la fecha es Domingo, avanzamos +1 día al Lunes entrante para mostrar la semana laboral operativa
-    const diff = d.getDate() + (day === 0 ? 1 : 1 - day)
+
+    const diff = d.getDate() + (day === 0 ? -6 : 1 - day)
+
     const monday = new Date(d)
+
     monday.setDate(diff)
 
-    const shortNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    const shortNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+
     const result: {
       date: Date
+
       dateStr: string
+
       dayShort: string
+
       dayNum: number
+
       monthShort: string
+
       isToday: boolean
+
       isSaturday: boolean
     }[] = []
 
     const todayStr = getMinDateString()
 
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       const cur = new Date(monday)
+
       cur.setDate(monday.getDate() + i)
+
       const dateStr = toLocalDateString(cur)
-      const monthShort = cur.toLocaleDateString('es-PE', { month: 'short' }).replace('.', '')
+
+      const monthShort = cur
+        .toLocaleDateString("es-PE", { month: "short" })
+        .replace(".", "")
 
       result.push({
         date: cur,
+
         dateStr,
+
         dayShort: shortNames[i],
+
         dayNum: cur.getDate(),
+
         monthShort,
+
         isToday: dateStr === todayStr,
+
         isSaturday: i === 5,
       })
     }
+
     return result
   }, [refDate])
 
   // Rango de fechas formateado limpiamente (ej. '28 Set – 3 Oct 2026' o '5 – 10 Oct 2026')
+
   const weekRangeText = useMemo(() => {
-    if (weekDays.length === 0) return ''
+    if (weekDays.length === 0) return ""
+
     const first = weekDays[0]
+
     const last = weekDays[weekDays.length - 1]
+
     const year = first.date.getFullYear()
+
     if (first.monthShort === last.monthShort) {
       return `${first.dayNum}–${last.dayNum} ${first.monthShort} ${year}`
     }
+
     return `${first.dayNum} ${first.monthShort} – ${last.dayNum} ${last.monthShort} ${year}`
   }, [weekDays])
 
   // Current day index when in Day view (0 to 5)
+
   // Por defecto se posiciona en el día actual (si está en la semana), o en el primer día hábil (0 = Lunes)
+
   const [dayIdx, setDayIdx] = useState(0)
 
   // Sincronizar dayIdx cuando cambia la semana o se detecta el día actual
+
   useEffect(() => {
-    const todayIndex = weekDays.findIndex(d => d.isToday)
+    const todayIndex = weekDays.findIndex((d) => d.isToday)
+
     if (todayIndex >= 0) {
       setDayIdx(todayIndex)
     }
   }, [weekDays])
 
   // ── Cargar Doctores ────────────────────────────────────────────────────────
+
   useEffect(() => {
     async function loadDocs() {
       try {
         let users: UserItem[] = []
+
         try {
           users = await fetchClinicOdontologos()
         } catch {
           users = await fetchUsersFromApi()
         }
-        const odon = users.filter(u => u.rol === 'ODONTOLOGO' && Boolean(u.usuarioClinicaId))
+
+        const odon = users.filter(
+          (u) => u.rol === "ODONTOLOGO" && Boolean(u.usuarioClinicaId),
+        )
+
         setDoctors(odon)
-        if (role === 'ODONTOLOGO' && user?.usuarioClinicaId) {
+
+        if (role === "ODONTOLOGO" && user?.usuarioClinicaId) {
           setFilterDoc(user.usuarioClinicaId)
         }
       } catch (err) {
-        if (role === 'ODONTOLOGO' && user && user.usuarioClinicaId) {
-          setDoctors([{
-            id: user.usuarioId || user.id,
-            usuarioClinicaId: user.usuarioClinicaId,
-            correo: user.correo,
-            nombres: user.nombres,
-            apellidos: user.apellidos,
-            rol: 'ODONTOLOGO',
-            estado: 'ACTIVO',
-          }])
+        if (role === "ODONTOLOGO" && user && user.usuarioClinicaId) {
+          setDoctors([
+            {
+              id: user.usuarioId || user.id,
+
+              usuarioClinicaId: user.usuarioClinicaId,
+
+              correo: user.correo,
+
+              nombres: user.nombres,
+
+              apellidos: user.apellidos,
+
+              rol: "ODONTOLOGO",
+
+              estado: "ACTIVO",
+            },
+          ])
+
           setFilterDoc(user.usuarioClinicaId)
         } else {
-          console.warn('Directorio no autorizado o no disponible para este rol:', err)
+          console.warn(
+            "Directorio no autorizado o no disponible para este rol:",
+            err,
+          )
         }
       }
     }
+
     loadDocs()
   }, [role, user])
 
   // ── Cargar Solicitudes de Reprogramación (Staff: Recepción / Admin) ─────────
+
   const loadPendingRequests = async (silent = false) => {
-    if (role !== 'ADMIN_CLINICA' && role !== 'RECEPCIONISTA') return
+    if (role !== "ADMIN_CLINICA" && role !== "RECEPCIONISTA") return
+
     try {
-      const reqs = await getClinicRescheduleRequests('PENDIENTE')
+      const reqs = await getClinicRescheduleRequests("PENDIENTE")
+
       setPendingRequests(reqs)
     } catch (err) {
-      if (!silent) console.warn('Error al cargar solicitudes de reprogramación:', err)
+      if (!silent)
+        console.warn("Error al cargar solicitudes de reprogramación:", err)
     }
   }
 
-  const handleResolveRequest = async (id: string, accion: 'APROBADA' | 'RECHAZADA', nota?: string) => {
+  const handleResolveRequest = async (
+    id: string,
+    accion: "APROBADA" | "RECHAZADA",
+    nota?: string,
+  ) => {
     setIsResolvingRequest(true)
+
     try {
       await resolveRescheduleRequest(id, {
         estado: accion,
-        motivoResolucion: nota || (accion === 'APROBADA' ? 'Aprobado por recepción' : 'Rechazado por recepción'),
+
+        motivoResolucion:
+          nota ||
+          (accion === "APROBADA"
+            ? "Aprobado por recepción"
+            : "Rechazado por recepción"),
       })
-      showToast(accion === 'APROBADA' ? '✓ Solicitud aprobada y cita reprogramada' : '✓ Solicitud rechazada')
+
+      showToast(
+        accion === "APROBADA"
+          ? "✓ Solicitud aprobada y cita reprogramada"
+          : "✓ Solicitud rechazada",
+      )
+
       await loadPendingRequests(true)
+
       await loadWeekCitas(true)
     } catch (err: any) {
       const status = err.status || err.response?.status
+
       const msg = err.response?.data?.message || err.message
-      if (status === 409 || msg?.toLowerCase().includes('conflicto') || msg?.toLowerCase().includes('solapa')) {
-        showToast('⚠️ Conflicto 409: El horario ya está ocupado. Se recarga la agenda.')
+
+      if (
+        status === 409 ||
+        msg?.toLowerCase().includes("conflicto") ||
+        msg?.toLowerCase().includes("solapa")
+      ) {
+        showToast(
+          "⚠️ Conflicto 409: El horario ya está ocupado. Se recarga la agenda.",
+        )
+
         await loadWeekCitas(true)
+
         await loadPendingRequests(true)
       } else {
-        showToast(msg || 'Error al resolver solicitud')
+        showToast(msg || "Error al resolver solicitud")
       }
     } finally {
       setIsResolvingRequest(false)
@@ -674,24 +1002,34 @@ export default function Agenda() {
   }
 
   // ── Cargar Citas para el rango de la semana (Lunes a Sábado) ───────────────
+
   const loadWeekCitas = async (silent = false) => {
     if (weekDays.length < 5) return
+
     if (!silent) setIsLoading(true)
+
     try {
-      const desde = toLimaIsoString(weekDays[0].dateStr, '00:00')
-      const hasta = toLimaIsoString(weekDays[weekDays.length - 1].dateStr, '23:59')
+      const desde = toLimaIsoString(weekDays[0].dateStr, "00:00")
+
+      const hasta = toLimaIsoString(
+        weekDays[weekDays.length - 1].dateStr,
+        "23:59",
+      )
 
       let data: Appointment[] = []
+
       if (filterDoc) {
         data = await getAppointmentsByDoctor(filterDoc, desde, hasta)
       } else {
         data = await getAppointments(desde, hasta)
       }
+
       setCitas(data)
     } catch (err: any) {
       if (!silent) {
-        console.warn('Error al consultar citas de Spring Boot:', err)
-        showToast('Error al conectar con la agenda')
+        console.warn("Error al consultar citas de Spring Boot:", err)
+
+        showToast("Error al conectar con la agenda")
       }
     } finally {
       if (!silent) setIsLoading(false)
@@ -699,196 +1037,277 @@ export default function Agenda() {
   }
 
   // Sincronización y Sondeo cada 5 segundos (garantiza sincronización <= 10 s entre sesiones)
+
   useEffect(() => {
     loadWeekCitas()
+
     loadPendingRequests(true)
+
     const interval = setInterval(() => {
       loadWeekCitas(true)
+
       loadPendingRequests(true)
     }, 5000)
+
     return () => clearInterval(interval)
   }, [weekDays, filterDoc, role])
 
   // ── Filtrado por Doctor ────────────────────────────────────────────────────
+
   const filteredCitas = useMemo(() => {
     if (!filterDoc) return citas
-    return citas.filter(c => c.odontologoId === filterDoc)
+
+    return citas.filter((c) => c.odontologoId === filterDoc)
   }, [citas, filterDoc])
 
   // ── Navegación de Semana y Día ─────────────────────────────────────────────
+
   const shiftWeek = (delta: number) => {
-    setRefDate(prev => {
+    setRefDate((prev) => {
       const next = new Date(prev)
+
       next.setDate(next.getDate() + delta * 7)
+
       return next
     })
   }
 
   const shiftDay = (delta: number) => {
-    setDayIdx(prev => {
+    setDayIdx((prev) => {
       const next = prev + delta
+
       if (next < 0) return 0
+
       if (next > weekDays.length - 1) return weekDays.length - 1
+
       return next
     })
   }
 
   // ── Clic en ranura horaria (Reglas de validación antes de abrir modal) ─────
+
   const handleSlotClick = (targetDateStr: string, hour: number) => {
     // Regla 1: Validar fecha no pasada
+
     const minDate = getMinDateString()
+
     if (targetDateStr < minDate) {
-      showToast('⚠️ No se pueden programar citas en fechas pasadas')
+      showToast("⚠️ No se pueden programar citas en fechas pasadas")
+
       return
     }
 
-    // Regla 1: Validar domingo
-    if (isSundayDate(targetDateStr)) {
-      showToast('⚠️ La clínica permanece cerrada los domingos')
-      return
-    }
+    if (closedAt(targetDateStr, hour)) {
+      showToast(
+        "Este horario está cerrado según la configuración de la clínica",
+      )
 
-    // Regla 2: Sábados cierran a las 13:00 (última cita a las 12:15)
-    if (isSaturdayDate(targetDateStr) && hour >= 13) {
-      showToast('⚠️ Los sábados la clínica atiende únicamente hasta las 13:00')
-      return
-    }
-
-    // Regla 2: Lunes a viernes cierran a las 18:00
-    if (!isSaturdayDate(targetDateStr) && hour >= 18) {
-      showToast('⚠️ La clínica atiende de 08:00 a 18:00')
       return
     }
 
     // Regla 2: Si es hoy, verificar si la hora ya transcurrió en el reloj
+
     if (isTodayDate(targetDateStr)) {
       const now = new Date()
+
       const nowMinutes = now.getHours() * 60 + now.getMinutes()
+
       if (hour * 60 <= nowMinutes) {
-        showToast('⚠️ Este horario ya ha transcurrido en el día de hoy')
+        showToast("⚠️ Este horario ya ha transcurrido en el día de hoy")
+
         return
       }
     }
 
-    const timeFormatted = `${String(hour).padStart(2, '0')}:00`
+    const timeFormatted = `${String(hour).padStart(2, "0")}:00`
+
     setPrefill({
       date: targetDateStr,
+
       time: timeFormatted,
     })
+
     setShowModal(true)
   }
 
   // ── Acciones sobre la Cita con reconsulta inmediata ────────────────────────
+
   const handleConfirm = async (id: string) => {
     try {
-      const updated = await updateStatus(id, 'CONFIRMADA')
-      setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
-      setSelCita(sc => (sc && sc.id === id ? updated : sc))
-      showToast('✓ Cita confirmada exitosamente')
+      const updated = await updateStatus(id, "CONFIRMADA")
+
+      setCitas((cs) => cs.map((c) => (c.id === id ? updated : c)))
+
+      setSelCita((sc) => (sc && sc.id === id ? updated : sc))
+
+      showToast("✓ Cita confirmada exitosamente")
+
       await loadWeekCitas(true)
     } catch (err: any) {
-      showToast(err.message || 'Error al confirmar')
+      showToast(err.message || "Error al confirmar")
     }
   }
 
   const handleStartAttention = async (id: string) => {
     try {
-      const updated = await updateStatus(id, 'EN_ATENCION')
-      setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
-      setSelCita(sc => (sc && sc.id === id ? updated : sc))
-      showToast('✓ Estado: En atención. Abriendo historia clínica...')
+      const encounter = await startAppointmentAttention(id)
+
+      showToast("✓ Estado: En atención. Abriendo historia clínica...")
+
       await loadWeekCitas(true)
 
-      const targetCita = selCita?.id === id ? selCita : citas.find(c => c.id === id)
-      if (targetCita) {
-        navigate(`/app/pacientes?pacienteId=${targetCita.pacienteId}&citaId=${targetCita.id}&tab=historia&atender=true`)
-      }
+      navigate(
+        `/app/pacientes?pacienteId=${encounter.pacienteId}&citaId=${id}&tab=historia&atender=true`,
+      )
     } catch (err: any) {
-      showToast(err.message || 'Error al actualizar')
+      showToast(err.message || "Error al actualizar")
     }
   }
 
   const handleContinueAttention = (c: Appointment) => {
-    navigate(`/app/pacientes?pacienteId=${c.pacienteId}&citaId=${c.id}&tab=historia&atender=true`)
+    navigate(
+      `/app/pacientes?pacienteId=${c.pacienteId}&citaId=${c.id}&tab=historia&atender=true`,
+    )
   }
 
   const handleFinish = async (id: string) => {
-    try {
-      const updated = await updateStatus(id, 'FINALIZADA')
-      setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
-      setSelCita(sc => (sc && sc.id === id ? updated : sc))
-      showToast('✓ Cita finalizada')
-      await loadWeekCitas(true)
-    } catch (err: any) {
-      showToast(err.message || 'Error al finalizar')
-    }
+    const appointment = citas.find((c) => c.id === id)
+
+    if (appointment) handleContinueAttention(appointment)
   }
 
-  const handleMarkAttendance = async (id: string, asistencia: 'ASISTIO' | 'NO_SHOW') => {
+  const handleMarkAttendance = async (
+    id: string,
+    asistencia: "ASISTIO" | "NO_SHOW",
+  ) => {
     try {
       const updated = await markAttendance(id, asistencia)
-      setCitas(cs => cs.map(c => (c.id === id ? updated : c)))
-      setSelCita(sc => (sc && sc.id === id ? updated : sc))
-      showToast(asistencia === 'ASISTIO' ? '✓ Asistencia registrada (ASISTIÓ)' : '✓ Inasistencia registrada (NO_SHOW)')
+
+      setCitas((cs) => cs.map((c) => (c.id === id ? updated : c)))
+
+      setSelCita((sc) => (sc && sc.id === id ? updated : sc))
+
+      showToast(
+        asistencia === "ASISTIO"
+          ? "✓ Asistencia registrada (ASISTIÓ)"
+          : "✓ Inasistencia registrada (NO_SHOW)",
+      )
+
       await loadWeekCitas(true)
     } catch (err: any) {
-      showToast(err.message || 'Error al registrar asistencia')
+      showToast(err.message || "Error al registrar asistencia")
     }
   }
 
   // Reprogramar con validación estricta y manejo de 400 y 409
+
+  const reprogSlotData = useAppointmentSlots(
+    reprogramarCita?.odontologoId || "",
+    reprogFecha,
+  )
+
   const handleExecuteReprogramar = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (!reprogramarCita) return
+
     setReprogError(null)
 
-    const validation = validateAppointmentSchedule(reprogFecha, reprogInicio, reprogFin)
+    const validation = {
+      valid:
+        !reprogSlotData.loading &&
+        !reprogSlotData.error &&
+        reprogSlotData.slots.some(
+          (s) =>
+            s.time === reprogInicio && s.endTime === reprogFin && !s.isPast,
+        ),
+      error:
+        reprogSlotData.error ||
+        "Seleccione un turno disponible para reprogramar",
+    }
+
     if (!validation.valid) {
-      setReprogError(validation.error || 'Horario no permitido.')
+      setReprogError(validation.error || "Horario no permitido.")
+
       return
     }
 
     // Timestamps ISO oficiales con offset Lima (-05:00)
+
     const nuevoInicio = toLimaIsoString(reprogFecha, reprogInicio)
+
     const nuevoFin = toLimaIsoString(reprogFecha, reprogFin)
 
     try {
-      const updated = await reschedule(reprogramarCita.id, nuevoInicio, nuevoFin)
+      const updated = await reschedule(
+        reprogramarCita.id,
+        nuevoInicio,
+        nuevoFin,
+      )
+
       await loadWeekCitas(true)
+
       if (selCita?.id === reprogramarCita.id) setSelCita(updated)
-      showToast('✓ Cita reprogramada correctamente')
+
+      showToast("✓ Cita reprogramada correctamente")
+
       setReprogramarCita(null)
     } catch (err: any) {
       const status = err.status || err.response?.status
+
       const msg = err.response?.data?.message || err.message
-      if (status === 409 || msg?.toLowerCase().includes('conflicto') || msg?.toLowerCase().includes('solapa')) {
+
+      if (
+        status === 409 ||
+        msg?.toLowerCase().includes("conflicto") ||
+        msg?.toLowerCase().includes("solapa")
+      ) {
         setReprogError(CONFLICT_MESSAGE)
+
         // 409 muestra conflicto y recarga, NO guarda en memoria
+
         await loadWeekCitas(true)
       } else if (status === 400) {
-        setReprogError(msg || 'Error 400: Datos de reprogramación inválidos según las reglas de la clínica.')
+        setReprogError(
+          msg ||
+            "Error 400: Datos de reprogramación inválidos según las reglas de la clínica.",
+        )
       } else {
-        setReprogError(msg || 'Error al reprogramar la cita')
+        setReprogError(msg || "Error al reprogramar la cita")
       }
     }
   }
 
   const handleExecuteCancel = async () => {
     if (!cancelCita) return
+
     try {
-      const updated = await updateStatus(cancelCita.id, 'CANCELADA', cancelMotivo)
-      setCitas(cs => cs.map(c => (c.id === cancelCita.id ? updated : c)))
+      const updated = await updateStatus(
+        cancelCita.id,
+        "CANCELADA",
+        cancelMotivo,
+      )
+
+      setCitas((cs) => cs.map((c) => (c.id === cancelCita.id ? updated : c)))
+
       if (selCita?.id === cancelCita.id) setSelCita(updated)
-      showToast('✓ Cita cancelada')
+
+      showToast("✓ Cita cancelada")
+
       setCancelCita(null)
+
       await loadWeekCitas(true)
     } catch (err: any) {
-      showToast(err.message || 'Error al cancelar')
+      showToast(err.message || "Error al cancelar")
     }
   }
 
   // Horas del día para labels (8am a 6pm/7pm)
-  const hours = useMemo(() => Array.from({ length: TOTAL_H }, (_, i) => HOUR_START + i), [])
+
+  const hours = useMemo(
+    () => Array.from({ length: TOTAL_H }, (_, i) => HOUR_START + i),
+    [HOUR_START, TOTAL_H],
+  )
 
   return (
     <div className="flex h-full bg-white relative overflow-hidden fade-in">
@@ -906,28 +1325,33 @@ export default function Agenda() {
         <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 shrink-0">
           {/* View Toggle */}
           <div className="flex bg-slate-100 rounded-lg p-0.5">
-            {(['week', 'day'] as const).map(v => (
+            {(["week", "day"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  view === v ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500 hover:text-slate-700'
+                  view === v
+                    ? "bg-white text-slate-800 shadow-xs"
+                    : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                {v === 'week' ? 'Semana' : 'Día'}
+                {v === "week" ? "Semana" : "Día"}
               </button>
             ))}
           </div>
 
           {/* Navegación por Semana */}
-          {view === 'week' && (
+          {view === "week" && (
             <div className="flex items-center gap-1.5 ml-1">
               <button
                 onClick={() => shiftWeek(-1)}
                 title="Semana anterior"
                 className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                <Icon d="M15 19l-7-7 7-7" className="w-3.5 h-3.5 text-slate-500" />
+                <Icon
+                  d="M15 19l-7-7 7-7"
+                  className="w-3.5 h-3.5 text-slate-500"
+                />
               </button>
               <span className="text-xs font-semibold text-slate-700 px-1">
                 {weekRangeText}
@@ -942,32 +1366,41 @@ export default function Agenda() {
               <button
                 onClick={() => {
                   setRefDate(new Date())
-                  const todayIndex = weekDays.findIndex(d => d.isToday)
+
+                  const todayIndex = weekDays.findIndex((d) => d.isToday)
+
                   if (todayIndex >= 0) setDayIdx(todayIndex)
                 }}
                 className="text-[11px] font-semibold text-slate-500 hover:text-teal-700 px-2 py-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 Hoy
               </button>
-              {isSundayToday && (
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium ml-1">
-                  <span>⚠️</span> Hoy es domingo (clínica cerrada) · Mostrando semana entrante
-                </span>
-              )}
+              {isSundayToday &&
+                !getClinicDaySchedule(getMinDateString(), clinicSchedule)
+                  .isOpen && (
+                  <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium ml-1">
+                    <span>⚠️</span> Hoy la clínica permanece cerrada según su
+                    horario
+                  </span>
+                )}
             </div>
           )}
 
           {/* Navegación por Día */}
-          {view === 'day' && (
+          {view === "day" && (
             <div className="flex items-center gap-1 ml-1">
               <button
                 onClick={() => shiftDay(-1)}
                 className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                <Icon d="M15 19l-7-7 7-7" className="w-3.5 h-3.5 text-slate-500" />
+                <Icon
+                  d="M15 19l-7-7 7-7"
+                  className="w-3.5 h-3.5 text-slate-500"
+                />
               </button>
               <span className="text-sm font-semibold text-slate-700 min-w-[120px] text-center">
-                {weekDays[dayIdx]?.dayShort} {weekDays[dayIdx]?.dayNum} {weekDays[dayIdx]?.monthShort}
+                {weekDays[dayIdx]?.dayShort} {weekDays[dayIdx]?.dayNum}{" "}
+                {weekDays[dayIdx]?.monthShort}
               </span>
               <button
                 onClick={() => shiftDay(1)}
@@ -982,7 +1415,7 @@ export default function Agenda() {
           <div className="flex-1" />
 
           {/* Botón de Solicitudes de Reprogramación (Recepción y Admin) */}
-          {(role === 'ADMIN_CLINICA' || role === 'RECEPCIONISTA') && (
+          {(role === "ADMIN_CLINICA" || role === "RECEPCIONISTA") && (
             <button
               onClick={() => setShowRequestsModal(true)}
               className="relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer"
@@ -997,20 +1430,23 @@ export default function Agenda() {
           )}
 
           {/* Selector de Odontólogos según Rol (D02 Odontólogo ve su agenda clínica autorizada) */}
-          {role === 'ODONTOLOGO' ? (
+          {role === "ODONTOLOGO" ? (
             <div className="px-3 py-1.5 text-xs bg-teal-50 text-teal-800 font-semibold rounded-lg border border-teal-200 flex items-center gap-1.5">
               <span>🩺</span>
-              <span>Dr(a). {user?.nombres} {user?.apellidos} (Mi agenda)</span>
+              <span>
+                Dr(a). {user?.nombres} {user?.apellidos} (Mi agenda)
+              </span>
             </div>
           ) : (
             <select
               value={filterDoc}
-              onChange={e => setFilterDoc(e.target.value)}
+              onChange={(e) => setFilterDoc(e.target.value)}
               className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 text-slate-600 font-medium cursor-pointer"
             >
               <option value="">Todos los doctores</option>
-              {doctors.map(d => {
+              {doctors.map((d) => {
                 const val = d.usuarioClinicaId!
+
                 return (
                   <option key={val} value={val}>
                     Dr(a). {d.nombres} {d.apellidos}
@@ -1023,19 +1459,31 @@ export default function Agenda() {
           {/* Leyenda de Procedimientos (Matching Image 1) */}
           <div className="hidden lg:flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#7C3AED' }} />
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: "#7C3AED" }}
+              />
               <span className="text-[11px] text-slate-500">Ortodoncia</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#DC2626' }} />
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: "#DC2626" }}
+              />
               <span className="text-[11px] text-slate-500">Endodoncia</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#D97706' }} />
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: "#D97706" }}
+              />
               <span className="text-[11px] text-slate-500">Extracción</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#1E8C82' }} />
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: "#1E8C82" }}
+              />
               <span className="text-[11px] text-slate-500">Limpieza</span>
             </div>
           </div>
@@ -1044,36 +1492,49 @@ export default function Agenda() {
           <button
             onClick={() => {
               setPrefill({})
+
               setShowModal(true)
             }}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white rounded-xl transition-all shadow-xs hover:opacity-90 active:scale-98 cursor-pointer"
-            style={{ backgroundColor: '#1E8C82' }}
+            style={{ backgroundColor: "#1E8C82" }}
           >
-            <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5" />
-            + Nueva cita
+            <Icon d="M12 4v16m8-8H4" className="w-3.5 h-3.5" />+ Nueva cita
           </button>
         </div>
 
         {/* ── CALENDARIO PRINCIPAL ──────────────────────────────────────────── */}
-        {view === 'week' ? (
+        {view === "week" ? (
           /* ── WEEK VIEW (Matching Image 1 Grid con soporte de Lunes a Sábado) ─ */
+
           <div className="flex-1 overflow-auto bg-white">
             <div className="min-w-[840px] h-full flex flex-col">
               {/* Day Headers (Sticky) */}
               <div
                 className="grid sticky top-0 z-10 bg-white border-b border-slate-200"
-                style={{ gridTemplateColumns: `52px repeat(${weekDays.length}, 1fr)` }}
+                style={{
+                  gridTemplateColumns: `52px repeat(${weekDays.length}, 1fr)`,
+                }}
               >
                 <div className="px-2 py-3" />
-                {weekDays.map(d => (
+                {weekDays.map((d) => (
                   <div
                     key={d.dateStr}
                     className={`px-2 py-2.5 text-center border-l border-slate-100 transition-colors ${
-                      d.isToday ? 'bg-teal-50/60 ring-1 ring-inset ring-teal-500/30' : d.isSaturday ? 'bg-slate-50/50' : ''
+                      d.isToday
+                        ? "bg-teal-50/60 ring-1 ring-inset ring-teal-500/30"
+                        : d.isSaturday
+                          ? "bg-slate-50/50"
+                          : ""
                     }`}
                   >
                     <div className="flex items-center justify-center gap-1">
-                      <p className={`text-xs ${d.isToday ? 'text-teal-700 font-bold' : 'text-slate-500'}`}>
+                      <p
+                        className={`text-xs ${
+                          d.isToday
+                            ? "text-teal-700 font-bold"
+                            : "text-slate-500"
+                        }`}
+                      >
                         {d.dayShort}
                       </p>
                       {d.isToday && (
@@ -1082,11 +1543,17 @@ export default function Agenda() {
                         </span>
                       )}
                     </div>
-                    <p className={`font-bold text-base mt-0.5 ${d.isToday ? 'text-teal-900' : 'text-slate-800'}`}>
+                    <p
+                      className={`font-bold text-base mt-0.5 ${
+                        d.isToday ? "text-teal-900" : "text-slate-800"
+                      }`}
+                    >
                       {d.dayNum}
                     </p>
                     <p className="text-[10px] text-slate-400">
-                      {d.isSaturday ? '08h-13h' : d.monthShort}
+                      {d.isSaturday
+                        ? `${getClinicDaySchedule(d.dateStr, clinicSchedule).openTime}–${getClinicDaySchedule(d.dateStr, clinicSchedule).closeTime}`
+                        : d.monthShort}
                     </p>
                   </div>
                 ))}
@@ -1095,17 +1562,20 @@ export default function Agenda() {
               {/* Grid Lines & Appointment Cards */}
               <div
                 className="relative grid flex-1"
-                style={{ gridTemplateColumns: `52px repeat(${weekDays.length}, 1fr)`, minHeight: TOTAL_H * CELL_H }}
+                style={{
+                  gridTemplateColumns: `52px repeat(${weekDays.length}, 1fr)`,
+                  minHeight: TOTAL_H * CELL_H,
+                }}
               >
                 {/* Time Labels Column */}
                 <div>
-                  {hours.map(h => (
+                  {hours.map((h) => (
                     <div
                       key={h}
                       className="flex items-start justify-end pr-2 text-[10px] text-slate-400 font-medium"
                       style={{ height: CELL_H }}
                     >
-                      {String(h).padStart(2, '0')}:00
+                      {String(h).padStart(2, "0")}:00
                     </div>
                   ))}
                 </div>
@@ -1113,22 +1583,24 @@ export default function Agenda() {
                 {/* Day Columns */}
                 {weekDays.map((d) => {
                   // Filtrar citas que pertenecen a este día según hora Lima
-                  const dayCitas = filteredCitas.filter(c => {
+
+                  const dayCitas = filteredCitas.filter((c) => {
                     const citaDate = toLimaDateString(c.inicioEn)
-                    return citaDate === d.dateStr && c.estado !== 'CANCELADA'
+
+                    return citaDate === d.dateStr && c.estado !== "CANCELADA"
                   })
 
                   return (
                     <div
                       key={d.dateStr}
-                      className={`relative border-l border-slate-100 ${d.isToday ? 'bg-teal-50/15' : ''}`}
+                      className={`relative border-l border-slate-100 ${
+                        d.isToday ? "bg-teal-50/15" : ""
+                      }`}
                       style={{ height: TOTAL_H * CELL_H }}
                     >
                       {/* Hour Slot Clickable Rows */}
-                      {hours.map(h => {
-                        const isSatClosed = d.isSaturday && h >= 13
-                        const isWeekdayClosed = !d.isSaturday && h >= 18
-                        const isClosed = isSatClosed || isWeekdayClosed
+                      {hours.map((h) => {
+                        const isClosed = closedAt(d.dateStr, h)
 
                         return (
                           <div
@@ -1136,14 +1608,14 @@ export default function Agenda() {
                             onClick={() => handleSlotClick(d.dateStr, h)}
                             className={`border-b border-slate-100 transition-colors ${
                               isClosed
-                                ? 'bg-slate-50/70 cursor-not-allowed select-none'
-                                : 'hover:bg-slate-50/60 cursor-pointer'
+                                ? "bg-slate-50/70 cursor-not-allowed select-none"
+                                : "hover:bg-slate-50/60 cursor-pointer"
                             }`}
                             style={{ height: CELL_H }}
                             title={
                               isClosed
-                                ? `Cerrado (${d.isSaturday ? 'Sábados atención hasta 13:00' : 'Atención hasta 18:00'})`
-                                : `Clic para agendar cita a las ${String(h).padStart(2, '0')}:00`
+                                ? "Cerrado según horario configurado"
+                                : `Clic para agendar cita a las ${String(h).padStart(2, "0")}:00`
                             }
                           >
                             {isClosed && (
@@ -1156,29 +1628,41 @@ export default function Agenda() {
                       })}
 
                       {/* Render Appointment Cards directly on grid (Image 1 Style) */}
-                      {dayCitas.map(c => {
-                        const { hour: startH, minute: startM } = getLimaHourMinute(c.inicioEn)
-                        const { hour: endH, minute: endM } = getLimaHourMinute(c.finEn)
-                        const duration = (endH * 60 + endM) - (startH * 60 + startM) || 45
+                      {dayCitas.map((c) => {
+                        const { hour: startH, minute: startM } =
+                          getLimaHourMinute(c.inicioEn)
+
+                        const { hour: endH, minute: endM } = getLimaHourMinute(
+                          c.finEn,
+                        )
+
+                        const duration =
+                          endH * 60 + endM - (startH * 60 + startM) || 45
 
                         const topPct =
-                          (((startH - HOUR_START) + startM / 60) / TOTAL_H) * 100
+                          ((startH - HOUR_START + startM / 60) / TOTAL_H) * 100
+
                         const heightPx = (duration / 60) * CELL_H
+
                         const color = getProcedureColor(c.motivo)
 
                         return (
                           <button
                             key={c.id}
                             type="button"
-                            onClick={e => {
+                            onClick={(e) => {
                               e.stopPropagation()
+
                               setSelCita(c)
                             }}
                             className="absolute left-1 right-1 rounded-lg overflow-hidden text-left shadow-2xs hover:shadow-md transition-all group z-10 cursor-pointer"
                             style={{
                               top: `${topPct}%`,
+
                               height: Math.max(heightPx - 4, 24),
-                              backgroundColor: color + '20',
+
+                              backgroundColor: color + "20",
+
                               borderLeft: `3px solid ${color}`,
                             }}
                           >
@@ -1188,9 +1672,9 @@ export default function Agenda() {
                                   className="text-[10px] font-bold leading-tight truncate flex-1"
                                   style={{ color }}
                                 >
-                                  {c.motivo || 'Consulta general'}
+                                  {c.motivo || "Consulta general"}
                                 </p>
-                                {c.modalidad === 'VIRTUAL' && (
+                                {c.modalidad === "VIRTUAL" && (
                                   <span className="text-[8px] font-bold bg-sky-100 text-sky-700 px-1 py-0.2 rounded shrink-0">
                                     📹 Meet
                                   </span>
@@ -1211,32 +1695,42 @@ export default function Agenda() {
           </div>
         ) : (
           /* ── DAY VIEW (Matching Image 1 Single Day) ────────────────────── */
+
           <div className="flex-1 overflow-auto bg-white">
             <div className="min-w-0">
               {/* Day Header */}
               <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-slate-800 text-sm flex items-center gap-2" style={{ fontFamily: 'Outfit' }}>
+                  <p
+                    className="font-bold text-slate-800 text-sm flex items-center gap-2"
+                    style={{ fontFamily: "Outfit" }}
+                  >
                     {weekDays[dayIdx]?.isToday && (
                       <span className="text-[10px] font-bold uppercase tracking-wider bg-teal-600 text-white px-2 py-0.5 rounded-full">
                         Hoy
                       </span>
                     )}
                     <span>
-                      {weekDays[dayIdx]?.dayShort}, {weekDays[dayIdx]?.dayNum} de {weekDays[dayIdx]?.monthShort}{' '}
+                      {weekDays[dayIdx]?.dayShort}, {weekDays[dayIdx]?.dayNum}{" "}
+                      de {weekDays[dayIdx]?.monthShort}{" "}
                       {weekDays[dayIdx]?.date.getFullYear()}
                     </span>
                   </p>
                   <p className="text-xs text-slate-400">
                     {
                       filteredCitas.filter(
-                        c =>
+                        (c) =>
                           c.inicioEn &&
-                          c.inicioEn.substring(0, 10) === weekDays[dayIdx]?.dateStr &&
-                          c.estado !== 'CANCELADA'
+                          c.inicioEn.substring(0, 10) ===
+                            weekDays[dayIdx]?.dateStr &&
+                          c.estado !== "CANCELADA",
                       ).length
-                    }{' '}
-                    citas programadas ({weekDays[dayIdx]?.isSaturday ? 'Horario sábado: 08:00 - 13:00' : 'Horario regular: 08:00 - 18:00'})
+                    }{" "}
+                    citas programadas (
+                    {weekDays[dayIdx]?.isSaturday
+                      ? "Horario sábado: 08:00 - 13:00"
+                      : "Horario regular: 08:00 - 18:00"}
+                    )
                   </p>
                 </div>
               </div>
@@ -1244,16 +1738,19 @@ export default function Agenda() {
               {/* Day Grid */}
               <div
                 className="relative grid"
-                style={{ gridTemplateColumns: '56px 1fr', minHeight: TOTAL_H * CELL_H }}
+                style={{
+                  gridTemplateColumns: "56px 1fr",
+                  minHeight: TOTAL_H * CELL_H,
+                }}
               >
                 <div>
-                  {hours.map(h => (
+                  {hours.map((h) => (
                     <div
                       key={h}
                       className="flex items-start justify-end pr-2 pt-1 text-[10px] text-slate-400 font-medium"
                       style={{ height: CELL_H + 12 }}
                     >
-                      {String(h).padStart(2, '0')}:00
+                      {String(h).padStart(2, "0")}:00
                     </div>
                   ))}
                 </div>
@@ -1262,11 +1759,10 @@ export default function Agenda() {
                   className="relative border-l border-slate-100"
                   style={{ height: TOTAL_H * (CELL_H + 12) }}
                 >
-                  {hours.map(h => {
+                  {hours.map((h) => {
                     const curDay = weekDays[dayIdx]
-                    const isSatClosed = curDay?.isSaturday && h >= 13
-                    const isWeekdayClosed = !curDay?.isSaturday && h >= 18
-                    const isClosed = isSatClosed || isWeekdayClosed
+
+                    const isClosed = closedAt(curDay?.dateStr, h)
 
                     return (
                       <div
@@ -1274,14 +1770,14 @@ export default function Agenda() {
                         onClick={() => handleSlotClick(curDay?.dateStr, h)}
                         className={`border-b border-slate-100 transition-colors ${
                           isClosed
-                            ? 'bg-slate-50/70 cursor-not-allowed select-none'
-                            : 'hover:bg-slate-50/50 cursor-pointer'
+                            ? "bg-slate-50/70 cursor-not-allowed select-none"
+                            : "hover:bg-slate-50/50 cursor-pointer"
                         }`}
                         style={{ height: CELL_H + 12 }}
                         title={
                           isClosed
-                            ? `Cerrado (${curDay?.isSaturday ? 'Sábados cierran 13:00' : 'Cierre 18:00'})`
-                            : `Clic para agendar a las ${String(h).padStart(2, '0')}:00`
+                            ? "Cerrado según horario configurado"
+                            : `Clic para agendar a las ${String(h).padStart(2, "0")}:00`
                         }
                       >
                         {isClosed && (
@@ -1294,43 +1790,60 @@ export default function Agenda() {
                   })}
 
                   {filteredCitas
+
                     .filter(
-                      c =>
-                        toLimaDateString(c.inicioEn) === weekDays[dayIdx]?.dateStr &&
-                        c.estado !== 'CANCELADA'
+                      (c) =>
+                        toLimaDateString(c.inicioEn) ===
+                          weekDays[dayIdx]?.dateStr && c.estado !== "CANCELADA",
                     )
-                    .map(c => {
-                      const { hour: startH, minute: startM } = getLimaHourMinute(c.inicioEn)
-                      const { hour: endH, minute: endM } = getLimaHourMinute(c.finEn)
-                      const duration = (endH * 60 + endM) - (startH * 60 + startM) || 45
+
+                    .map((c) => {
+                      const { hour: startH, minute: startM } =
+                        getLimaHourMinute(c.inicioEn)
+
+                      const { hour: endH, minute: endM } = getLimaHourMinute(
+                        c.finEn,
+                      )
+
+                      const duration =
+                        endH * 60 + endM - (startH * 60 + startM) || 45
 
                       const top =
-                        (((startH - HOUR_START) + startM / 60) / TOTAL_H) * 100
+                        ((startH - HOUR_START + startM / 60) / TOTAL_H) * 100
+
                       const h = (duration / 60) * (CELL_H + 12)
+
                       const col = getProcedureColor(c.motivo)
 
                       return (
                         <button
                           key={c.id}
                           type="button"
-                          onClick={e => {
+                          onClick={(e) => {
                             e.stopPropagation()
+
                             setSelCita(c)
                           }}
                           className="absolute left-3 right-3 rounded-xl overflow-hidden text-left shadow-2xs hover:shadow-md transition-all cursor-pointer"
                           style={{
                             top: `${top}%`,
+
                             height: Math.max(h - 4, 32),
-                            backgroundColor: col + '18',
+
+                            backgroundColor: col + "18",
+
                             borderLeft: `4px solid ${col}`,
                           }}
                         >
                           <div className="px-3 py-2">
                             <div className="flex items-center gap-2">
-                              <p className="text-xs font-bold leading-tight" style={{ color: col }}>
-                                {c.motivo || 'Consulta general'}
+                              <p
+                                className="text-xs font-bold leading-tight"
+                                style={{ color: col }}
+                              >
+                                {c.motivo || "Consulta general"}
                               </p>
-                              {c.modalidad === 'VIRTUAL' && (
+                              {c.modalidad === "VIRTUAL" && (
                                 <span className="text-[9px] font-bold bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
                                   📹 Google Meet
                                 </span>
@@ -1340,8 +1853,12 @@ export default function Agenda() {
                               {c.pacienteNombreCompleto}
                             </p>
                             <p className="text-[10px] text-slate-400 mt-0.5">
-                              {formatHourMinute(c.inicioEn)} - {formatHourMinute(c.finEn)} · {duration} min ·{' '}
-                              Dr. {c.odontologoNombreCompleto || 'Asignado'} · {c.modalidad === 'VIRTUAL' ? 'Teleconsulta Online' : (c.consultorio || 'Sillón')}
+                              {formatHourMinute(c.inicioEn)} -{" "}
+                              {formatHourMinute(c.finEn)} · {duration} min · Dr.{" "}
+                              {c.odontologoNombreCompleto || "Asignado"} ·{" "}
+                              {c.modalidad === "VIRTUAL"
+                                ? "Teleconsulta Online"
+                                : c.consultorio || "Sillón"}
                             </p>
                           </div>
                         </button>
@@ -1364,19 +1881,31 @@ export default function Agenda() {
           onContinueAttention={handleContinueAttention}
           onFinish={handleFinish}
           onMarkAttendance={handleMarkAttendance}
-          onOpenReprogramar={c => {
+          onOpenReprogramar={(c) => {
             setReprogramarCita(c)
-            const citaDateStr = toLimaDateString(c.inicioEn) || getMinDateString()
-            const validDate = citaDateStr < getMinDateString() ? getMinDateString() : citaDateStr
+
+            const citaDateStr =
+              toLimaDateString(c.inicioEn) || getMinDateString()
+
+            const validDate =
+              citaDateStr < getMinDateString()
+                ? getMinDateString()
+                : citaDateStr
+
             setReprogFecha(validDate)
+
             const initH = formatHourMinute(c.inicioEn)
+
             setReprogInicio(initH)
+
             setReprogFin(calculateEndTime(initH, 45))
+
             setReprogError(null)
           }}
-          onOpenCancel={c => {
+          onOpenCancel={(c) => {
             setCancelCita(c)
-            setCancelMotivo('')
+
+            setCancelMotivo("")
           }}
         />
       )}
@@ -1387,11 +1916,13 @@ export default function Agenda() {
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           initialDate={prefill.date || weekDays[0]?.dateStr}
-          initialTime={prefill.time || '10:00'}
+          initialTime={prefill.time || "10:00"}
           initialDoctorId={filterDoc || undefined}
-          onSuccess={nuevaCita => {
-            showToast('✓ Cita agendada exitosamente')
+          onSuccess={(nuevaCita) => {
+            showToast("✓ Cita agendada exitosamente")
+
             loadWeekCitas(true)
+
             setShowModal(false)
           }}
           onConflict={() => {
@@ -1412,158 +1943,194 @@ export default function Agenda() {
       )}
 
       {/* ── MODAL REPROGRAMAR (Reglas de negocio 1, 2, 3 y 5 aplicadas) ─────── */}
-      {reprogramarCita && (() => {
-        const reprogSlotData = getAvailableSlots(reprogFecha)
-        const isReprogSunday = reprogSlotData.isSunday
-        const reprogSlots = reprogSlotData.slots
+      {reprogramarCita &&
+        (() => {
+          const isReprogSunday = reprogSlotData.isSunday
 
-        return (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(5px)' }}
-          >
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-700 flex items-center justify-center font-bold text-sm">
-                    🔄
-                  </span>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-base" style={{ fontFamily: 'Outfit' }}>
-                      Reprogramar Horario de Cita
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      {reprogramarCita.pacienteNombreCompleto} · {reprogramarCita.motivo || 'Consulta'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setReprogramarCita(null)}
-                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  <Icon d="M6 18L18 6M6 6l12 12" className="w-4 h-4" />
-                </button>
-              </div>
+          const reprogSlots = reprogSlotData.slots
 
-              {/* Feedback de error 400 o 409 */}
-              {reprogError && (
-                <div className="bg-rose-50 border border-rose-300 rounded-xl p-3 text-xs text-rose-800 mt-3 flex items-start gap-2 animate-in fade-in">
-                  <span className="font-bold text-rose-600">⚠</span>
-                  <div className="flex-1">
-                    <p className="font-bold text-rose-950">Aviso de Validación</p>
-                    <p className="mt-0.5">{reprogError}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Advertencia si selecciona Domingo */}
-              {isReprogSunday && (
-                <div className="bg-amber-100 border border-amber-300 rounded-xl p-3 text-xs text-amber-900 mt-3 flex items-start gap-2">
-                  <span className="font-bold text-amber-700">⚠️</span>
-                  <div>
-                    <p className="font-bold">La clínica permanece cerrada los domingos.</p>
-                    <p className="text-amber-800 text-[11px] mt-0.5">Selecciona un día entre lunes y sábado.</p>
-                  </div>
-                </div>
-              )}
-
-              <form onSubmit={handleExecuteReprogramar} className="mt-4 space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    Nueva Fecha <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    min={getMinDateString()}
-                    max={getMaxDateString()}
-                    value={reprogFecha}
-                    onChange={e => {
-                      setReprogFecha(e.target.value)
-                      setReprogError(null)
-                    }}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/40"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Rango permitido: Hoy a +90 días (Lunes a Sábado).
-                  </p>
-                </div>
-
-                {!isReprogSunday && (
-                  <div className="grid grid-cols-2 gap-3">
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{
+                backgroundColor: "rgba(15, 23, 42, 0.7)",
+                backdropFilter: "blur(5px)",
+              }}
+            >
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-700 flex items-center justify-center font-bold text-sm">
+                      🔄
+                    </span>
                     <div>
-                      <label className="text-xs font-semibold text-slate-700 block mb-1">
-                        Hora Inicio <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        required
-                        value={reprogInicio}
-                        onChange={e => {
-                          const newStart = e.target.value
-                          setReprogInicio(newStart)
-                          setReprogFin(calculateEndTime(newStart, 45))
-                          setReprogError(null)
-                        }}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                      <h3
+                        className="font-bold text-slate-900 text-base"
+                        style={{ fontFamily: "Outfit" }}
                       >
-                        {reprogSlots.map(s => (
-                          <option key={s.time} value={s.time} disabled={s.isPast}>
-                            {s.label} {s.isPast ? '(Pasado)' : ''}
-                          </option>
-                        ))}
-                      </select>
+                        Reprogramar Horario de Cita
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {reprogramarCita.pacienteNombreCompleto} ·{" "}
+                        {reprogramarCita.motivo || "Consulta"}
+                      </p>
                     </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReprogramarCita(null)}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    <Icon d="M6 18L18 6M6 6l12 12" className="w-4 h-4" />
+                  </button>
+                </div>
 
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 block mb-1">
-                        Hora Fin (+45 min)
-                      </label>
-                      <input
-                        type="time"
-                        readOnly
-                        value={reprogFin}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-100 text-slate-700 font-semibold cursor-not-allowed"
-                      />
+                {/* Feedback de error 400 o 409 */}
+                {reprogError && (
+                  <div className="bg-rose-50 border border-rose-300 rounded-xl p-3 text-xs text-rose-800 mt-3 flex items-start gap-2 animate-in fade-in">
+                    <span className="font-bold text-rose-600">⚠</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-rose-950">
+                        Aviso de Validación
+                      </p>
+                      <p className="mt-0.5">{reprogError}</p>
                     </div>
                   </div>
                 )}
 
-                <div className="mt-5 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setReprogramarCita(null)}
-                    className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isReprogSunday || !reprogInicio}
-                    className="px-4 py-2 text-white rounded-xl text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors cursor-pointer"
-                    style={{ backgroundColor: '#1E8C82' }}
-                  >
-                    Guardar Nuevo Horario
-                  </button>
-                </div>
-              </form>
+                {/* Advertencia si selecciona Domingo */}
+                {isReprogSunday && (
+                  <div className="bg-amber-100 border border-amber-300 rounded-xl p-3 text-xs text-amber-900 mt-3 flex items-start gap-2">
+                    <span className="font-bold text-amber-700">⚠️</span>
+                    <div>
+                      <p className="font-bold">
+                        No hay turnos disponibles para esta fecha.
+                      </p>
+                      <p className="text-amber-800 text-[11px] mt-0.5">
+                        Selecciona un día entre lunes y sábado.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <form
+                  onSubmit={handleExecuteReprogramar}
+                  className="mt-4 space-y-3"
+                >
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Nueva Fecha <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      min={getMinDateString()}
+                      max={getMaxDateString()}
+                      value={reprogFecha}
+                      onChange={(e) => {
+                        setReprogFecha(e.target.value)
+
+                        setReprogError(null)
+                      }}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Rango permitido: Hoy a +90 días, según horarios
+                      configurados.
+                    </p>
+                  </div>
+
+                  {!isReprogSunday && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1">
+                          Hora Inicio <span className="text-rose-500">*</span>
+                        </label>
+                        <select
+                          required
+                          value={reprogInicio}
+                          onChange={(e) => {
+                            const newStart = e.target.value
+
+                            setReprogInicio(newStart)
+
+                            setReprogFin(
+                              reprogSlotData.slots.find(
+                                (s) => s.time === newStart,
+                              )?.endTime || "",
+                            )
+
+                            setReprogError(null)
+                          }}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                        >
+                          {reprogSlots.map((s) => (
+                            <option
+                              key={s.time}
+                              value={s.time}
+                              disabled={s.isPast}
+                            >
+                              {s.label} {s.isPast ? "(Pasado)" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700 block mb-1">
+                          Hora Fin (según turno)
+                        </label>
+                        <input
+                          type="time"
+                          readOnly
+                          value={reprogFin}
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-slate-100 text-slate-700 font-semibold cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setReprogramarCita(null)}
+                      className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isReprogSunday || !reprogInicio}
+                      className="px-4 py-2 text-white rounded-xl text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors cursor-pointer"
+                      style={{ backgroundColor: "#1E8C82" }}
+                    >
+                      Guardar Nuevo Horario
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        )
-      })()}
+          )
+        })()}
 
       {/* ── MODAL CANCELAR CITA ──────────────────────────────────────────────── */}
       {cancelCita && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(5px)' }}
+          style={{
+            backgroundColor: "rgba(15, 23, 42, 0.7)",
+            backdropFilter: "blur(5px)",
+          }}
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
-            <h3 className="font-bold text-slate-900 text-base" style={{ fontFamily: 'Outfit' }}>
+            <h3
+              className="font-bold text-slate-900 text-base"
+              style={{ fontFamily: "Outfit" }}
+            >
               Cancelar Cita
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              ¿Estás seguro de cancelar la cita de{' '}
+              ¿Estás seguro de cancelar la cita de{" "}
               <strong>{cancelCita.pacienteNombreCompleto}</strong>?
             </p>
 
@@ -1574,7 +2141,7 @@ export default function Agenda() {
               <textarea
                 rows={2}
                 value={cancelMotivo}
-                onChange={e => setCancelMotivo(e.target.value)}
+                onChange={(e) => setCancelMotivo(e.target.value)}
                 placeholder="Ej: Paciente solicitó cancelación / reprogramación..."
                 className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs resize-none focus:outline-none focus:ring-2 focus:ring-rose-400"
               />

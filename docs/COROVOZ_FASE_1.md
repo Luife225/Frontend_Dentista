@@ -1,17 +1,34 @@
 # Cómo probar CoroVoz
 
-1. Reiniciar el backend con la rama `feature/AlanAguilera`; arrancar el frontend con `npm run dev`.
-2. Iniciar sesión como odontólogo o recepcionista. Abrir CoroVoz en el menú. General acepta texto o voz y ofrece navegación real a Agenda, Pacientes y Notificaciones.
-3. Como odontólogo, abrir Pacientes, seleccionar un paciente de prueba y entrar en Odontograma. Abrir CoroVoz → Odontograma.
-4. Escribir «Corona en pieza 14» o «Caries en diente treinta y seis cara oclusal». Revisar paciente, pieza, condición y cara. Si se omite la cara, se propone GENERAL.
-5. Usar «Correcto: agregar» o decir «CoroVoz correcto». La marca se incorpora al borrador visible. «Editar» permite corregir el dictado completo; «Eliminar propuesta» solo descarta la propuesta pendiente.
-6. Pulsar Guardar borrador para conservar cambios manuales y de CoroVoz del mismo odontograma. Confirmar versión conserva el flujo original y no se ejecuta por voz.
-7. Pulsar Iniciar escucha para activar el micrófono. Hablar después de la respuesta de CoroVoz. «CoroVoz terminado» detiene la escucha. Si el navegador falla o no da permiso, continuar escribiendo.
+## Ayuda general
 
-`coroVozService` usa el cliente autenticado existente; la lógica general y el parser están en dos endpoints nuevos del backend. No requiere claves de GPT ni instala modelos grandes.
+1. Inicia frontend y backend de `feature/AlanAguilera`. El modelo de voz se instala una vez desde Backend_Dentista con `java tools/InstallCoroVozModel.java`. Reinicia backend al cambiar clases o corpus.
+2. Abre CoroVoz → General como odontólogo o recepcionista. Prueba «¿Qué es Coronix?», «¿Qué es CoroVoz?», «¿Cómo veo usuarios inactivos?» o «¿Cómo guardo el odontograma?». La respuesta distingue permisos y ofrece navegación solo a rutas autorizadas.
+3. Hay 45 temas y 375 ejemplos locales. No se llama a una API de GPT. Los temas cubren funciones reales y distinguen las pantallas que todavía son demostración.
+4. Para datos reales escribe «Próxima cita del paciente [nombre o DNI]», «Teléfono del paciente [nombre]» o «Información general del paciente [nombre]». Si hay varias coincidencias, elige la persona. Una pregunta posterior como «¿Y su correo?» conserva esa identidad. Escribir otro nombre cambia la consulta; Olvidar paciente limpia el contexto. No se muestran datos clínicos en General ni pacientes de otras clínicas.
 
-`CoroVozContext` conecta el panel con el odontograma montado y evita aplicar propuestas al cambiar de paciente, pestaña o versión. La integración de guardado usa la misma operación que Guardar borrador. General queda disponible para ambos roles; el modo clínico solo aparece para odontólogos.
+## Voz en Brave
 
-`useCoroVozSpeech` administra permiso, escucha, transcripción, lectura y limpieza del micrófono al cerrar. No puede activar voz con una palabra si el micrófono aún está apagado. El proveedor del navegador puede procesar el audio externamente; comprobar esa condición antes de usar datos reales.
+Abre por localhost o HTTPS, pulsa Iniciar escucha y permite el micrófono. La barra indica el nivel de entrada. El modo inicial «Cuando pulse Terminé» permite hablar y hacer pausas sin enviar todavía. Pulsa «Terminé: enviar» al acabar. También puedes seleccionar el envío tras 3,5 segundos de silencio. Se captura con getUserMedia + AudioWorklet y se reconoce mediante Whisper en el backend; no depende del servicio SpeechRecognition del navegador.
 
-Verificaciones automáticas: `npm run typecheck` y `npm run build`. Las pruebas visuales se realizaron con datos y respuestas API simulados; faltan pruebas de voz real en el navegador elegido y una prueba integrada contra una BD de desarrollo con un paciente de prueba.
+Si alcanzas 25 segundos, el texto queda para revisión y puedes completarlo antes de enviarlo. El servidor acepta hasta 30 segundos de audio. «Interrumpir respuesta» corta la lectura sin apagar el micrófono. Puedes desactivar Leer respuestas. Un fallo recuperable al transcribir muestra el motivo y permite volver a dictar. Mientras procesa o habla se pausa el envío para evitar eco.
+
+Comandos: «Prender CoroVoz», «CoroVoz correcto», «CoroVoz edita», «CoroVoz elimina» y «CoroVoz terminado». En modo manual pulsa Terminé después de decir el comando. Para activarse por primera vez siempre se necesita el botón y permiso; no escucha palabras si está apagado.
+
+## Odontograma
+
+1. Como odontólogo abre Pacientes, selecciona una persona de prueba y entra en una versión editable del Odontograma. Abre CoroVoz → Odontograma.
+2. Dicta o escribe «Pieza catorce». Debe mostrar «pieza 14» y solicitar la condición. Después envía «corona». También admite una frase completa: «Caries en diente treinta y seis cara oclusal».
+3. Revisa paciente, número, condición y cara. «Correcto: agregar» o «CoroVoz correcto» incorpora al borrador visible. Editar permite corregir el dictado; Eliminar propuesta solo descarta esa propuesta. El texto permanece editable antes de enviar.
+4. Usa Guardar borrador para conservar los cambios. Confirmar versión mantiene el flujo original del odontograma y no se ejecuta por voz. Cambiar de paciente, versión o pestaña descarta propuestas y fragmentos pendientes.
+
+`CoroVozContext` conecta el asistente con el odontograma montado. El servicio utiliza el cliente autenticado existente; `coroVozConversation` normaliza comandos y combina fragmentos evitando duplicar números al corregir. `useCoroVozSpeech` administra captura, envío manual o por pausa, interrupción y lectura. `coroVozAudio` convierte entradas de 16, 44.1 y 48 kHz a WAV PCM16 mono de 16 kHz.
+
+## Verificaciones
+
+- `node verification/corovoz-audio.mjs`: duración, tono, volumen y contrato WAV desde tres frecuencias.
+- `node verification/corovoz-conversation.mjs`: fragmentos, correcciones y comandos.
+- `npm run typecheck` y `npm run build`.
+- El backend verifica clasificación, roles, consultas administrativas, números FDI, fragmentos y formatos de audio. Se prueban también peticiones reales autenticadas sin guardar datos clínicos.
+
+La revisión del micrófono físico y precisión con ruido real requiere pruebas en el equipo del usuario. El corpus sigue siendo limitado: las respuestas no cubren cualquier formulación ni acreditan precisión clínica.

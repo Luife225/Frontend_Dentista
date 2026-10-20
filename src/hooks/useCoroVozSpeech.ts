@@ -1,139 +1,217 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { getCoroVozStatus, transcribeCoroVoz } from '../services/coroVozService'
+import { encodeCoroVozWav } from '../utils/coroVozAudio'
 
-interface RecognitionResult { isFinal: boolean; [index: number]: { transcript: string } }
-interface Recognition {
-  lang: string
-  continuous: boolean
-  interimResults: boolean
-  start: () => void
-  stop: () => void
-  abort: () => void
-  onstart: (() => void) | null
-  onend: (() => void) | null
-  onerror: ((event: { error: string }) => void) | null
-  onresult: ((event: { resultIndex: number; results: ArrayLike<RecognitionResult> }) => void) | null
-}
-type SpeechWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition }
+const emptyCapture = () => ({ chunks: [] as Float32Array[], samples: 0, voiced: false, silence: 0 })
 
-export default function useCoroVozSpeech(onText: (text: string) => void) {
+/** Captura estándar getUserMedia; el backend transcribe localmente, también en Brave. */
+export default function useCoroVozSpeech(onText: (text: string, reviewOnly: boolean) => void) {
   const [supported, setSupported] = useState(false)
   const [enabled, setEnabled] = useState(false)
   const [listening, setListening] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const [level, setLevel] = useState(0)
   const [interim, setInterim] = useState('')
   const [error, setError] = useState('')
+  const [speaking, setSpeaking] = useState(false)
+  const [sendMode, setSendMode] = useState<'manual' | 'pause'>('manual')
+  const sendModeRef = useRef(sendMode)
+  sendModeRef.current = sendMode
   const callbackRef = useRef(onText)
   callbackRef.current = onText
-  const recognitionRef = useRef<Recognition | null>(null)
-  const enabledRef = useRef(false)
-  const runningRef = useRef(false)
+  const streamRef = useRef<MediaStream | null>(null)
+  const contextRef = useRef<AudioContext | null>(null)
+  const nodeRef = useRef<AudioWorkletNode | null>(null)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const captureRef = useRef(emptyCapture())
+  const activeRef = useRef(false)
+  const startingRef = useRef(false)
   const pausedRef = useRef(false)
   const speakingRef = useRef(false)
+  const processingRef = useRef(false)
+  const resumeAtRef = useRef(0)
+  const generationRef = useRef(0)
   const utteranceRef = useRef(0)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-
-  const resume = useCallback(() => {
-    clearTimeout(timerRef.current)
-    if (!enabledRef.current || runningRef.current || pausedRef.current || speakingRef.current) return
-    timerRef.current = setTimeout(() => {
-      if (!enabledRef.current || runningRef.current || pausedRef.current || speakingRef.current) return
-      try { recognitionRef.current?.start() } catch { /* Ya iniciada por el navegador. */ }
-    }, 300)
-  }, [])
+  const requestRef = useRef<AbortController | null>(null)
 
   const stop = useCallback(() => {
-    enabledRef.current = false
-    speakingRef.current = false
-    pausedRef.current = false
+    generationRef.current++
     utteranceRef.current++
-    clearTimeout(timerRef.current)
-    recognitionRef.current?.abort()
+    activeRef.current = false
+    startingRef.current = false
+    pausedRef.current = false
+    speakingRef.current = false
+    setSpeaking(false)
+    processingRef.current = false
+    requestRef.current?.abort()
+    requestRef.current = null
+    if (nodeRef.current) nodeRef.current.port.onmessage = null
+    nodeRef.current?.disconnect()
+    sourceRef.current?.disconnect()
+    streamRef.current?.getTracks().forEach(track => track.stop())
+    void contextRef.current?.close().catch(() => {})
+    nodeRef.current = null
+    sourceRef.current = null
+    contextRef.current = null
+    streamRef.current = null
+    captureRef.current = emptyCapture()
     window.speechSynthesis?.cancel()
-    setEnabled(false)
-    setListening(false)
-    setInterim('')
+    setEnabled(false); setListening(false); setStarting(false); setTranscribing(false); setLevel(0); setInterim('')
   }, [])
 
-  useEffect(() => {
-    const speechWindow = window as SpeechWindow
-    const Constructor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
-    setSupported(Boolean(Constructor))
-    if (!Constructor) return
-    const recognition = new Constructor()
-    recognitionRef.current = recognition
-    recognition.lang = 'es-PE'
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.onstart = () => { runningRef.current = true; setListening(true) }
-    recognition.onend = () => { runningRef.current = false; setListening(false); resume() }
-    recognition.onresult = event => {
-      let final = '', partial = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i]
-        if (result.isFinal) final += `${result[0].transcript} `
-        else partial += result[0].transcript
+  const sendCapture = useCallback(async (reviewOnly = false) => {
+    if (!activeRef.current || pausedRef.current || speakingRef.current || processingRef.current) return
+    const capture = captureRef.current
+    const rate = contextRef.current?.sampleRate || 16000
+    captureRef.current = emptyCapture()
+    if (capture.samples < rate * 0.2) { setError('Habla cerca del micrófono y espera un instante antes de transcribir.'); return }
+    processingRef.current = true
+    setTranscribing(true); setListening(false); setInterim('Transcribiendo voz en el backend…'); setError('')
+    const controller = new AbortController()
+    requestRef.current = controller
+    const generation = generationRef.current
+    try {
+      const result = await transcribeCoroVoz(encodeCoroVozWav(capture.chunks, rate), controller.signal)
+      if (controller.signal.aborted || generation !== generationRef.current || !activeRef.current) return
+      requestRef.current = null
+      if (result.text.trim()) callbackRef.current(result.text.trim(), reviewOnly)
+      else setError('Se recibió audio pero no se entendieron palabras. Acércate al micrófono y vuelve a hablar.')
+    } catch (cause) {
+      if (!controller.signal.aborted && generation === generationRef.current) {
+        const message = cause instanceof Error ? cause.message : 'No se pudo transcribir la voz.'
+        setError(message)
       }
-      setInterim(partial)
-      if (final.trim() && !pausedRef.current && !speakingRef.current) callbackRef.current(final.trim())
+    } finally {
+      if (generation === generationRef.current) {
+        requestRef.current = null
+        processingRef.current = false
+        resumeAtRef.current = performance.now() + 350
+        setTranscribing(false); setInterim('')
+        setListening(activeRef.current && !pausedRef.current && !speakingRef.current)
+      }
     }
-    recognition.onerror = event => {
-      if (event.error === 'aborted' || event.error === 'no-speech') return
+  }, [stop])
+
+  const start = useCallback(async () => {
+    if (activeRef.current || startingRef.current) return
+    if (!window.isSecureContext || typeof navigator.mediaDevices?.getUserMedia !== 'function' || typeof window.AudioContext !== 'function') {
+      setError('El micrófono requiere HTTPS o localhost y permiso de audio en Brave.'); return
+    }
+    const generation = ++generationRef.current
+    startingRef.current = true
+    setStarting(true); setError('')
+    try {
+      const status = await getCoroVozStatus()
+      if (status.version < 4) throw new Error('Reinicia el backend para cargar la versión actual de CoroVoz.')
+      if (!status.speechReady) throw new Error('Falta el modelo local de voz. Ejecuta java tools/InstallCoroVozModel.java en Backend_Dentista.')
+      if (generation !== generationRef.current) return
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+      if (generation !== generationRef.current) { stream.getTracks().forEach(track => track.stop()); return }
+      streamRef.current = stream
+      const context = new AudioContext({ sampleRate: 16000 })
+      contextRef.current = context
+      await context.audioWorklet.addModule(`${import.meta.env.BASE_URL}corovoz-recorder.js`)
+      if (generation !== generationRef.current) { void context.close().catch(() => {}); return }
+      const source = context.createMediaStreamSource(stream)
+      const node = new AudioWorkletNode(context, 'corovoz-recorder')
+      sourceRef.current = source
+      nodeRef.current = node
+      node.port.onmessage = event => {
+        const chunk = event.data as Float32Array
+        let energy = 0
+        for (const sample of chunk) energy += sample * sample
+        const rms = Math.sqrt(energy / chunk.length)
+        setLevel(Math.min(1, rms * 12))
+        if (!activeRef.current || pausedRef.current || speakingRef.current || processingRef.current || performance.now() < resumeAtRef.current) {
+          captureRef.current = emptyCapture(); return
+        }
+        setListening(true)
+        const capture = captureRef.current
+        capture.chunks.push(chunk)
+        capture.samples += chunk.length
+        if (rms > 0.008) { capture.voiced = true; capture.silence = 0 }
+        else if (capture.voiced) capture.silence += chunk.length
+        if (!capture.voiced) {
+          while (capture.samples > context.sampleRate * 0.5 && capture.chunks.length > 1) capture.samples -= capture.chunks.shift()!.length
+        } else if (capture.samples > context.sampleRate * 25) {
+          // El límite guarda el texto para revisión; no ejecuta una frase cortada.
+          void sendCapture(true)
+        } else if (sendModeRef.current === 'pause' && capture.silence > context.sampleRate * 3.5) {
+          void sendCapture(false)
+        }
+      }
+      const silent = context.createGain()
+      silent.gain.value = 0
+      source.connect(node); node.connect(silent); silent.connect(context.destination)
+      await context.resume()
+      if (generation !== generationRef.current) return
+      activeRef.current = true
+      pausedRef.current = false
+      captureRef.current = emptyCapture()
+      setEnabled(true); setListening(true)
+      stream.getAudioTracks().forEach(track => { track.onended = () => { stop(); setError('El micrófono se desconectó. Vuelve a iniciar la escucha.') } })
+    } catch (cause) {
+      if (generation !== generationRef.current) return
       const messages: Record<string, string> = {
-        'not-allowed': 'Permite el micrófono en el navegador o continúa escribiendo.',
-        'audio-capture': 'No se encontró un micrófono disponible.',
-        'network': 'El reconocimiento de voz no pudo conectarse. Puedes seguir escribiendo.',
-        'language-not-supported': 'El navegador no admite este idioma de voz. Puedes seguir escribiendo.',
+        NotAllowedError: 'Brave o Windows bloquearon el micrófono. Permite el audio para localhost desde el icono junto a la dirección.',
+        NotFoundError: 'No hay un micrófono conectado o habilitado en Windows.',
+        NotReadableError: 'No se puede abrir el micrófono. Revisa si otra aplicación lo está usando.',
       }
       stop()
-      setError(messages[event.error] || 'El reconocimiento de voz se detuvo. Puedes seguir escribiendo.')
+      setError(cause instanceof Error ? messages[cause.name] || cause.message : 'No se pudo abrir el micrófono.')
+    } finally {
+      startingRef.current = false
+      setStarting(false)
     }
-    return () => {
-      enabledRef.current = false
-      utteranceRef.current++
-      clearTimeout(timerRef.current)
-      recognition.onend = null
-      recognition.onerror = null
-      recognition.onresult = null
-      recognition.onstart = null
-      recognition.abort()
-      window.speechSynthesis?.cancel()
-      recognitionRef.current = null
-      runningRef.current = false
-    }
-  }, [resume, stop])
-
-  const start = useCallback(() => {
-    if (!recognitionRef.current) return
-    setError('')
-    enabledRef.current = true
-    pausedRef.current = false
-    setEnabled(true)
-    try { recognitionRef.current.start() } catch { resume() }
-  }, [resume])
+  }, [sendCapture, stop])
 
   const pause = useCallback((value: boolean) => {
     pausedRef.current = value
-    if (value) recognitionRef.current?.stop()
-    else resume()
-  }, [resume])
+    captureRef.current = emptyCapture()
+    if (value) requestRef.current?.abort()
+    resumeAtRef.current = performance.now() + 350
+    setListening(activeRef.current && !value && !speakingRef.current && !processingRef.current)
+  }, [])
 
   const speak = useCallback((text: string) => {
     if (!window.speechSynthesis) return
     const generation = ++utteranceRef.current
     speakingRef.current = true
-    recognitionRef.current?.stop()
+    setSpeaking(true)
+    captureRef.current = emptyCapture()
+    setListening(false)
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'es-PE'
-    utterance.rate = 1
+    const spanish = window.speechSynthesis.getVoices().find(voice => voice.lang.startsWith('es'))
+    if (spanish) utterance.voice = spanish
+    utterance.lang = spanish?.lang || 'es-ES'
     const finish = () => {
-      if (utteranceRef.current !== generation) return
+      if (generation !== utteranceRef.current) return
       speakingRef.current = false
-      resume()
+      setSpeaking(false)
+      resumeAtRef.current = performance.now() + 350
+      setListening(activeRef.current && !pausedRef.current && !processingRef.current)
     }
-    utterance.onend = finish
-    utterance.onerror = finish
+    utterance.onend = finish; utterance.onerror = finish
     window.speechSynthesis.speak(utterance)
-  }, [resume])
+  }, [])
 
-  return { supported, enabled, listening, interim, error, start, stop, pause, speak }
+  const interrupt = useCallback(() => {
+    utteranceRef.current++
+    window.speechSynthesis?.cancel()
+    speakingRef.current = false
+    setSpeaking(false)
+    captureRef.current = emptyCapture()
+    resumeAtRef.current = performance.now() + 150
+    setListening(activeRef.current && !pausedRef.current && !processingRef.current)
+  }, [])
+
+  useEffect(() => {
+    setSupported(window.isSecureContext && typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof window.AudioContext === 'function')
+    return stop
+  }, [stop])
+
+  return { supported, enabled, listening, starting, transcribing, speaking, sendMode, setSendMode, interrupt,
+    level, interim, error, start, stop, pause, speak, finish: () => sendCapture(false) }
 }

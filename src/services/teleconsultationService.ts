@@ -3,12 +3,15 @@ import { apiClient } from "./apiClient"
 export interface TeleconsultationJoinResponse {
   citaId: string
   salaId: string
-  token: string
+  token?: string
+  jwtToken?: string
   jitsiServerUrl: string
   rol: "MODERADOR" | "PARTICIPANTE"
   esModerador: boolean
-  nombreParticipante: string
-  estado: string
+  nombreParticipante?: string
+  nombreUsuario?: string
+  estado?: string
+  estadoSesion?: string
 }
 
 export interface TeleconsultationCloseResponse {

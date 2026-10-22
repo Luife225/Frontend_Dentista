@@ -134,7 +134,8 @@ export default function TeleconsultationRoom({
   }
 
   // URL del iframe seguro con JWT y parámetros de configuración
-  const iframeSrc = `${session.jitsiServerUrl}/${session.salaId}?jwt=${session.token}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false`
+  const effectiveJwt = session.token || session.jwtToken || ""
+  const iframeSrc = `${session.jitsiServerUrl}/${session.salaId}?jwt=${effectiveJwt}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false`
 
   if (isMinimized) {
     return (

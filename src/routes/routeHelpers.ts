@@ -12,7 +12,7 @@ import type { Role } from '../contexts/AuthContext'
 export const getDefaultRouteForRole = (rol?: Role | string | null): string => {
   switch (rol) {
     case 'SUPER_ADMIN':
-      return '/app/super-admin'
+      return '/app/solicitudes'
     case 'ADMIN_CLINICA':
       return '/app/dashboard'
     case 'ODONTOLOGO':
@@ -32,7 +32,7 @@ export const getDefaultRouteForRole = (rol?: Role | string | null): string => {
 export const getRoleLabel = (rol?: Role | string | null): string => {
   switch (rol) {
     case 'SUPER_ADMIN':
-      return 'Super Administrador'
+      return 'Soporte Técnico TI'
     case 'ADMIN_CLINICA':
       return 'Administrador de Clínica'
     case 'ODONTOLOGO':

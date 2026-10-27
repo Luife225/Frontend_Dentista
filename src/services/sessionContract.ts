@@ -1,5 +1,5 @@
-export type OperativeRole = 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE';
-const OPERATIVE_ROLES: readonly string[] = ['ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA', 'PACIENTE'];
+export type OperativeRole = 'SUPER_ADMIN' | 'ODONTOLOGO' | 'RECEPCIONISTA' | 'ADMIN_CLINICA' | 'PACIENTE';
+const OPERATIVE_ROLES: readonly string[] = ['SUPER_ADMIN', 'ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA', 'PACIENTE'];
 
 interface SessionIdentity {
   id: string;

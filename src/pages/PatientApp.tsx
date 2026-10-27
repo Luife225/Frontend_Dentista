@@ -6,6 +6,7 @@ import {
 import useAppointmentSlots from "../hooks/useAppointmentSlots"
 
 import { useState, useEffect, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
 
 import { useAuth } from "../contexts/AuthContext"
 
@@ -2560,6 +2561,7 @@ function TabPerfil() {
 
 export default function PatientApp() {
   const { role, user, logout: onLogout } = useAuth()
+  const navigate = useNavigate()
 
   const [tab, setTab] = useState<Tab>("inicio")
 
@@ -2805,6 +2807,20 @@ export default function PatientApp() {
             )
           })}
         </nav>
+ 
+        {/* Mesa de Ayuda & Incidencias */}
+        <div className="px-2 pb-2">
+          <button
+            onClick={() => navigate("/app/solicitudes")}
+            title="Mesa de Ayuda & Incidencias"
+            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/70 transition-all cursor-pointer ${
+              collapsed ? "justify-center" : ""
+            }`}
+          >
+            <span className="text-sm">🆘</span>
+            {!collapsed && <span>Mesa de Ayuda</span>}
+          </button>
+        </div>
 
         {/* User row */}
         <div

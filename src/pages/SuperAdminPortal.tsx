@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import coronixLogo from '../imports/coronixLogoData'
 
@@ -852,7 +853,8 @@ function SectionLogs() {
 // ── Shell ─────────────────────────────────────────────────────────────────────
 
 export default function SuperAdminPortal() {
-  const { role, logout: onLogout } = useAuth()
+  const { user, role, logout: onLogout } = useAuth()
+  const navigate = useNavigate()
   const [active, setActive] = useState<Section>('overview')
 
   const savedRole = typeof window !== 'undefined' ? localStorage.getItem('coronyx_role') : null
@@ -907,10 +909,12 @@ export default function SuperAdminPortal() {
 
         {/* User row */}
         <div className="p-3 border-t border-white/8 flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold shrink-0">SA</div>
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            {user?.nombres?.charAt(0) || 'S'}
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white/70 text-xs font-medium truncate">Super Admin</p>
-            <p className="text-white/25 text-xs truncate">admin@coronyx.io</p>
+            <p className="text-white/70 text-xs font-medium truncate">{user?.nombreCompleto || 'Super Admin'}</p>
+            <p className="text-white/25 text-xs truncate">{user?.correo || 'superadmin@coronyx.pe'}</p>
           </div>
           <button onClick={onLogout} className="text-white/20 hover:text-white/60 transition-colors text-xs" title="Cerrar sesión">⏏</button>
         </div>
@@ -922,6 +926,12 @@ export default function SuperAdminPortal() {
         <header className="h-12 border-b border-white/8 bg-slate-900/50 flex items-center px-5 gap-4 shrink-0">
           <h2 className="text-white/80 text-sm font-semibold" style={{fontFamily:'Outfit'}}>{TITLE[active]}</h2>
           <div className="flex-1" />
+          <button
+            onClick={() => navigate('/app/solicitudes')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/30 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-xs font-medium transition-colors"
+          >
+            ← Ir a Mesa de Ayuda / Clínica
+          </button>
           <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5">
             <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse shrink-0" />
             <span className="text-amber-400/80 text-xs font-medium">Modo administración global</span>

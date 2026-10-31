@@ -31,6 +31,7 @@ export interface TicketItem {
   solicitanteCorreo?: string
   responsable: string
   responsableRol?: string
+  responsableId?: number
   impacto: number // 1: Bajo, 2: Medio, 3: Alto
   probabilidad: number // 1: Baja, 2: Media, 3: Alta
   prioridad: PrioridadNivel
@@ -149,6 +150,22 @@ const OFFICIAL_CATALOG: CatalogPreset[] = [
     rutaAccion: "/app/agenda",
     accionLabel: "ℹ️ Ver Horarios de Sede",
     justificacionMatriz: "Impacto Bajo (1) × Probabilidad Media (2) = Score 2 → BAJO. No bloquea operaciones ni consultas activas.",
+  },
+  {
+    codigo: "INC-PAC-006",
+    solicitanteRol: "PACIENTE",
+    solicitud: "Consulta médica sobre dosificación de antibiótico post-tratamiento",
+    descripcion: "Paciente refiere duda clínica urgente sobre posología de medicamentos tras exodoncia o endodoncia.",
+    tipoItil: "Información",
+    impacto: 3,
+    probabilidad: 2,
+    prioridad: "ALTO",
+    responsable: "Odontólogo",
+    responsableRol: "ODONTOLOGO",
+    slaMinutos: 30,
+    rutaAccion: "/app/pacientes",
+    accionLabel: "🦷 Ver Ficha Clínica",
+    justificacionMatriz: "Impacto Alto (3) × Probabilidad Media (2) = Score 6 → ALTO. Seguimiento farmacológico post-quirúrgico del paciente.",
   },
 
   // ── ODONTÓLOGO
@@ -269,10 +286,28 @@ const OFFICIAL_CATALOG: CatalogPreset[] = [
     justificacionMatriz: "Impacto Alto (3) × Probabilidad Media (2) = Score 6 → ALTO. Riesgo crítico de seguridad de datos de salud.",
   },
   {
-    codigo: "INC-ADM-002",
+    codigo: "INC-ADM-003",
     solicitanteRol: "ADMIN_CLINICA",
-    solicitud: "Caída de base de datos o error 500 en servicios de Railway Cloud",
-    descripcion: "Indisponibilidad del backend o lentitud generalizada en consultas de sede.",
+    solicitud: "Solicitud de creación de credenciales de acceso para nueva odontóloga especialista",
+    descripcion: "Alta de cuenta, membresía de clínica y perfil RBAC para personal odontológico nuevo.",
+    tipoItil: "Acceso",
+    impacto: 2,
+    probabilidad: 2,
+    prioridad: "MEDIO",
+    responsable: "Admin Clínica",
+    responsableRol: "ADMIN_CLINICA",
+    slaMinutos: 60,
+    rutaAccion: "/app/consultorio",
+    accionLabel: "👥 Crear Usuario",
+    justificacionMatriz: "Impacto Medio (2) × Probabilidad Media (2) = Score 4 → MEDIO. Gestión administrativa de personal asistencial.",
+  },
+
+  // ── SOPORTE TÉCNICO TI / SUPER_ADMIN
+  {
+    codigo: "INC-TI-001",
+    solicitanteRol: "SUPER_ADMIN",
+    solicitud: "Caída de base de datos o error 500 en microservicios de Railway Cloud",
+    descripcion: "Indisponibilidad del backend o lentitud crítica generalizada en consultas de sede.",
     tipoItil: "Incidencia",
     impacto: 3,
     probabilidad: 3,
@@ -412,16 +447,16 @@ export default function MesaAyuda() {
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [sortMode, setSortMode] = useState<"prioridad" | "fifo">("prioridad")
 
-  // Catálogo segmentado visible en formulario
+  // Catálogo segmentado visible en formulario: Por defecto, cada rol solo ve sus opciones correspondientes
   const [showAllCatalogRoles, setShowAllCatalogRoles] = useState<boolean>(false)
   const availableCatalog = useMemo(() => {
-    if (showAllCatalogRoles || effectiveRole === "SUPER_ADMIN" || effectiveRole === "ADMIN_CLINICA") {
+    if (showAllCatalogRoles) {
       return OFFICIAL_CATALOG
     }
     return OFFICIAL_CATALOG.filter(
       (c) => c.solicitanteRol === normalizedRole || c.solicitanteRol === "TODOS"
     )
-  }, [showAllCatalogRoles, effectiveRole, normalizedRole])
+  }, [showAllCatalogRoles, normalizedRole])
 
   // Formulario de nueva solicitud
   const [selectedCatalogCode, setSelectedCatalogCode] = useState<string>(availableCatalog[0]?.codigo || "INC-PAC-001")
@@ -553,21 +588,25 @@ export default function MesaAyuda() {
         if (!isMyTicket) return false
       }
 
-      // 2. Si es Recepcionista: ve EXCLUSIVAMENTE los tickets correspondientes a su rol
+      // 2. Si es Recepcionista: ve EXCLUSIVAMENTE los tickets correspondientes a su rol o asignados a ella
       if (isRecepcionista) {
         const isForRecepcionista =
-          t.responsableRol === "RECEPCIONISTA" ||
-          t.responsable === "Recepcionista" ||
-          t.solicitanteRol === "RECEPCIONISTA"
+          t.responsableRol?.toUpperCase() === "RECEPCIONISTA" ||
+          t.responsable?.toLowerCase() === "recepcionista" ||
+          t.solicitanteRol?.toUpperCase() === "RECEPCIONISTA" ||
+          (user?.id && t.responsableId === Number(user.id)) ||
+          (user?.nombreCompleto && t.responsable?.toLowerCase() === user.nombreCompleto.toLowerCase())
         if (!isForRecepcionista) return false
       }
 
-      // 3. Si es Odontólogo: ve EXCLUSIVAMENTE los tickets correspondientes a su rol
+      // 3. Si es Odontólogo: ve EXCLUSIVAMENTE los tickets correspondientes a su rol o asignados a él
       if (isOdontologo) {
         const isForOdontologo =
-          t.responsableRol === "ODONTOLOGO" ||
-          t.responsable === "Odontólogo" ||
-          t.solicitanteRol === "ODONTOLOGO"
+          t.responsableRol?.toUpperCase() === "ODONTOLOGO" ||
+          t.responsable?.toLowerCase() === "odontólogo" ||
+          t.solicitanteRol?.toUpperCase() === "ODONTOLOGO" ||
+          (user?.id && t.responsableId === Number(user.id)) ||
+          (user?.nombreCompleto && t.responsable?.toLowerCase() === user.nombreCompleto.toLowerCase())
         if (!isForOdontologo) return false
       }
 
@@ -659,7 +698,11 @@ export default function MesaAyuda() {
   // KPIs segmentados para Recepcionista
   const recepcionistaStats = useMemo(() => {
     const asignados = tickets.filter(
-      (t) => t.responsableRol === "RECEPCIONISTA" || t.responsable === "Recepcionista"
+      (t) =>
+        t.responsableRol?.toUpperCase() === "RECEPCIONISTA" ||
+        t.responsable?.toLowerCase() === "recepcionista" ||
+        (user?.id && t.responsableId === Number(user.id)) ||
+        (user?.nombreCompleto && t.responsable?.toLowerCase() === user.nombreCompleto.toLowerCase())
     )
     const pendientes = asignados.filter((t) => t.estado === "PENDIENTE").length
     const urgentes = asignados.filter(
@@ -669,17 +712,22 @@ export default function MesaAyuda() {
     ).length
     const atendidos = asignados.filter((t) => t.estado === "ATENDIDO").length
     return { asignados: asignados.length, pendientes, urgentes, atendidos }
-  }, [tickets])
+  }, [tickets, user])
 
   // KPIs segmentados para Odontólogo
   const odontologoStats = useMemo(() => {
     const mios = tickets.filter(
-      (t) => t.solicitanteRol === "ODONTOLOGO" || t.responsableRol === "ODONTOLOGO"
+      (t) =>
+        t.solicitanteRol?.toUpperCase() === "ODONTOLOGO" ||
+        t.responsableRol?.toUpperCase() === "ODONTOLOGO" ||
+        t.responsable?.toLowerCase() === "odontólogo" ||
+        (user?.id && t.responsableId === Number(user.id)) ||
+        (user?.nombreCompleto && t.responsable?.toLowerCase() === user.nombreCompleto.toLowerCase())
     )
     const pendientes = mios.filter((t) => t.estado === "PENDIENTE" || t.estado === "EN_PROCESO").length
     const resueltos = mios.filter((t) => t.estado === "ATENDIDO").length
     return { total: mios.length, pendientes, resueltos }
-  }, [tickets])
+  }, [tickets, user])
 
   // KPIs oficiales ITIL (Para Administrador / Soporte TI)
   const stats = useMemo(() => {
@@ -817,11 +865,16 @@ export default function MesaAyuda() {
       comentario: `El operador ${userRoleLabel} ha tomado el ticket y comenzó las acciones de resolución.`,
     }
 
+    const operatorName = user?.nombreCompleto || user?.correo || userRoleLabel
+    const operatorId = user?.id ? Number(user.id) : undefined
+
     const updated = currentList.map((t) =>
       t.id === ticket.id
         ? {
             ...t,
             estado: "EN_PROCESO" as EstadoTicket,
+            responsable: operatorName,
+            responsableId: operatorId || t.responsableId,
             bitacora: [...(t.bitacora || []), newBitacoraEntry],
           }
         : t
@@ -838,8 +891,9 @@ export default function MesaAyuda() {
         body: JSON.stringify({
           estado: "EN_PROCESO",
           nuevoEstado: "EN_PROCESO",
-          usuarioNombre: user?.nombreCompleto || userRoleLabel,
-          usuarioRol: userRoleLabel,
+          usuarioId: user?.id ? String(user.id) : undefined,
+          usuarioNombre: operatorName,
+          usuarioRol: effectiveRole || "RECEPCIONISTA",
           evidencia: "Inicio de atención operativa.",
         }),
       }).catch(() => {})
@@ -875,14 +929,31 @@ export default function MesaAyuda() {
       comentario: evidenceText,
     }
 
+    // Cálculo dinámico del tiempo transcurrido real entre fechaRegistro y la resolución
+    let realElapsed = "1 min"
+    try {
+      const regDate = resolvingTicket.fechaRegistro ? new Date(resolvingTicket.fechaRegistro) : null
+      if (regDate && !isNaN(regDate.getTime())) {
+        const diffMins = Math.max(1, Math.floor((Date.now() - regDate.getTime()) / 60000))
+        realElapsed = diffMins >= 60
+          ? `${Math.floor(diffMins / 60)} h ${String(diffMins % 60).padStart(2, "0")} min`
+          : `${diffMins} min`
+      }
+    } catch {}
+
+    const resolverName = user?.nombreCompleto || user?.correo || userRoleLabel
+    const resolverId = user?.id ? Number(user.id) : undefined
+
     const updated = currentList.map((t) =>
       t.id === resolvingTicket.id
         ? {
             ...t,
             estado: "ATENDIDO" as EstadoTicket,
+            responsable: resolverName,
+            responsableId: resolverId || t.responsableId,
             evidencia: evidenceText,
             fechaCierre: timestampStr,
-            tiempoTranscurrido: t.tiempoTranscurrido.includes("min") ? t.tiempoTranscurrido : "15 min",
+            tiempoTranscurrido: realElapsed,
             bitacora: [...(t.bitacora || []), newBitacoraEntry],
           }
         : t
@@ -898,8 +969,9 @@ export default function MesaAyuda() {
         body: JSON.stringify({
           estado: "ATENDIDO",
           nuevoEstado: "ATENDIDO",
-          usuarioNombre: user?.nombreCompleto || userRoleLabel,
-          usuarioRol: userRoleLabel,
+          usuarioId: user?.id ? String(user.id) : undefined,
+          usuarioNombre: resolverName,
+          usuarioRol: effectiveRole || "RECEPCIONISTA",
           evidencia: evidenceText,
         }),
       }).catch(() => {})

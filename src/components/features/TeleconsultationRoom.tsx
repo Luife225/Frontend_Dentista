@@ -30,6 +30,7 @@ export default function TeleconsultationRoom({
   const [closing, setClosing] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
   const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [useLocalDocker, setUseLocalDocker] = useState(false)
   const timerRef = useRef<number | null>(null)
 
   async function initSession() {
@@ -133,9 +134,12 @@ export default function TeleconsultationRoom({
     )
   }
 
-  // URL del iframe seguro con JWT y parámetros de configuración
+  // URL del iframe seguro con JWT y parámetros de configuración (usa http://localhost:8088 por defecto para evitar bloqueo de certificado autofirmado en :8443)
   const effectiveJwt = session.token || session.jwtToken || ""
-  const iframeSrc = `${session.jitsiServerUrl}/${session.salaId}?jwt=${effectiveJwt}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false`
+  const httpDockerBaseUrl = (session.jitsiServerUrl || "http://localhost:8088").replace("https://localhost:8443", "http://localhost:8088")
+  const httpsDockerBaseUrl = "https://localhost:8443"
+  const baseUrl = useLocalDocker ? httpsDockerBaseUrl : httpDockerBaseUrl
+  const iframeSrc = `${baseUrl}/${session.salaId}?jwt=${effectiveJwt}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false`
 
   if (isMinimized) {
     return (
@@ -200,6 +204,18 @@ export default function TeleconsultationRoom({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setIframeLoaded(false)
+              setUseLocalDocker((prev) => !prev)
+            }}
+            title="Alternar entre puerto HTTP :8088 (sin bloqueo de certificado) y puerto HTTPS :8443"
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-800/50 rounded-xl text-[11px] font-semibold transition-colors cursor-pointer"
+          >
+            {useLocalDocker ? "🔒 Puerto :8443" : "🟢 Jitsi :8088"}
+          </button>
+
           <span className="text-xs font-mono text-slate-300 bg-slate-800 px-2 py-1 rounded-lg">
             ⏱ {formatDuration(callDuration)}
           </span>

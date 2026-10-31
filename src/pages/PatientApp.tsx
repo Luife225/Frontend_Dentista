@@ -931,14 +931,42 @@ function TabInicio({
                 </div>
               </div>
 
-              {nextAppt.modalidad === "VIRTUAL" && !["CANCELADA", "FINALIZADA"].includes(nextAppt.estado) && onJoinTeleconsulta && (
-                <div className="mt-4">
-                  <button
-                    onClick={() => onJoinTeleconsulta(nextAppt.id)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
-                  >
-                    <span>📹 Ingresar a teleconsulta segura</span>
-                  </button>
+              {nextAppt.modalidad === "VIRTUAL" && !["CANCELADA", "FINALIZADA"].includes(nextAppt.estado) && (
+                <div className="mt-4 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {nextAppt.enlaceTeleconsulta && (
+                      <a
+                        href={nextAppt.enlaceTeleconsulta}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                      >
+                        <span>📹 Unirse por Google Meet ↗</span>
+                      </a>
+                    )}
+                    {onJoinTeleconsulta && (
+                      <button
+                        onClick={() => onJoinTeleconsulta(nextAppt.id)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                      >
+                        <span>🔒 Sala Integrada (Jitsi)</span>
+                      </button>
+                    )}
+                  </div>
+                  {nextAppt.enlaceTeleconsulta ? (
+                    <a
+                      href={nextAppt.enlaceTeleconsulta}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xs text-sky-200 underline break-all"
+                    >
+                      {nextAppt.enlaceTeleconsulta}
+                    </a>
+                  ) : (
+                    <p className="text-xs text-amber-200 font-medium">
+                      ⏳ Enlace Meet opcional pendiente · Puedes usar la Sala Integrada (Jitsi).
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -1263,18 +1291,48 @@ function TabAgenda({
                         {formatLimaTime(a.inicioEn)} - {formatLimaTime(a.finEn)}{" "}
                         · {a.consultorio || "Sillón"}
                       </p>
+                      {a.modalidad === "VIRTUAL" && (
+                        a.enlaceTeleconsulta ? (
+                          <a
+                            href={a.enlaceTeleconsulta}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block mt-1 text-xs text-cyan-700 underline break-all"
+                          >
+                            {a.enlaceTeleconsulta}
+                          </a>
+                        ) : (
+                          <p className="text-xs text-amber-700 mt-1">
+                            Enlace pendiente de asignación por el odontólogo.
+                          </p>
+                        )
+                      )}
                     </div>
                   </div>
 
                   {/* Actions for this appointment */}
                   <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 shrink-0 flex-wrap">
-                    {a.modalidad === "VIRTUAL" && !["CANCELADA", "FINALIZADA"].includes(a.estado) && onJoinTeleconsulta && (
-                      <button
-                        onClick={() => onJoinTeleconsulta(a.id)}
-                        className="px-3.5 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <span>📹 Ingresar a teleconsulta</span>
-                      </button>
+                    {a.modalidad === "VIRTUAL" && !["CANCELADA", "FINALIZADA"].includes(a.estado) && (
+                      <>
+                        {a.enlaceTeleconsulta && (
+                          <a
+                            href={a.enlaceTeleconsulta}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3.5 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>📹 Google Meet ↗</span>
+                          </a>
+                        )}
+                        {onJoinTeleconsulta && (
+                          <button
+                            onClick={() => onJoinTeleconsulta(a.id)}
+                            className="px-3.5 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>🔒 Sala Jitsi</span>
+                          </button>
+                        )}
+                      </>
                     )}
                     {a.estado === "PROGRAMADA" && (
                       <button
@@ -2656,6 +2714,15 @@ export default function PatientApp() {
     } catch (err: any) {
       showToast(err.message || "Error al cancelar solicitud")
     }
+  }
+
+  const handleJoinTeleconsulta = (citaId: string) => {
+    const appt = appointments.find((a) => String(a.id) === String(citaId))
+    if (appt?.enlaceTeleconsulta && appt.enlaceTeleconsulta.trim()) {
+      window.open(appt.enlaceTeleconsulta.trim(), "_blank", "noopener,noreferrer")
+      return
+    }
+    showToast("⏳ El odontólogo aún no ha asignado el enlace de reunión para esta cita.")
   }
 
   const savedRole =

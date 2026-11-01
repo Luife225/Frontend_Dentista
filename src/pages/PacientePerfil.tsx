@@ -2011,9 +2011,26 @@ function PacienteArchivosTab({
                   <div>
                     {/* Visual Card Header */}
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800">
-                        {att.tipoArchivo}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800">
+                          {att.tipoArchivo}
+                        </span>
+                        {att.iaNombreModelo && (
+                          <span
+                            className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                              att.iaEstadoRevision === "CORREGIDO"
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : att.iaEstadoRevision === "ACEPTADO"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : att.iaEstadoRevision === "RECHAZADO"
+                                ? "bg-slate-100 text-slate-600 border-slate-300"
+                                : "bg-amber-50 text-amber-700 border-amber-200 animate-pulse"
+                            }`}
+                          >
+                            🤖 IA: {att.iaEstadoRevision || "Analizado"}
+                          </span>
+                        )}
+                      </div>
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           att.esVisiblePaciente

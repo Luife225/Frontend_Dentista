@@ -1,3 +1,22 @@
+/** Keep word endings but omit the long pause used only to decide when to stop. */
+export function prepareCoroVozAudio(chunks: Float32Array[], silenceSamples: number): Float32Array[] {
+  const length = chunks.reduce((total, chunk) => total + chunk.length, 0)
+  let remaining = Math.max(0, length - Math.max(0, silenceSamples - 16000 * 0.4))
+  const result: Float32Array[] = []
+  let peak = 0
+  for (const chunk of chunks) {
+    const copy = chunk.slice(0, remaining)
+    for (const sample of copy) peak = Math.max(peak, Math.abs(sample))
+    result.push(copy)
+    remaining -= copy.length
+    if (!remaining) break
+  }
+  // Bounded gain helps quiet microphones. Called only after the local speech detector accepts voice.
+  const gain = peak > 0.001 ? Math.min(4, 0.75 / peak) : 1
+  if (gain > 1) for (const chunk of result) for (let i = 0; i < chunk.length; i++) chunk[i] *= gain
+  return result
+}
+
 /** WAV PCM16 mono a 16 kHz, contrato explícito compartido con el backend. */
 export function encodeCoroVozWav(chunks: Float32Array[], sampleRate: number): Blob {
   if (!Number.isFinite(sampleRate) || sampleRate < 16000) throw new Error('La frecuencia del micrófono no es compatible')

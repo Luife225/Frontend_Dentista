@@ -277,7 +277,8 @@ const ROUTE_TO_MODULE: Record<string, ModuleId> = {
 // ─── Dashboard Layout ─────────────────────────────────────────────────────────
 
 export default function DashboardLayout() {
-  return <CoroVozProvider><DashboardContent /></CoroVozProvider>
+  const { user, role } = useAuth()
+  return <CoroVozProvider key={`${user?.usuarioId}/${user?.clinicaId}/${role}`}><DashboardContent /></CoroVozProvider>
 }
 
 function DashboardContent() {

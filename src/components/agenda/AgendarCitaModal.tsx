@@ -47,6 +47,9 @@ interface AgendarCitaModalProps {
   initialPatientId?: string
 
   initialDoctorId?: string
+  initialReason?: string
+  initialModality?: 'PRESENCIAL' | 'VIRTUAL'
+  preserveRequestedTime?: boolean
 }
 
 const MOTIVOS_FRECUENTES = [
@@ -81,6 +84,9 @@ export default function AgendarCitaModal({
   initialDoctorId,
 
   initialPatientId,
+  initialReason,
+  initialModality,
+  preserveRequestedTime = false,
 }: AgendarCitaModalProps) {
   const { role, user } = useAuth()
 
@@ -121,12 +127,12 @@ export default function AgendarCitaModal({
   const [consultorio, setConsultorio] = useState<string>(CONSULTORIOS[0])
 
   const [modalidad, setModalidad] = useState<"PRESENCIAL" | "VIRTUAL">(
-    "PRESENCIAL",
+    initialModality || "PRESENCIAL",
   )
 
   const [enlaceTeleconsulta, setEnlaceTeleconsulta] = useState("")
 
-  const [motivo, setMotivo] = useState("")
+  const [motivo, setMotivo] = useState(initialReason || "")
 
   const [isGeneratingMeet, setIsGeneratingMeet] = useState(false)
 
@@ -232,6 +238,12 @@ export default function AgendarCitaModal({
   // Ajustar hora inicio cuando cambia la fecha o se recalculan los slots
 
   useEffect(() => {
+    if (slotData.loading || !odontologoId) return
+    if (preserveRequestedTime && fecha === initialDate && horaInicio === initialTime) {
+      const requested = slots.find(s => s.time === initialTime && !s.isPast)
+      setHoraFin(requested?.endTime || '')
+      return
+    }
     if (isSunday) {
       setHoraInicio("")
 
@@ -259,7 +271,7 @@ export default function AgendarCitaModal({
     } else {
       setHoraFin(currentSlot.endTime)
     }
-  }, [fecha, slots, isSunday])
+  }, [fecha, slots, isSunday, slotData.loading, odontologoId, preserveRequestedTime, initialDate, initialTime, horaInicio])
 
   // Cargar pacientes y doctores al abrir
 
@@ -787,6 +799,7 @@ export default function AgendarCitaModal({
                     onChange={(e) => handleHoraInicioChange(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 text-slate-800 font-medium cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
                   >
+                    {preserveRequestedTime && horaInicio === initialTime && !slots.some(s => s.time === initialTime) && <option value={initialTime}>{initialTime} — hora solicitada sin turno disponible</option>}
                     {slots.length === 0 ? (
                       <option value="">Sin horarios disponibles</option>
                     ) : (
@@ -804,6 +817,7 @@ export default function AgendarCitaModal({
                     Disponibilidad según horario, citas y ausencias del
                     profesional.
                   </p>
+                  {preserveRequestedTime && fecha === initialDate && horaInicio === initialTime && !slotData.loading && !horaFin && <p role="alert" className="text-xs text-amber-800 mt-2">La hora solicitada ({initialTime}) no está disponible para este odontólogo. Selecciona otro turno para continuar.</p>}
                 </div>
 
                 {/* Hora Fin (Cálculo Automático +45 min y validación con cierre) */}

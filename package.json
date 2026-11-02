@@ -5,18 +5,22 @@
   "type": "module",
   "packageManager": "pnpm@10.34.3",
   "scripts": {
+    "predev": "node scripts/prepare-corovoz-vad.mjs",
+    "prebuild": "node scripts/prepare-corovoz-vad.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "start": "vite preview",
     "typecheck": "tsc --noEmit",
-    "verify:corovoz": "node verification/corovoz-audio.mjs && node verification/corovoz-conversation.mjs && node verification/corovoz-activity.mjs",
+    "verify:corovoz": "node verification/corovoz-audio.mjs && node verification/corovoz-conversation.mjs && node verification/corovoz-activity.mjs && node verification/corovoz-dental.mjs && node verification/corovoz-appointment.mjs",
     "preview": "vite preview",
     "format": "oxfmt",
     "test": "node --test tests/*.test.cjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
+    "@ricky0123/vad-web": "0.0.30",
     "gsap": "^3.15.0",
+    "onnxruntime-web": "1.30.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.3"

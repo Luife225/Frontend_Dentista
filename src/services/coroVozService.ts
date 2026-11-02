@@ -1,5 +1,13 @@
 import { apiClient, ApiError } from './apiClient'
 
+export interface CoroVozAppointmentDraft {
+  date: string
+  time: string
+  patientId: string | null
+  reason: string
+  modality: 'PRESENCIAL' | 'VIRTUAL'
+}
+
 export interface CoroVozAnswer {
   intent: string
   answer: string
@@ -9,16 +17,19 @@ export interface CoroVozAnswer {
   patients: { id: string; name: string; documentHint: string }[]
   patientId: string | null
   patientName: string | null
+  suggestions: { intent: string; label: string }[]
+  appointmentDraft?: CoroVozAppointmentDraft | null
 }
 
 export interface DentalProposal {
   piece: number
   surface: 'GENERAL' | 'OCLUSAL' | 'VESTIBULAR' | 'LINGUAL' | 'MESIAL' | 'DISTAL'
-  condition: 'CARIES' | 'RESTAURADO' | 'CORONA' | 'EXTRAIDO' | 'ENDODONCIA' | 'IMPLANTE' | 'FRACTURA'
+  condition: 'SANO' | 'CARIES' | 'RESTAURADO' | 'CORONA' | 'EXTRAIDO' | 'ENDODONCIA' | 'IMPLANTE' | 'FRACTURA'
   note: string
 }
 
 export interface DentalInterpretation {
+  draft?: (Omit<DentalProposal, 'piece' | 'condition'> & { piece: number | null; condition: DentalProposal['condition'] | null }) | null
   understood: boolean
   message: string
   proposal: DentalProposal | null
@@ -26,14 +37,20 @@ export interface DentalInterpretation {
   fragment: string
   selectedPiece: number | null
   correctedFrom: number | null
+  contextPiece: number | null
+  suggestions: { value: string; label: string }[]
 }
 
-export function askCoroVoz(text: string, signal?: AbortSignal, patientId?: string | null) {
-  return corovozRequest<CoroVozAnswer>('/general', { method: 'POST', body: JSON.stringify({ text, patientId }), signal })
+export function askCoroVoz(text: string, signal?: AbortSignal, patientId?: string | null, selectedIntent?: string, patientConfirmed = false) {
+  return corovozRequest<CoroVozAnswer>('/general', { method: 'POST', body: JSON.stringify({ text, patientId, selectedIntent, patientConfirmed }), signal })
 }
 
 export function interpretDentalCommand(text: string, signal?: AbortSignal, contextPiece?: number | null) {
   return corovozRequest<DentalInterpretation>('/odontograma/interpretar', { method: 'POST', body: JSON.stringify({ text, contextPiece }), signal })
+}
+
+export function reviseDentalCommand(text: string, field: string, draft: unknown, signal?: AbortSignal) {
+  return corovozRequest<DentalInterpretation>('/odontograma/editar', { method: 'POST', body: JSON.stringify({ text, field, draft }), signal })
 }
 
 export function getCoroVozStatus() {

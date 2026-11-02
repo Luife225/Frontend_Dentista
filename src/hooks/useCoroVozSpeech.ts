@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { MicVAD } from '@ricky0123/vad-web'
+import ortModuleUrl from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url'
+import ortBinaryUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url'
 import { getCoroVozStatus, transcribeCoroVoz } from '../services/coroVozService'
-import { encodeCoroVozWav } from '../utils/coroVozAudio'
-import { emptySpeechActivity, shouldAutoSend, updateSpeechActivity } from '../utils/coroVozActivity'
+import { encodeCoroVozWav, prepareCoroVozAudio } from '../utils/coroVozAudio'
+import { emptySpeechActivity, pauseReached, shouldStopConversationIdle, speechDetectionMode, updateSpeechActivity } from '../utils/coroVozActivity'
 
 const emptyCapture = () => ({ chunks: [] as Float32Array[], samples: 0, activity: emptySpeechActivity() })
 
 /** Captura estándar getUserMedia; el backend transcribe localmente, también en Brave. */
-export default function useCoroVozSpeech(onText: (text: string, reviewOnly: boolean) => void) {
+export default function useCoroVozSpeech(onText: (text: string, reviewOnly: boolean) => void, awaitingReply = false) {
+  const awaitingReplyRef = useRef(awaitingReply)
+  awaitingReplyRef.current = awaitingReply
   const [supported, setSupported] = useState(false)
   const [enabled, setEnabled] = useState(false)
   const [listening, setListening] = useState(false)
@@ -15,6 +20,7 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
   const [level, setLevel] = useState(0)
   const [interim, setInterim] = useState('')
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [speaking, setSpeaking] = useState(false)
   const [sendMode, setSendMode] = useState<'manual' | 'pause'>('manual')
   const sendModeRef = useRef(sendMode)
@@ -23,8 +29,7 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
   callbackRef.current = onText
   const streamRef = useRef<MediaStream | null>(null)
   const contextRef = useRef<AudioContext | null>(null)
-  const nodeRef = useRef<AudioWorkletNode | null>(null)
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const vadRef = useRef<MicVAD | null>(null)
   const captureRef = useRef(emptyCapture())
   const activeRef = useRef(false)
   const startingRef = useRef(false)
@@ -35,6 +40,20 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
   const generationRef = useRef(0)
   const utteranceRef = useRef(0)
   const requestRef = useRef<AbortController | null>(null)
+
+  const releaseMicrophone = useCallback(() => {
+    const vad = vadRef.current
+    vadRef.current = null
+    streamRef.current?.getTracks().forEach(track => { track.onended = null; track.stop() })
+    streamRef.current = null
+    const context = contextRef.current
+    contextRef.current = null
+    void (async () => {
+      await vad?.destroy().catch(() => {})
+      if (context?.state !== 'closed') await context?.close().catch(() => {})
+    })()
+    setEnabled(false); setListening(false); setLevel(0)
+  }, [])
 
   const stop = useCallback(() => {
     generationRef.current++
@@ -47,34 +66,30 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
     processingRef.current = false
     requestRef.current?.abort()
     requestRef.current = null
-    if (nodeRef.current) nodeRef.current.port.onmessage = null
-    nodeRef.current?.disconnect()
-    sourceRef.current?.disconnect()
-    streamRef.current?.getTracks().forEach(track => track.stop())
-    void contextRef.current?.close().catch(() => {})
-    nodeRef.current = null
-    sourceRef.current = null
-    contextRef.current = null
-    streamRef.current = null
+    releaseMicrophone()
     captureRef.current = emptyCapture()
     window.speechSynthesis?.cancel()
     setEnabled(false); setListening(false); setStarting(false); setTranscribing(false); setLevel(0); setInterim('')
-  }, [])
+  }, [releaseMicrophone])
 
   const sendCapture = useCallback(async (reviewOnly = false) => {
     if (!activeRef.current || pausedRef.current || speakingRef.current || processingRef.current) return
     const capture = captureRef.current
-    const rate = contextRef.current?.sampleRate || 16000
-    captureRef.current = emptyCapture()
+    const rate = 16000 // Silero frames are resampled to 16 kHz by MicVAD.
     if (!capture.activity.voiced || capture.samples < rate * 0.2) { setError('No detecté voz en la grabación. Comprueba el micrófono y vuelve a intentarlo.'); return }
+    captureRef.current = emptyCapture()
     processingRef.current = true
+    if (reviewOnly || sendModeRef.current === 'manual') {
+      activeRef.current = false
+      releaseMicrophone()
+    }
     setTranscribing(true); setListening(false); setInterim('Transcribiendo…'); setError('')
     const controller = new AbortController()
     requestRef.current = controller
     const generation = generationRef.current
     try {
-      const result = await transcribeCoroVoz(encodeCoroVozWav(capture.chunks, rate), controller.signal)
-      if (controller.signal.aborted || generation !== generationRef.current || !activeRef.current) return
+      const result = await transcribeCoroVoz(encodeCoroVozWav(prepareCoroVozAudio(capture.chunks, capture.activity.silenceSamples), rate), controller.signal)
+      if (controller.signal.aborted || generation !== generationRef.current) return
       requestRef.current = null
       if (result.text.trim()) callbackRef.current(result.text.trim(), reviewOnly)
       else setError('Se recibió audio pero no se entendieron palabras. Acércate al micrófono y vuelve a hablar.')
@@ -92,34 +107,52 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
         setListening(activeRef.current && !pausedRef.current && !speakingRef.current)
       }
     }
-  }, [stop])
+  }, [releaseMicrophone])
 
   const start = useCallback(async () => {
-    if (activeRef.current || startingRef.current) return
+    if (activeRef.current || startingRef.current || processingRef.current) return
     if (!window.isSecureContext || typeof navigator.mediaDevices?.getUserMedia !== 'function' || typeof window.AudioContext !== 'function') {
       setError('El micrófono requiere una conexión segura y permiso de acceso.'); return
     }
     const generation = ++generationRef.current
     startingRef.current = true
-    setStarting(true); setError('')
+    setStarting(true); setError(''); setNotice('')
     try {
       const status = await getCoroVozStatus()
       if (status.version < 4) throw new Error('El servicio de voz necesita actualizarse. Contacta al administrador.')
       if (!status.speechReady) throw new Error('El reconocimiento de voz no está disponible. Contacta al administrador.')
       if (generation !== generationRef.current) return
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
-      if (generation !== generationRef.current) { stream.getTracks().forEach(track => track.stop()); return }
-      streamRef.current = stream
       const context = new AudioContext({ sampleRate: 16000 })
       contextRef.current = context
-      await context.audioWorklet.addModule(`${import.meta.env.BASE_URL}corovoz-recorder.js`)
-      if (generation !== generationRef.current) { void context.close().catch(() => {}); return }
-      const source = context.createMediaStreamSource(stream)
-      const node = new AudioWorkletNode(context, 'corovoz-recorder')
-      sourceRef.current = source
-      nodeRef.current = node
-      node.port.onmessage = event => {
-        const chunk = event.data as Float32Array
+      const { MicVAD } = await import('@ricky0123/vad-web')
+      if (generation !== generationRef.current) return
+      const vad = await MicVAD.new({
+        model: 'v5', audioContext: context, startOnLoad: false,
+        baseAssetPath: `${import.meta.env.BASE_URL}corovoz-vad/`,
+        // Vite owns these URLs in dev and production. Importing a module from public fails in dev.
+        ortConfig: ort => {
+          ort.env.wasm.wasmPaths = {
+            mjs: new URL(ortModuleUrl, window.location.href).href,
+            wasm: new URL(ortBinaryUrl, window.location.href).href,
+          }
+          ort.env.wasm.numThreads = 1
+          ort.env.logLevel = 'error'
+        },
+        // Load the model before opening the microphone so its loading time cannot swallow the first words.
+        getStream: async () => {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+          if (generation !== generationRef.current) {
+            stream.getTracks().forEach(track => track.stop())
+            throw new Error('Escucha cancelada')
+          }
+          streamRef.current = stream
+          return stream
+        },
+        resumeStream: async stream => stream,
+        pauseStream: async () => {},
+        onSpeechStart: () => {}, onSpeechRealStart: () => {}, onSpeechEnd: () => {}, onVADMisfire: () => {},
+        onFrameProcessed: (probabilities, chunk) => {
+        if (generation !== generationRef.current) return
         let energy = 0
         for (const sample of chunk) energy += sample * sample
         const rms = Math.sqrt(energy / chunk.length)
@@ -129,28 +162,32 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
         }
         setListening(true)
         const capture = captureRef.current
-        capture.chunks.push(chunk)
+        capture.chunks.push(chunk.slice())
         capture.samples += chunk.length
-        capture.activity = updateSpeechActivity(capture.activity, rms, chunk.length)
+        capture.activity = updateSpeechActivity(capture.activity, probabilities.isSpeech, chunk.length, speechDetectionMode(sendModeRef.current, awaitingReplyRef.current))
+        if (shouldStopConversationIdle(capture.activity, 16000, sendModeRef.current, awaitingReplyRef.current)) {
+          stop(); setNotice('Micrófono apagado tras 15 segundos sin voz. Pulsa Iniciar escucha para continuar.'); return
+        }
         if (!capture.activity.voiced) {
-          while (capture.samples > context.sampleRate * 0.5 && capture.chunks.length > 1) capture.samples -= capture.chunks.shift()!.length
-        } else if (capture.samples > context.sampleRate * 25) {
+          while (capture.samples > 16000 * 1.2 && capture.chunks.length > 1) capture.samples -= capture.chunks.shift()!.length
+        } else if (capture.samples > 16000 * 25) {
           // El límite guarda el texto para revisión; no ejecuta una frase cortada.
           void sendCapture(true)
-        } else if (shouldAutoSend(capture.activity, context.sampleRate, sendModeRef.current)) {
-          void sendCapture(false)
+        } else if (pauseReached(capture.activity, 16000)) {
+          void sendCapture(sendModeRef.current === 'manual')
         }
-      }
-      const silent = context.createGain()
-      silent.gain.value = 0
-      source.connect(node); node.connect(silent); silent.connect(context.destination)
+      } })
+      if (generation !== generationRef.current) { await vad.destroy(); return }
+      vadRef.current = vad
       await context.resume()
       if (generation !== generationRef.current) return
       activeRef.current = true
       pausedRef.current = false
       captureRef.current = emptyCapture()
+      await vad.start()
+      if (generation !== generationRef.current) return
       setEnabled(true); setListening(true)
-      stream.getAudioTracks().forEach(track => { track.onended = () => { stop(); setError('El micrófono se desconectó. Vuelve a iniciar la escucha.') } })
+      streamRef.current?.getAudioTracks().forEach(track => { track.onended = () => { stop(); setError('El micrófono se desconectó. Vuelve a iniciar la escucha.') } })
     } catch (cause) {
       if (generation !== generationRef.current) return
       const messages: Record<string, string> = {
@@ -212,6 +249,6 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
     return stop
   }, [stop])
 
-  return { supported, enabled, listening, starting, transcribing, speaking, sendMode, setSendMode, interrupt,
+  return { supported, enabled, listening, starting, transcribing, speaking, sendMode, setSendMode, interrupt, notice,
     level, interim, error, start, stop, pause, speak, finish: () => sendCapture(false) }
 }

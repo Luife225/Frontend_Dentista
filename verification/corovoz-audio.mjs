@@ -4,7 +4,7 @@ import ts from 'typescript'
 
 const source = await readFile(new URL('../src/utils/coroVozAudio.ts', import.meta.url), 'utf8')
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText
-const { encodeCoroVozWav } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
+const { encodeCoroVozWav, prepareCoroVozAudio } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
 
 // Señal conocida a 44.1/48 kHz: comprueba que el backend recibe duración, tono y amplitud válidos.
 for (const rate of [16000, 44100, 48000]) {
@@ -28,4 +28,10 @@ for (const rate of [16000, 44100, 48000]) {
   assert.ok(Math.sqrt(energy / 8000) > 0.3, `Amplitud insuficiente desde ${rate} Hz`)
 }
 assert.throws(() => encodeCoroVozWav([], 0))
+const quiet = new Float32Array(8000).fill(0.03)
+const prepared = prepareCoroVozAudio([quiet, new Float32Array(56000)], 56000)
+assert.equal(prepared.reduce((sum, chunk) => sum + chunk.length, 0), 14400)
+assert.ok(Math.abs(prepared[0][0] - 0.12) < 0.001)
+assert.ok(Math.abs(quiet[0] - 0.03) < 0.001, 'Original capture must remain intact')
+assert.equal(prepareCoroVozAudio([new Float32Array([0.9, -0.9])], 0)[0][0], Math.fround(0.9))
 console.log('Audio correcto: PCM16 mono a 16 kHz, duración, tono y amplitud verificados en tres frecuencias de entrada.')

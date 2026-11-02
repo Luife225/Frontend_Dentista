@@ -11,6 +11,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useOptionalCoroVoz } from '../../contexts/CoroVozContext'
 import type { DentalProposal } from '../../services/coroVozService'
+import { applyDentalFinding } from '../../utils/coroVozDental'
 
 export type FaceCode = 'OCLUSAL' | 'VESTIBULAR' | 'LINGUAL' | 'MESIAL' | 'DISTAL' | 'GENERAL'
 
@@ -80,23 +81,21 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
     const affected = proposal.surface === 'GENERAL'
       ? [...map.keys()].some(key => key.startsWith(`${proposal.piece}:`))
       : map.has(`${proposal.piece}:${proposal.surface}`) || map.has(`${proposal.piece}:GENERAL`)
+    if (proposal.condition === 'SANO') return affected
+      ? 'Marcar sano quitará los hallazgos de esa pieza o cara al confirmar. En modo automático también se guardará el borrador.'
+      : 'Esta pieza o cara ya aparece sana. No hay hallazgos que quitar.'
     return affected
       ? 'Esta propuesta sustituirá marcas existentes de esa pieza o cara. Revisa la condición antes de confirmar.'
-      : 'Se agregará al borrador en pantalla. Después usa Guardar borrador para conservarlo.'
+      : 'Se agregará al borrador. En modo automático se guardará al decir confirmar; en modo manual usa Guardar borrador.'
   }, [])
 
   const applyVoiceFinding = useCallback((proposal: DentalProposal) => {
     const validPiece = [...UPPER_ARCH, ...LOWER_ARCH].includes(proposal.piece)
     const validFace = ['GENERAL', 'OCLUSAL', 'VESTIBULAR', 'LINGUAL', 'MESIAL', 'DISTAL'].includes(proposal.surface)
-    const validCondition = ['CARIES', 'RESTAURADO', 'CORONA', 'EXTRAIDO', 'ENDODONCIA', 'IMPLANTE', 'FRACTURA'].includes(proposal.condition)
+    const validCondition = Object.prototype.hasOwnProperty.call(CONDITIONS_MAP, proposal.condition)
     if (!canDictateRef.current || !validPiece || !validFace || !validCondition) return false
-    const next = new Map(findingsRef.current)
-    if (proposal.surface === 'GENERAL') {
-      for (const face of ['OCLUSAL', 'VESTIBULAR', 'LINGUAL', 'MESIAL', 'DISTAL']) next.delete(`${proposal.piece}:${face}`)
-    } else {
-      next.delete(`${proposal.piece}:GENERAL`)
-    }
-    next.set(`${proposal.piece}:${proposal.surface}`, { condition: proposal.condition, note: proposal.note || undefined })
+    if (proposal.condition === 'EXTRAIDO' && proposal.surface !== 'GENERAL') return false
+    const next = applyDentalFinding(findingsRef.current, proposal)
     findingsRef.current = next
     setFindingsMap(next)
     setSelectedTooth(proposal.piece)
@@ -245,7 +244,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
     setIsSaving(true)
     try {
       const hallazgosPayload: HallazgoDto[] = []
-      findingsMap.forEach((val, key) => {
+      findingsRef.current.forEach((val, key) => {
         const [pieceStr, face] = key.split(':')
         hallazgosPayload.push({
           codigoPiezaDental: parseInt(pieceStr, 10),

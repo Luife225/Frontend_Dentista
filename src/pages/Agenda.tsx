@@ -7,9 +7,10 @@ import useAppointmentSlots from "../hooks/useAppointmentSlots"
 
 import { startAppointmentAttention } from "../services/clinicalEncounterService"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
+import { readCoroVozAppointment } from "../utils/coroVozAppointment"
 
 import {
   getAppointments,
@@ -667,6 +668,8 @@ function SolicitudesModal({
 // ── Main Agenda Component ─────────────────────────────────────────────────────
 
 export default function Agenda() {
+  const location = useLocation()
+  const consumedDraft = useRef('')
   const navigate = useNavigate()
 
   const { role, user } = useAuth()
@@ -744,7 +747,7 @@ export default function Agenda() {
 
   const [showModal, setShowModal] = useState(false)
 
-  const [prefill, setPrefill] = useState<{ date?: string ;time?: string }>({})
+  const [prefill, setPrefill] = useState<{ date?: string; time?: string; patientId?: string; reason?: string; modality?: 'PRESENCIAL' | 'VIRTUAL'; fromCoroVoz?: boolean }>({})
 
   const [cancelCita, setCancelCita] = useState<Appointment | null>(null)
 
@@ -868,6 +871,19 @@ export default function Agenda() {
   // Por defecto se posiciona en el día actual (si está en la semana), o en el primer día hábil (0 = Lunes)
 
   const [dayIdx, setDayIdx] = useState(0)
+
+  useEffect(() => {
+    const draft = readCoroVozAppointment(location.state?.coroVozAppointment)
+    if (!draft || consumedDraft.current === location.key) return
+    consumedDraft.current = location.key
+    const date = new Date(`${draft.date}T12:00:00`)
+    setRefDate(date)
+    setDayIdx(Math.min(5, (date.getDay() + 6) % 7))
+    setView('week')
+    setPrefill({ date: draft.date, time: draft.time, patientId: draft.patientId || undefined, reason: draft.reason, modality: draft.modality, fromCoroVoz: true })
+    setShowModal(true)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.key, location.state, location.pathname, navigate])
 
   // Sincronizar dayIdx cuando cambia la semana o se detecta el día actual
 
@@ -1917,6 +1933,10 @@ export default function Agenda() {
           onClose={() => setShowModal(false)}
           initialDate={prefill.date || weekDays[0]?.dateStr}
           initialTime={prefill.time || "10:00"}
+          initialPatientId={prefill.patientId}
+          initialReason={prefill.reason}
+          initialModality={prefill.modality}
+          preserveRequestedTime={prefill.fromCoroVoz}
           initialDoctorId={filterDoc || undefined}
           onSuccess={(nuevaCita) => {
             showToast("✓ Cita agendada exitosamente")

@@ -44,6 +44,8 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
 
   const [version, setVersion] = useState<OdontogramaVersionDto | null>(null)
   const [history, setHistory] = useState<OdontogramaVersionDto[]>([])
+  const [selectedHistoricalVersion, setSelectedHistoricalVersion] = useState<OdontogramaVersionDto | null>(null)
+  const [draftBackupMap, setDraftBackupMap] = useState<Map<string, { condition: string; note?: string }> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -57,8 +59,11 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
   const [toothNote, setToothNote] = useState<string>('')
   const [showHistoryModal, setShowHistoryModal] = useState(false)
 
-  const isConfirmed = version?.estado === 'CONFIRMADO'
-  const isReadOnly = propReadOnly || !isOdontologo || isConfirmed
+  // Versión actualmente mostrada (puede ser la actual o una histórica seleccionada)
+  const displayedVersion = selectedHistoricalVersion || version
+  const isViewingHistorical = Boolean(selectedHistoricalVersion && selectedHistoricalVersion.id !== version?.id)
+  const isConfirmed = displayedVersion?.estado === 'CONFIRMADO'
+  const isReadOnly = propReadOnly || !isOdontologo || isConfirmed || isViewingHistorical
 
   const showToast = (msg: string, isErr = false) => {
     if (isErr) {
@@ -70,11 +75,58 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
     }
   }
 
+  const populateFindingsFromVersion = (target: OdontogramaVersionDto) => {
+    const map = new Map<string, { condition: string; note?: string }>()
+    if (target.hallazgos) {
+      for (const h of target.hallazgos) {
+        const key = `${h.codigoPiezaDental}:${h.codigoSuperficieCara.toUpperCase()}`
+        map.set(key, { condition: h.codigoCondicion.toUpperCase(), note: h.notaObservacion })
+      }
+    }
+    setFindingsMap(map)
+    setSelectedTooth(null)
+    setSelectedFace(null)
+    setToothNote('')
+  }
+
+  // Cargar una versión histórica seleccionada
+  const handleSelectVersion = (target: OdontogramaVersionDto) => {
+    if (target.id === version?.id) {
+      handleReturnToCurrent()
+      return
+    }
+    // Si estábamos en borrador actual, respaldar en memoria los cambios para no perderlos
+    if (!isViewingHistorical && version?.estado === 'BORRADOR') {
+      setDraftBackupMap(new Map(findingsMap))
+    }
+    setSelectedHistoricalVersion(target)
+    populateFindingsFromVersion(target)
+    setShowHistoryModal(false)
+    showToast(`Visualizando Versión ${target.numeroVersion} (${target.estado})`)
+  }
+
+  // Volver a la versión actual / borrador activo
+  const handleReturnToCurrent = () => {
+    setSelectedHistoricalVersion(null)
+    if (draftBackupMap && version?.estado === 'BORRADOR') {
+      setFindingsMap(new Map(draftBackupMap))
+    } else if (version) {
+      populateFindingsFromVersion(version)
+    }
+    setSelectedTooth(null)
+    setSelectedFace(null)
+    setToothNote('')
+    setShowHistoryModal(false)
+    showToast(`Regresaste a la Versión actual ${version?.numeroVersion ? `(v${version.numeroVersion})` : ''}`)
+  }
+
   // Carga scoped estrictamente a patientId (sin estado global compartido)
   const loadOdontogram = useCallback(async () => {
     if (!patientId) return
     setIsLoading(true)
     setErrorMessage(null)
+    setSelectedHistoricalVersion(null)
+    setDraftBackupMap(null)
     try {
       const [current, hist] = await Promise.all([
         getCurrentOdontogram(patientId),
@@ -83,18 +135,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
       setVersion(current)
       setHistory(hist)
 
-      // Poblar mapa de hallazgos
-      const map = new Map<string, { condition: string; note?: string }>()
-      if (current.hallazgos) {
-        for (const h of current.hallazgos) {
-          const key = `${h.codigoPiezaDental}:${h.codigoSuperficieCara.toUpperCase()}`
-          map.set(key, { condition: h.codigoCondicion.toUpperCase(), note: h.notaObservacion })
-        }
-      }
-      setFindingsMap(map)
-      setSelectedTooth(null)
-      setSelectedFace(null)
-      setToothNote('')
+      populateFindingsFromVersion(current)
     } catch (err: any) {
       console.error('Error al cargar odontograma:', err)
       setErrorMessage(err.message || 'Error al cargar odontograma del paciente')
@@ -366,28 +407,41 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
               <h2 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
                 Odontograma 2D {patientName ? `— ${patientName}` : ''}
               </h2>
-              {version && (
+              {displayedVersion && (
                 <span
                   className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                    version.estado === 'CONFIRMADO'
-                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                      : 'bg-amber-100 text-amber-700 border border-amber-200'
+                    isViewingHistorical
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                      : displayedVersion.estado === 'CONFIRMADO'
+                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-100 text-amber-700 border border-amber-200'
                   }`}
                 >
-                  v{version.numeroVersion} {version.estado}
+                  v{displayedVersion.numeroVersion} {displayedVersion.estado} {isViewingHistorical ? '· HISTÓRICO' : ''}
                 </span>
               )}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              {version?.estado === 'CONFIRMADO'
-                ? `Versión confirmada e inmutable · Firmado por: ${version.firmadoPorNombre || 'Odontólogo'}`
-                : 'Modo edición (Borrador activo). Guarda o confirma para cerrar la versión.'}
+              {isViewingHistorical
+                ? `Visualizando registro histórico archivado · Firmado por: ${displayedVersion?.firmadoPorNombre || 'Odontólogo'}`
+                : displayedVersion?.estado === 'CONFIRMADO'
+                  ? `Versión confirmada e inmutable · Firmado por: ${displayedVersion.firmadoPorNombre || 'Odontólogo'}`
+                  : 'Modo edición (Borrador activo). Guarda o confirma para cerrar la versión.'}
             </p>
           </div>
         </div>
 
         {/* Action buttons */}
         <div className="flex items-center gap-2">
+          {isViewingHistorical && (
+            <button
+              onClick={handleReturnToCurrent}
+              className="px-3.5 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+            >
+              <span>↩ Volver a v{version?.numeroVersion} (Actual)</span>
+            </button>
+          )}
+
           {history.length > 1 && (
             <button
               onClick={() => setShowHistoryModal(true)}
@@ -397,7 +451,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
             </button>
           )}
 
-          {isOdontologo && !isConfirmed && (
+          {!isViewingHistorical && isOdontologo && !isConfirmed && (
             <>
               <button
                 disabled={isSaving}
@@ -416,7 +470,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
             </>
           )}
 
-          {isOdontologo && isConfirmed && (
+          {!isViewingHistorical && isOdontologo && isConfirmed && (
             <button
               disabled={isSaving}
               onClick={handleCreateNewVersion}
@@ -427,6 +481,38 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
           )}
         </div>
       </div>
+
+      {/* Historical Inspection Banner */}
+      {isViewingHistorical && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl text-amber-900 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-base shrink-0">
+              🕒
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-950 flex items-center gap-2">
+                <span>Visualizando Odontograma Histórico — Versión {displayedVersion?.numeroVersion}</span>
+                <span className="text-[10px] font-bold uppercase bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md">
+                  Solo Lectura · Inmutable
+                </span>
+              </p>
+              <p className="text-[11px] text-amber-800/90 mt-0.5">
+                {displayedVersion?.fechaConfirmacion
+                  ? `Confirmado: ${new Date(displayedVersion.fechaConfirmacion).toLocaleString('es-PE')} · Firmado por: ${displayedVersion.firmadoPorNombre || 'Odontólogo'}`
+                  : `Fecha: ${displayedVersion?.fechaCreacion ? new Date(displayedVersion.fechaCreacion).toLocaleString('es-PE') : 'No registrada'}`}
+                {' · '}{displayedVersion?.hallazgos?.length || 0} hallazgo(s) registrados en esta versión.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={handleReturnToCurrent}
+            className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+          >
+            <span>↩ Volver a la versión actual (v{version?.numeroVersion})</span>
+          </button>
+        </div>
+      )}
 
       {/* Conditions Palette */}
       {!isReadOnly && (
@@ -541,46 +627,94 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 p-5 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
-                Historial de Versiones de Odontograma
-              </h3>
+              <div>
+                <h3 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
+                  Historial de Versiones de Odontograma
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Haz clic en cualquier versión para cargarla y revisar sus hallazgos en pantalla.
+                </p>
+              </div>
               <button
                 onClick={() => setShowHistoryModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 ✕
               </button>
             </div>
-            <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-              {history.map(h => (
-                <div key={h.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-800 text-sm">Versión {h.numeroVersion}</span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                          h.estado === 'CONFIRMADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {h.estado}
-                      </span>
+
+            <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto space-y-1">
+              {history.map(h => {
+                const isSelected = displayedVersion?.id === h.id
+                const isCurrent = version?.id === h.id
+
+                return (
+                  <div
+                    key={h.id}
+                    onClick={() => handleSelectVersion(h)}
+                    className={`p-3 rounded-xl flex items-center justify-between cursor-pointer transition-all border ${
+                      isSelected
+                        ? 'bg-cyan-50/80 border-cyan-300 ring-2 ring-cyan-400/20'
+                        : 'hover:bg-slate-50 border-transparent hover:border-slate-200'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 text-sm">Versión {h.numeroVersion}</span>
+                        {isCurrent && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase bg-cyan-100 text-cyan-800 border border-cyan-200">
+                            Actual
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            h.estado === 'CONFIRMADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {h.estado}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {h.fechaConfirmacion
+                          ? `Confirmado: ${new Date(h.fechaConfirmacion).toLocaleString('es-PE')}`
+                          : `Creado: ${h.fechaCreacion ? new Date(h.fechaCreacion).toLocaleString('es-PE') : 'Reciente'}`}
+                        {h.firmadoPorNombre ? ` · ${h.firmadoPorNombre}` : ''}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {h.fechaConfirmacion
-                        ? `Confirmado: ${new Date(h.fechaConfirmacion).toLocaleString('es-PE')}`
-                        : `Creado: ${h.fechaCreacion ? new Date(h.fechaCreacion).toLocaleString('es-PE') : 'Reciente'}`}
-                    </p>
+
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xs text-slate-500 font-mono">
+                        {h.hallazgos?.length || 0} hallazgo(s)
+                      </span>
+                      {isSelected ? (
+                        <span className="text-xs font-bold text-cyan-700 bg-cyan-100/90 border border-cyan-200 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-2xs">
+                          <span>👁️</span> En pantalla
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-500 bg-white border border-slate-200 px-2.5 py-1 rounded-lg hover:bg-cyan-600 hover:text-white hover:border-cyan-600 transition-colors shadow-2xs">
+                          Ver 👁️
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs text-slate-500 font-mono">
-                    {h.hallazgos?.length || 0} hallazgo(s)
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
-            <div className="text-right pt-2 border-t">
+
+            <div className="flex items-center justify-between pt-3 border-t">
+              {isViewingHistorical ? (
+                <button
+                  onClick={handleReturnToCurrent}
+                  className="px-3.5 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-xl transition-colors cursor-pointer"
+                >
+                  ↩ Volver a versión actual (v{version?.numeroVersion})
+                </button>
+              ) : (
+                <div />
+              )}
               <button
                 onClick={() => setShowHistoryModal(false)}
-                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200"
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 cursor-pointer"
               >
                 Cerrar
               </button>

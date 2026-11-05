@@ -60,7 +60,7 @@ function DashboardMockup() {
           </div>
           <div className="flex-1 mx-3 px-3 py-0.5 rounded text-[10px] text-white/30 border border-white/8"
             style={{ background: '#0d1a18', maxWidth: 220 }}>
-            app.coronyx.io
+            Plataforma CORONYX · Perú
           </div>
         </div>
 
@@ -161,7 +161,7 @@ const FEATURES = [
   { icon: '📹', title: 'Teleodontología',         desc: 'Videoconsultas integradas con chat, adjuntos de radiografías en tiempo real y registro automático en el historial.', tag: 'Teleconsulta' },
   { icon: '🔬', title: 'Análisis ML de RX',       desc: 'Carga imágenes DICOM y obtén detección asistida de caries, reabsorciones y lesiones óseas por machine learning.',   tag: 'IA' },
   { icon: '📋', title: 'Historia clínica unif.',  desc: 'Paciente, historial, odontograma y radiografías en una sola vista. Diseñado para el flujo clínico real.',            tag: 'Clínico' },
-  { icon: '💳', title: 'Caja y facturación',      desc: 'Control de ingresos, múltiples métodos de pago y reportes mensuales. Cobro pendiente con un clic desde la agenda.', tag: 'Gestión' },
+  { icon: '💳', title: 'Caja en soles',            desc: 'Registra cargos y abonos en soles (PEN), consulta saldos pendientes y exporta los movimientos.', tag: 'Gestión' },
   { icon: '📦', title: 'Inventario',              desc: 'Control de stock con alertas de mínimos, historial de consumo por procedimiento y órdenes de compra integradas.',    tag: 'Gestión' },
   { icon: '👥', title: 'Multi-rol y multi-sede',  desc: 'Acceso diferenciado por rol. SUPER_ADMIN gestiona todas las clínicas; cada sede tiene su propia configuración.',      tag: 'Enterprise' },
 ]
@@ -196,7 +196,7 @@ const ROLES = [
     title: 'Administrador',
     badge: 'Config.',
     badgeColor: '#475569',
-    desc: 'Configuración del consultorio, gestión del equipo médico, horarios, facturación avanzada y reportes gerenciales.',
+    desc: 'Configuración de la clínica, gestión del equipo, horarios, Caja e inventario.',
     modules: ['Configuración sede', 'Usuarios y roles', 'Reportes financieros', 'Inventario'],
     bg: 'from-slate-500/10 to-gray-500/5',
     accent: '#64748B',
@@ -207,20 +207,20 @@ const ROLES = [
     title: 'Paciente',
     badge: 'App móvil',
     badgeColor: '#059669',
-    desc: 'Portal web responsive exclusivo. Consulta tus citas, realiza pagos, sigue el avance de tu tratamiento y accede a teleconsultas.',
-    modules: ['Mis citas', 'Pagos en línea', 'Avances del tratamiento', 'Teleconsulta', 'Mis documentos'],
+    desc: 'Portal web para consultar tus citas, acceder a teleconsultas y revisar tus documentos publicados.',
+    modules: ['Mis citas', 'Teleconsulta', 'Mis documentos'],
     bg: 'from-emerald-500/10 to-green-500/5',
     accent: '#059669',
   },
 ]
 
 const SECURITY = [
-  { icon: '🔒', title: 'Cifrado end-to-end',    desc: 'Datos en tránsito con TLS 1.3 y en reposo con AES-256. Las radiografías y documentos se almacenan cifrados.' },
-  { icon: '🛡', title: 'HIPAA Compliant',        desc: 'Arquitectura diseñada para cumplir con HIPAA, Ley 1581 de Protección de Datos (Colombia) y GDPR.' },
-  { icon: '☁️', title: 'Infraestructura cloud', desc: 'Desplegado en AWS con auto-scaling, backups automáticos diarios y recuperación ante desastres en < 4 h.' },
-  { icon: '📊', title: '99.9% uptime SLA',       desc: 'Acuerdo de nivel de servicio garantizado. Monitoreo 24/7 con alertas proactivas y soporte prioritario.' },
-  { icon: '🔑', title: 'Control de acceso',      desc: 'Roles granulares, autenticación multifactor y auditoría de cada acción sobre datos clínicos.' },
-  { icon: '📜', title: 'ISO 27001',              desc: 'Gestión de seguridad de la información certificada. Revisiones de vulnerabilidades cada trimestre.' },
+  { icon: '🔒', title: 'Sesiones protegidas',   desc: 'El acceso a la plataforma requiere autenticación y permisos según el rol asignado.' },
+  { icon: '🛡', title: 'Privacidad del paciente', desc: 'Acceso a expedientes y documentos según el rol, la clínica y el paciente autorizado.' },
+  { icon: '☁️', title: 'Aislamiento por clínica', desc: 'Cada clínica consulta únicamente la información que le corresponde.' },
+  { icon: '📊', title: 'Historial clínico',      desc: 'Las versiones clínicas confirmadas conservan su historial y no se sobrescriben.' },
+  { icon: '🔑', title: 'Control de acceso',      desc: 'Odontólogos, personal administrativo y pacientes cuentan con permisos diferenciados.' },
+  { icon: '📜', title: 'Archivos autorizados',   desc: 'Los pacientes acceden a sus propios archivos publicados mediante controles del servidor.' },
 ]
 
 // ── Contact form component ────────────────────────────────────────────────────
@@ -279,13 +279,13 @@ function ContactForm() {
         <div>
           <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Teléfono / WhatsApp</label>
           <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-            placeholder="+57..."
+            placeholder="+51 999 999 999"
             className={inputCls} style={inputStyle} />
         </div>
         <div>
           <label className="text-xs text-white/45 font-medium block mb-1.5" style={{ fontFamily: 'Outfit' }}>Correo electrónico *</label>
           <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            required placeholder="tu@correo.co"
+            required placeholder="tu@correo.pe"
             className={inputCls} style={inputStyle} />
         </div>
       </div>
@@ -578,7 +578,7 @@ export default function LandingPage() {
                     onUpdate: () => {
                       if (stat.formatThousand) {
                         const valStr = Math.floor(proxy.value)
-                          .toLocaleString('es-CO')
+                          .toLocaleString('es-PE')
                           .replace(/,/g, ' ')
                         el.textContent = `${stat.prefix}${valStr}${stat.suffix}`
                       } else if (stat.decimals > 0) {
@@ -739,12 +739,12 @@ export default function LandingPage() {
 
               <p className="hero-anim-item text-white/55 leading-relaxed mb-8 max-w-md"
                 style={{ fontSize: '1.0625rem' }}>
-                CORONYX unifica agenda, historia clínica, odontograma interactivo, asistente IA por voz y teleodontología en un solo sistema — diseñado para el consultorio real.
+                CORONYX reúne agenda, historia clínica, odontograma, teleconsulta y Caja en soles para clínicas odontológicas del Perú.
               </p>
 
               {/* Trust badges */}
               <div className="hero-anim-item flex flex-wrap gap-2 mb-9">
-                {['HIPAA Compliant','ISO 27001','SOC 2','AES-256','99.9% SLA'].map(b => (
+                {['Trujillo, Perú', 'Horario de Perú', 'Caja en PEN', 'Acceso por roles'].map(b => (
                   <span key={b} className="text-xs font-medium px-2.5 py-1 rounded-lg border border-white/10"
                     style={{ backgroundColor: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', fontFamily: 'Outfit' }}>
                     {b}
@@ -1030,14 +1030,14 @@ export default function LandingPage() {
         <div className="text-center mb-16">
           <p className="text-xs font-bold uppercase tracking-[0.18em] mb-3"
             style={{ color: '#1E8C82', fontFamily: 'Outfit' }}>
-            Seguridad y cumplimiento
+            Seguridad y privacidad
           </p>
           <h2 className="text-white font-bold mb-4"
             style={{ fontFamily: 'Outfit', fontSize: 'clamp(1.8rem, 3vw, 2.6rem)' }}>
             Datos clínicos protegidos<br />al más alto nivel.
           </h2>
           <p className="text-white/40 text-sm max-w-md mx-auto leading-relaxed">
-            La información de tus pacientes es confidencial y sensible. Diseñamos cada capa de CORONYX con seguridad de primera clase.
+            La información de tus pacientes es confidencial. CORONYX aplica controles de acceso por rol, clínica y paciente.
           </p>
         </div>
 
@@ -1056,9 +1056,9 @@ export default function LandingPage() {
           ))}
         </div>
 
-        {/* Compliance strip */}
+        {/* Controles de acceso documentados */}
         <div className="mt-10 flex items-center justify-center gap-8 py-6 border-y border-white/6">
-          {['HIPAA', 'ISO 27001', 'SOC 2 Type II', 'Ley 1581 CO', 'GDPR Ready'].map(c => (
+          {['Acceso por roles', 'Datos aislados por clínica', 'Documentos con acceso autorizado'].map(c => (
             <div key={c} className="flex items-center gap-2">
               <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
@@ -1087,9 +1087,8 @@ export default function LandingPage() {
             <div className="space-y-5">
               {[
                 { icon: '📧', label: 'Email institucional', value: 'hola@coronyx.io', sub: 'Respuesta en menos de 24 h' },
-                { icon: '💬', label: 'WhatsApp soporte',    value: '+57 601 456 7890',  sub: 'L-V de 8:00 a 18:00' },
-                { icon: '📍', label: 'Oficina',             value: 'Bogotá, Colombia',  sub: 'Cra. 15 # 93-47 Of. 301' },
-                { icon: '🌐', label: 'Plataforma web',      value: 'app.coronyx.io',    sub: 'Acceso 24/7' },
+                { icon: '📞', label: 'Teléfono de contacto', value: '+51 907 253 763', sub: 'Trujillo, Perú' },
+                { icon: '📍', label: 'Ciudad',               value: 'Trujillo, Perú',   sub: 'Hora de Perú (UTC−5)' },
               ].map(item => (
                 <div key={item.label} className="flex items-start gap-4">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
@@ -1111,7 +1110,7 @@ export default function LandingPage() {
                 <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
               </div>
               <p className="text-white/40 text-xs leading-relaxed">
-                Tus datos están protegidos bajo la <span className="text-white/60">Ley 1581 de Colombia</span> y nuestras políticas de privacidad HIPAA-compliant.
+                El acceso a los datos clínicos se controla por rol y clínica. Los pacientes solo pueden consultar sus propios documentos publicados.
               </p>
             </div>
           </div>
@@ -1136,7 +1135,7 @@ export default function LandingPage() {
             Moderniza tu clínica<br />con inteligencia artificial.
           </h2>
           <p className="text-white/50 text-sm mb-10 leading-relaxed">
-            Más de 6 clínicas en Colombia ya gestionan su agenda, historia clínica y facturación en CORONYX. Únete hoy.
+            Gestiona citas, historias clínicas, teleconsultas y cobros en soles desde una plataforma pensada para clínicas odontológicas del Perú.
           </p>
           <div className="flex gap-3 justify-center">
             <button onClick={() => onNavigate('/login')}
@@ -1200,7 +1199,7 @@ export default function LandingPage() {
         <div className="border-t border-white/5 py-5">
           <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
             <p className="text-white/20 text-xs">© 2026 CORONYX · Todos los derechos reservados</p>
-            <p className="text-white/15 text-xs">Colombia · Bogotá · v2.0 Enterprise</p>
+            <p className="text-white/15 text-xs">Trujillo · Perú</p>
           </div>
         </div>
       </footer>

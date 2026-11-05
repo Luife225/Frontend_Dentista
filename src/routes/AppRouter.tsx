@@ -1,22 +1,40 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import ProtectedRoute from './ProtectedRoute'
-import PublicRoute from './PublicRoute'
-import DashboardLayout from '../layouts/DashboardLayout'
+import { Routes, Route, Navigate } from "react-router-dom"
+
+import ProtectedRoute from "./ProtectedRoute"
+
+import PublicRoute from "./PublicRoute"
+
+import DashboardLayout from "../layouts/DashboardLayout"
 
 // Pages
-import LandingPage from '../pages/LandingPage'
-import Login from '../pages/Login'
-import Dashboard from '../pages/Dashboard'
-import Agenda from '../pages/Agenda'
-import PacientePerfil from '../pages/PacientePerfil'
-import Teleodontologia from '../pages/Teleodontologia'
-import Notificaciones from '../components/features/Notificaciones'
-import Inventario from '../pages/Inventario'
-import Caja from '../pages/Caja'
-import Consultorio from '../pages/Consultorio'
-import SuperAdminPortal from '../pages/SuperAdminPortal'
-import PatientApp from '../pages/PatientApp'
-import Unauthorized from '../pages/Unauthorized'
+
+import LandingPage from "../pages/LandingPage"
+
+import Login from "../pages/Login"
+
+import Dashboard from "../pages/Dashboard"
+
+import Agenda from "../pages/Agenda"
+
+import PacientePerfil from "../pages/PacientePerfil"
+
+import Teleodontologia from "../pages/Teleodontologia"
+
+import Notificaciones from "../components/features/Notificaciones"
+
+import Inventario from "../pages/Inventario"
+
+import Caja from "../pages/Caja"
+
+import Consultorio from "../pages/Consultorio"
+
+import SuperAdminPortal from "../pages/SuperAdminPortal"
+
+import PatientApp from "../pages/PatientApp"
+
+import Unauthorized from "../pages/Unauthorized"
+
+import MesaAyuda from "../pages/MesaAyuda"
 
 export default function AppRouter() {
   return (
@@ -47,7 +65,7 @@ export default function AppRouter() {
       <Route
         path="/app/super-admin"
         element={
-          <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
             <SuperAdminPortal />
           </ProtectedRoute>
         }
@@ -57,7 +75,7 @@ export default function AppRouter() {
       <Route
         path="/app/patient-portal"
         element={
-          <ProtectedRoute allowedRoles={['PACIENTE']}>
+          <ProtectedRoute allowedRoles={["PACIENTE"]}>
             <PatientApp />
           </ProtectedRoute>
         }
@@ -67,7 +85,9 @@ export default function AppRouter() {
       <Route
         path="/app"
         element={
-          <ProtectedRoute allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA']}>
+          <ProtectedRoute
+            allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA", "SUPER_ADMIN", "PACIENTE"]}
+          >
             <DashboardLayout />
           </ProtectedRoute>
         }
@@ -75,21 +95,25 @@ export default function AppRouter() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
 
-        {/* Agenda clínica: Odontólogo, Recepcionista y Administrador de Clínica */}
+        {/* Agenda clínica: Odontólogo, Recepcionista, Administrador de Clínica y Soporte */}
         <Route
           path="agenda"
           element={
-            <ProtectedRoute allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA']}>
+            <ProtectedRoute
+              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA", "SUPER_ADMIN"]}
+            >
               <Agenda />
             </ProtectedRoute>
           }
         />
 
-        {/* Perfil e historias de pacientes: Odontólogo, Recepcionista y Administrador de Clínica */}
+        {/* Perfil e historias de pacientes: Odontólogo, Recepcionista, Administrador de Clínica y Soporte */}
         <Route
           path="pacientes"
           element={
-            <ProtectedRoute allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA']}>
+            <ProtectedRoute
+              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA", "SUPER_ADMIN"]}
+            >
               <PacientePerfil />
             </ProtectedRoute>
           }
@@ -99,7 +123,7 @@ export default function AppRouter() {
         <Route
           path="teleodontologia"
           element={
-            <ProtectedRoute allowedRoles={['ODONTOLOGO']}>
+            <ProtectedRoute allowedRoles={["ODONTOLOGO"]}>
               <Teleodontologia />
             </ProtectedRoute>
           }
@@ -109,7 +133,7 @@ export default function AppRouter() {
         <Route
           path="notificaciones"
           element={
-            <ProtectedRoute allowedRoles={['ODONTOLOGO', 'RECEPCIONISTA']}>
+            <ProtectedRoute allowedRoles={["ODONTOLOGO", "RECEPCIONISTA"]}>
               <Notificaciones />
             </ProtectedRoute>
           }
@@ -119,7 +143,7 @@ export default function AppRouter() {
         <Route
           path="inventario"
           element={
-            <ProtectedRoute allowedRoles={['RECEPCIONISTA', 'ADMIN_CLINICA']}>
+            <ProtectedRoute allowedRoles={["RECEPCIONISTA", "ADMIN_CLINICA"]}>
               <Inventario />
             </ProtectedRoute>
           }
@@ -129,7 +153,9 @@ export default function AppRouter() {
         <Route
           path="caja"
           element={
-            <ProtectedRoute allowedRoles={['ODONTOLOGO', 'ADMIN_CLINICA']}>
+            <ProtectedRoute
+              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA"]}
+            >
               <Caja />
             </ProtectedRoute>
           }
@@ -139,19 +165,42 @@ export default function AppRouter() {
         <Route
           path="consultorio"
           element={
-            <ProtectedRoute allowedRoles={['ADMIN_CLINICA']}>
+            <ProtectedRoute allowedRoles={["ADMIN_CLINICA"]}>
               <Consultorio />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Mesa de Ayuda / Gestión de Incidencias e ITIL: Odontólogo, Recepcionista y Administrador de Clínica */}
+        <Route
+          path="solicitudes"
+          element={
+            <ProtectedRoute
+              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA", "SUPER_ADMIN", "PACIENTE"]}
+            >
+              <MesaAyuda />
             </ProtectedRoute>
           }
         />
       </Route>
 
       {/* ── Aliases y compatibilidad de rutas ───────────────────────────── */}
+      <Route path="/solicitudes" element={<Navigate to="/app/solicitudes" replace />} />
+      <Route path="/soporte" element={<Navigate to="/app/solicitudes" replace />} />
       <Route path="/agenda" element={<Navigate to="/app/agenda" replace />} />
       <Route path="/admin" element={<Navigate to="/app/dashboard" replace />} />
-      <Route path="/odontologia" element={<Navigate to="/app/dashboard" replace />} />
-      <Route path="/recepcion" element={<Navigate to="/app/dashboard" replace />} />
-      <Route path="/portal-paciente" element={<Navigate to="/app/patient-portal" replace />} />
+      <Route
+        path="/odontologia"
+        element={<Navigate to="/app/dashboard" replace />}
+      />
+      <Route
+        path="/recepcion"
+        element={<Navigate to="/app/dashboard" replace />}
+      />
+      <Route
+        path="/portal-paciente"
+        element={<Navigate to="/app/patient-portal" replace />}
+      />
 
       {/* ── Catch-all → Landing ────────────────────────────────────────── */}
       <Route path="*" element={<Navigate to="/" replace />} />

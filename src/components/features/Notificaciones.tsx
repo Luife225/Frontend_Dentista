@@ -70,6 +70,7 @@ export default function Notificaciones() {
     try {
       const data = await getMyNotifications()
       setNotifications(data)
+      window.dispatchEvent(new Event('coronyx:notifications-read'))
     } catch (err: any) {
       console.error('[Notificaciones] Error al consultar bandeja:', err)
       setError(err?.message || 'Error al conectar con la bandeja de notificaciones.')
@@ -87,6 +88,7 @@ export default function Notificaciones() {
     try {
       const updated = await markAsRead(id)
       setNotifications(prev => prev.map(n => (n.id === id ? updated : n)))
+      window.dispatchEvent(new Event('coronyx:notifications-read'))
     } catch (err: any) {
       console.error('[Notificaciones] Error al marcar como leída:', err)
     } finally {
@@ -106,6 +108,7 @@ export default function Notificaciones() {
           fechaLectura: new Date().toISOString(),
         }))
       )
+      window.dispatchEvent(new Event('coronyx:notifications-read'))
     } catch (err: any) {
       console.error('[Notificaciones] Error al marcar todas como leídas:', err)
     }
@@ -209,7 +212,7 @@ export default function Notificaciones() {
       {/* Loading */}
       {loading && !error && (
         <div className="p-12 text-center text-slate-400 font-medium animate-pulse bg-white rounded-xl border border-slate-100">
-          Consultando notificaciones registradas en la base de datos...
+          Cargando notificaciones...
         </div>
       )}
 

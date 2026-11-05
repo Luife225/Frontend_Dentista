@@ -1,148 +1,586 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from "react"
 
-const transactions = [
-  { id:1, date:'2026-08-08', time:'08:47', patient:'Carlos Rivas', procedure:'Extracción #38', amount:320000, method:'Transferencia', status:'paid' },
-  { id:2, date:'2026-08-08', time:'09:30', patient:'María González', procedure:'Limpieza ultrasónica', amount:95000, method:'Efectivo', status:'paid' },
-  { id:3, date:'2026-08-08', time:'11:00', patient:'Sofía Mendez', procedure:'Corona provisional', amount:450000, method:'Tarjeta', status:'pending' },
-  { id:4, date:'2026-08-07', time:'15:20', patient:'Lucía Reyes', procedure:'Ortodoncia control', amount:120000, method:'Transferencia', status:'paid' },
-  { id:5, date:'2026-08-07', time:'16:45', patient:'Andrés Torres', procedure:'Blanqueamiento', amount:380000, method:'Tarjeta', status:'paid' },
-  { id:6, date:'2026-08-06', time:'10:10', patient:'Roberto Patiño', procedure:'Endodoncia #46', amount:850000, method:'Transferencia', status:'paid' },
-  { id:7, date:'2026-08-06', time:'14:00', patient:'Javier Molina', procedure:'Diagnóstico', amount:80000, method:'Efectivo', status:'pending' },
-]
+import { useAuth } from "../contexts/AuthContext"
 
-const monthly = [
-  { month:'Mar', val: 3800000 }, { month:'Abr', val: 4200000 }, { month:'May', val: 3950000 },
-  { month:'Jun', val: 5100000 }, { month:'Jul', val: 4750000 }, { month:'Ago', val: 2295000 },
-]
-const maxVal = Math.max(...monthly.map(m => m.val))
+import {
+  fetchPatientsFromApi,
+  type BackendPatientDto,
+} from "../services/patientService"
+
+import { getAppointmentsByPatient } from "../services/appointmentService"
+
+import type { Appointment } from "../types/appointment"
+
+import {
+  listCharges,
+  createCharge,
+  payCharge,
+  voidCharge,
+  voidPayment,
+  type CashCharge,
+} from "../services/businessService"
+
+import { formatLimaDate, toLimaDateString } from "../utils/appointmentRules"
+
+import exportCsv from "../utils/exportCsv"
+
+const money = (v: number) =>
+  new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(
+    v,
+  )
+
+const field = "w-full border border-slate-300 rounded-xl p-2 text-sm bg-white"
+
+const button =
+  "px-4 py-2 rounded-xl bg-cyan-700 text-white text-sm font-semibold disabled:opacity-50"
 
 export default function Caja() {
-  const [dateFilter, setDateFilter] = useState<'today'|'week'|'month'>('today')
-  const todayTotal = transactions.filter(t => t.date === '2026-08-08' && t.status === 'paid').reduce((s,t) => s + t.amount, 0)
-  const pending = transactions.filter(t => t.status === 'pending').reduce((s,t) => s + t.amount, 0)
+  const { role } = useAuth()
 
-  const filtered = transactions.filter(t => {
-    if (dateFilter === 'today') return t.date === '2026-08-08'
-    if (dateFilter === 'week') return ['2026-08-06','2026-08-07','2026-08-08'].includes(t.date)
-    return true
+  const admin = role === "ADMIN_CLINICA"
+
+  const [charges, setCharges] = useState<CashCharge[]>([])
+
+  const [patients, setPatients] = useState<BackendPatientDto[]>([])
+
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+
+  const [selected, setSelected] = useState("")
+
+  const [query, setQuery] = useState("")
+
+  const [date, setDate] = useState(toLimaDateString(new Date().toISOString()))
+
+  const [error, setError] = useState("")
+
+  const [notice, setNotice] = useState("")
+
+  const [loading, setLoading] = useState(true)
+
+  const [busy, setBusy] = useState(false)
+
+  const [form, setForm] = useState({
+    pacienteId: "",
+    citaId: "",
+    concepto: "",
+    importe: "",
   })
 
+  const [payment, setPayment] = useState({
+    importe: "",
+    medio: "EFECTIVO",
+    referencia: "",
+  })
+
+  const [action, setAction] = useState<{
+    type: "cargo" | "pago"
+    id: string
+  } | null>(null)
+
+  const [reason, setReason] = useState("")
+
+  // Mantener la clave cuando falla la red permite reintentar sin cobrar dos veces.
+
+  const [chargeKey, setChargeKey] = useState(crypto.randomUUID())
+
+  const [paymentKey, setPaymentKey] = useState(crypto.randomUUID())
+
+  async function load() {
+    setLoading(true)
+    setError("")
+
+    try {
+      const [cs, ps] = await Promise.all([
+        listCharges(),
+        fetchPatientsFromApi(),
+      ])
+
+      setCharges(cs)
+      setPatients(ps)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    setAppointments([])
+
+    if (form.pacienteId)
+      getAppointmentsByPatient(form.pacienteId)
+        .then((cs) => {
+          if (active) setAppointments(cs)
+        })
+        .catch((e) => {
+          if (active) setError(e.message)
+        })
+
+    return () => {
+      active = false
+    }
+  }, [form.pacienteId])
+
+  const current = charges.find((c) => c.id === selected)
+
+  const filtered = charges.filter((c) =>
+    `${c.pacienteNombre} ${c.concepto} ${c.id}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  )
+
+  const dailyPayments = useMemo(
+    () =>
+      charges
+        .flatMap((c) =>
+          c.pagos.map((p) => ({
+            ...p,
+            paciente: c.pacienteNombre,
+            concepto: c.concepto,
+          })),
+        )
+
+        .filter((p) => toLimaDateString(p.fechaCreacion) === date),
+    [charges, date],
+  )
+
+  const collected =
+    dailyPayments
+      .filter((p) => !p.anulado)
+      .reduce((s, p) => s + Math.round(Number(p.importe) * 100), 0) / 100
+
+  const outstanding =
+    charges.reduce((s, c) => s + Math.round(Number(c.saldo) * 100), 0) / 100
+
+  async function run(work: () => Promise<CashCharge>, success: string) {
+    setBusy(true)
+    setError("")
+    setNotice("")
+
+    try {
+      const updated = await work()
+
+      setCharges((cs) => [updated, ...cs.filter((c) => c.id !== updated.id)])
+
+      setSelected(updated.id)
+      setNotice(success)
+
+      return true
+    } catch (e: any) {
+      setError(e.message)
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <div className="p-6 space-y-6 fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-900" style={{fontFamily:'Outfit'}}>Caja y reportes</h1>
-        <button className="px-3 py-1.5 text-sm border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50">Exportar reporte</button>
+    <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Caja y cobros</h1>
+          <p className="text-sm text-slate-500">
+            Cargos, abonos y saldos de la clínica en soles.
+          </p>
+        </div>
+        <button className={button} disabled={loading || busy} onClick={load}>
+          Actualizar
+        </button>
       </div>
-
-      {/* KPI row */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label:'Ingresos hoy', value:`$${todayTotal.toLocaleString('es-CO')}`, sub:'Cobrado', color:'emerald' },
-          { label:'Pendiente cobro', value:`$${pending.toLocaleString('es-CO')}`, sub:'2 pacientes', color:'amber' },
-          { label:'Citas facturadas', value:'5', sub:'de 7 hoy', color:'cyan' },
-          { label:'Meta mensual', value:'$4.8M', sub:'47% alcanzado', color:'slate' },
-        ].map((k, i) => (
-          <div key={i} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider" style={{fontFamily:'Outfit'}}>{k.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${
-              k.color === 'emerald' ? 'text-emerald-600' :
-              k.color === 'amber' ? 'text-amber-600' :
-              k.color === 'cyan' ? 'text-cyan-600' : 'text-slate-800'
-            }`} style={{fontFamily:'Outfit'}}>{k.value}</p>
-            <p className="text-xs text-slate-400 mt-1">{k.sub}</p>
-          </div>
-        ))}
+      {error && (
+        <div role="alert" className="p-3 rounded-xl bg-rose-50 text-rose-700">
+          {error}
+        </div>
+      )}
+      {notice && (
+        <p
+          role="status"
+          className="p-3 rounded-xl bg-emerald-50 text-emerald-800"
+        >
+          {notice}
+        </p>
+      )}
+      <div className="grid sm:grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4">
+          <p className="text-sm text-slate-500">
+            Cobrado en la fecha seleccionada
+          </p>
+          <p className="text-2xl font-bold text-emerald-700">
+            {money(collected)}
+          </p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-4">
+          <p className="text-sm text-slate-500">Saldo total pendiente</p>
+          <p className="text-2xl font-bold text-amber-700">
+            {money(outstanding)}
+          </p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl p-4">
+          <label className="text-sm text-slate-500">
+            Fecha del reporte (Lima)
+            <input
+              type="date"
+              className={field}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </label>
+          <button
+            disabled={loading}
+            className="text-sm text-cyan-700 underline mt-2"
+            onClick={() =>
+              exportCsv(`caja-${date}.csv`, [
+                [
+                  "Pago",
+                  "Cargo",
+                  "Fecha",
+                  "Paciente",
+                  "Concepto",
+                  "Importe PEN",
+                  "Medio",
+                  "Referencia",
+                  "Anulado",
+                  "Motivo",
+                ],
+                ...dailyPayments.map((p) => [
+                  p.id,
+                  p.cargoId,
+                  p.fechaCreacion,
+                  p.paciente,
+                  p.concepto,
+                  p.importe,
+                  p.medio,
+                  p.referencia,
+                  p.anulado ? "Sí" : "No",
+                  p.motivoAnulacion,
+                ]),
+              ])
+            }
+          >
+            Exportar pagos de esta fecha
+          </button>
+        </div>
       </div>
+      <div className="grid lg:grid-cols-3 gap-5">
+        <form
+          className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3"
+          onSubmit={async (e) => {
+            e.preventDefault()
 
-      <div className="grid grid-cols-3 gap-5">
-        {/* Transactions */}
-        <div className="col-span-2 bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900" style={{fontFamily:'Outfit'}}>Movimientos</h2>
-            <div className="flex border border-slate-200 rounded-lg overflow-hidden text-xs">
-              {(['today','week','month'] as const).map(f => (
-                <button key={f} onClick={() => setDateFilter(f)}
-                  className={`px-3 py-1.5 font-medium transition-colors ${dateFilter === f ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
-                  {f === 'today' ? 'Hoy' : f === 'week' ? 'Semana' : 'Mes'}
+            if (
+              await run(
+                () =>
+                  createCharge({
+                    ...form,
+                    citaId: form.citaId || undefined,
+                    solicitudId: chargeKey,
+                  }),
+                "Cargo registrado",
+              )
+            ) {
+              setForm({ pacienteId: "", citaId: "", concepto: "", importe: "" })
+              setChargeKey(crypto.randomUUID())
+            }
+          }}
+        >
+          <h2 className="font-bold">Nuevo cargo</h2>
+          <label className="block text-sm">
+            Paciente
+            <select
+              required
+              className={field}
+              value={form.pacienteId}
+              onChange={(e) => {
+                setForm((f) => ({
+                  ...f,
+                  pacienteId: e.target.value,
+                  citaId: "",
+                }))
+                setChargeKey(crypto.randomUUID())
+              }}
+            >
+              <option value="">Seleccionar paciente</option>
+              {patients.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombres} {p.apellidos} · {p.numeroDocumento}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            Cita vinculada (opcional)
+            <select
+              className={field}
+              value={form.citaId}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, citaId: e.target.value }))
+              }
+            >
+              <option value="">Sin cita</option>
+              {appointments.map((a) => (
+                <option key={a.id} value={a.id}>
+                  #{a.id} · {formatLimaDate(a.inicioEn)} · {a.estado}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            Concepto
+            <input
+              required
+              maxLength={200}
+              className={field}
+              value={form.concepto}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, concepto: e.target.value }))
+              }
+            />
+          </label>
+          <label className="block text-sm">
+            Importe S/
+            <input
+              required
+              type="number"
+              min="0.01"
+              max="9999999999.99"
+              step="0.01"
+              className={field}
+              value={form.importe}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, importe: e.target.value }))
+              }
+            />
+          </label>
+          <button className={button} disabled={busy || loading}>
+            Registrar cargo
+          </button>
+        </form>
+        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5">
+          <label className="text-sm">
+            Buscar cargos
+            <input
+              className={field}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Paciente, concepto o número"
+            />
+          </label>
+          {loading ? (
+            <p className="p-5" role="status">
+              Cargando caja…
+            </p>
+          ) : filtered.length === 0 ? (
+            <p className="py-8 text-slate-500">
+              No hay cargos registrados con este criterio.
+            </p>
+          ) : (
+            <div className="divide-y mt-3 max-h-96 overflow-y-auto">
+              {filtered.map((c) => (
+                <button
+                  key={c.id}
+                  className={`w-full text-left p-3 rounded-xl ${
+                    selected === c.id ? "bg-cyan-50" : "hover:bg-slate-50"
+                  }`}
+                  onClick={() => {
+                    setSelected(c.id)
+                    setPayment({
+                      importe: String(c.saldo),
+                      medio: "EFECTIVO",
+                      referencia: "",
+                    })
+                    setPaymentKey(crypto.randomUUID())
+                    setAction(null)
+                  }}
+                >
+                  <div className="flex justify-between gap-2">
+                    <span className="font-semibold">{c.pacienteNombre}</span>
+                    <span>{money(Number(c.importe))}</span>
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    #{c.id} · {c.concepto} · {c.estado}
+                  </p>
+                  <p className="text-sm">Saldo {money(Number(c.saldo))}</p>
                 </button>
               ))}
             </div>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {filtered.map(t => (
-              <div key={t.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
-                <div className="text-right w-16">
-                  <p className="text-xs font-mono text-slate-400">{t.time}</p>
-                  <p className="text-xs text-slate-400">{t.date.slice(5)}</p>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800">{t.patient}</p>
-                  <p className="text-xs text-slate-400 truncate">{t.procedure}</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-slate-400">{t.method}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {t.status === 'paid' ? 'Pagado' : 'Pendiente'}
-                  </span>
-                  <span className={`font-semibold text-sm font-mono ${t.status === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    ${t.amount.toLocaleString('es-CO')}
-                  </span>
-                  {t.status === 'pending' && (
-                    <button className="text-xs px-2 py-1 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">Cobrar</button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bar chart */}
-        <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
-          <h3 className="font-semibold text-slate-900 mb-4" style={{fontFamily:'Outfit'}}>Ingresos mensuales</h3>
-          <div className="flex items-end justify-between gap-2 h-36">
-            {monthly.map((m, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                <p className="text-xs text-slate-400 font-mono">{i === 5 ? `$${(m.val/1000000).toFixed(1)}M` : ''}</p>
-                <div className="w-full flex flex-col justify-end" style={{ height: '100px' }}>
-                  <div
-                    className={`w-full rounded-t-md transition-all ${i === 5 ? 'bg-cyan-500' : 'bg-slate-100 hover:bg-slate-200'}`}
-                    style={{ height: `${(m.val / maxVal) * 100}%` }}
-                  />
-                </div>
-                <p className="text-xs text-slate-400">{m.month}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Mejor mes</span>
-              <span className="font-semibold text-slate-700">Jun — $5.1M</span>
-            </div>
-            <div className="flex justify-between text-xs mt-1">
-              <span className="text-slate-400">Promedio</span>
-              <span className="font-semibold text-slate-700">$4.1M / mes</span>
-            </div>
-          </div>
-
-          {/* Payment breakdown */}
-          <div className="mt-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2" style={{fontFamily:'Outfit'}}>Medios de pago</p>
-            {[
-              { label:'Transferencia', pct:55, color:'bg-cyan-500' },
-              { label:'Tarjeta', pct:30, color:'bg-violet-400' },
-              { label:'Efectivo', pct:15, color:'bg-slate-300' },
-            ].map(p => (
-              <div key={p.label} className="flex items-center gap-2 mb-1.5">
-                <span className="text-xs text-slate-500 w-24">{p.label}</span>
-                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className={`h-full ${p.color} rounded-full`} style={{width:`${p.pct}%`}}></div>
-                </div>
-                <span className="text-xs text-slate-400 font-mono w-8 text-right">{p.pct}%</span>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
       </div>
+      {current && (
+        <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+          <h2 className="font-bold">
+            Cargo #{current.id} · {current.concepto}
+          </h2>
+          <p className="text-sm text-slate-600">
+            {current.pacienteNombre} · {current.estado} · Pagado:{" "}
+            {money(Number(current.pagado))} · Saldo:{" "}
+            {money(Number(current.saldo))}
+          </p>
+          {Number(current.saldo) > 0 && current.estado !== "ANULADO" && (
+            <form
+              className="grid sm:grid-cols-4 gap-3 items-end"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (
+                  await run(
+                    () =>
+                      payCharge(current.id, {
+                        ...payment,
+                        solicitudId: paymentKey,
+                      }),
+                    "Pago registrado",
+                  )
+                ) {
+                  setPaymentKey(crypto.randomUUID())
+                  setPayment((p) => ({ ...p, importe: "", referencia: "" }))
+                }
+              }}
+            >
+              <label className="text-sm">
+                Abono S/
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  max={current.saldo}
+                  className={field}
+                  value={payment.importe}
+                  onChange={(e) =>
+                    setPayment((p) => ({ ...p, importe: e.target.value }))
+                  }
+                />
+              </label>
+              <label className="text-sm">
+                Medio
+                <select
+                  className={field}
+                  value={payment.medio}
+                  onChange={(e) =>
+                    setPayment((p) => ({ ...p, medio: e.target.value }))
+                  }
+                >
+                  {["EFECTIVO", "TARJETA", "TRANSFERENCIA", "YAPE", "PLIN"].map(
+                    (m) => (
+                      <option key={m}>{m}</option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <label className="text-sm">
+                Referencia
+                <input
+                  maxLength={120}
+                  className={field}
+                  value={payment.referencia}
+                  onChange={(e) =>
+                    setPayment((p) => ({ ...p, referencia: e.target.value }))
+                  }
+                />
+              </label>
+              <button className={button} disabled={busy}>
+                Registrar abono
+              </button>
+            </form>
+          )}
+          <div className="divide-y">
+            {current.pagos.length === 0 && (
+              <p className="text-sm text-slate-500">Sin pagos.</p>
+            )}
+            {current.pagos.map((p) => (
+              <div
+                key={p.id}
+                className="py-3 flex flex-wrap justify-between gap-2"
+              >
+                <span className="text-sm">
+                  Pago #{p.id} · {formatLimaDate(p.fechaCreacion)} · {p.medio} ·{" "}
+                  {money(Number(p.importe))} ·{" "}
+                  {p.anulado
+                    ? `Anulado: ${p.motivoAnulacion}`
+                    : p.referencia || "Registrado"}
+                </span>
+                {admin && !p.anulado && (
+                  <button
+                    disabled={busy}
+                    className="text-sm text-rose-700 underline"
+                    onClick={() => {
+                      setAction({ type: "pago", id: p.id })
+                      setReason("")
+                    }}
+                  >
+                    Anular pago
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {admin &&
+            current.estado !== "ANULADO" &&
+            Number(current.pagado) === 0 && (
+              <button
+                disabled={busy}
+                className="text-sm text-rose-700 underline"
+                onClick={() => {
+                  setAction({ type: "cargo", id: current.id })
+                  setReason("")
+                }}
+              >
+                Anular cargo
+              </button>
+            )}
+          {action && (
+            <form
+              className="bg-rose-50 p-4 rounded-xl space-y-2"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (
+                  await run(
+                    () =>
+                      action.type === "cargo"
+                        ? voidCharge(action.id, reason)
+                        : voidPayment(action.id, reason),
+                    "Anulación registrada",
+                  )
+                )
+                  setAction(null)
+              }}
+            >
+              <label className="text-sm">
+                Motivo de anulación
+                <input
+                  required
+                  maxLength={500}
+                  className={field}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </label>
+              <div className="flex gap-3">
+                <button className={button} disabled={busy}>
+                  Confirmar anulación
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setAction(null)}
+                >
+                  Volver
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      )}
+      <p className="text-xs text-slate-500">
+        Registro interno de cobros. Los pagos se registran después de
+        recibirlos; el sistema no procesa tarjetas ni emite comprobantes
+        electrónicos tributarios.
+      </p>
     </div>
   )
 }

@@ -45,3 +45,4 @@ jobs:
 
       - name: 7. Compilación de versión final de despliegue (Vite Build)
         run: pnpm run build
+

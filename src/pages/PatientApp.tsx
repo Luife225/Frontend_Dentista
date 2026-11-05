@@ -934,23 +934,24 @@ function TabInicio({
               {nextAppt.modalidad === "VIRTUAL" && !["CANCELADA", "FINALIZADA"].includes(nextAppt.estado) && (
                 <div className="mt-4 space-y-2">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    {nextAppt.enlaceTeleconsulta && (
+                    {nextAppt.enlaceTeleconsulta ? (
                       <a
                         href={nextAppt.enlaceTeleconsulta}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
                       >
-                        <span>📹 Unirse por Google Meet ↗</span>
+                        <span>📹 Unirse a Videollamada (Google Meet) ↗</span>
                       </a>
-                    )}
-                    {onJoinTeleconsulta && (
-                      <button
-                        onClick={() => onJoinTeleconsulta(nextAppt.id)}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
-                      >
-                        <span>🔒 Sala Integrada (Jitsi)</span>
-                      </button>
+                    ) : (
+                      onJoinTeleconsulta && (
+                        <button
+                          onClick={() => onJoinTeleconsulta(nextAppt.id)}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                        >
+                          <span>📹 Ingresar a Sala Virtual</span>
+                        </button>
+                      )
                     )}
                   </div>
                   {nextAppt.enlaceTeleconsulta ? (
@@ -964,7 +965,7 @@ function TabInicio({
                     </a>
                   ) : (
                     <p className="text-xs text-amber-200 font-medium">
-                      ⏳ Enlace Meet opcional pendiente · Puedes usar la Sala Integrada (Jitsi).
+                      ⏳ Tu odontólogo activará el enlace de videollamada al iniciar la consulta.
                     </p>
                   )}
                 </div>
@@ -1314,7 +1315,7 @@ function TabAgenda({
                   <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 shrink-0 flex-wrap">
                     {a.modalidad === "VIRTUAL" && !["CANCELADA", "FINALIZADA"].includes(a.estado) && (
                       <>
-                        {a.enlaceTeleconsulta && (
+                        {a.enlaceTeleconsulta ? (
                           <a
                             href={a.enlaceTeleconsulta}
                             target="_blank"
@@ -1323,14 +1324,15 @@ function TabAgenda({
                           >
                             <span>📹 Google Meet ↗</span>
                           </a>
-                        )}
-                        {onJoinTeleconsulta && (
-                          <button
-                            onClick={() => onJoinTeleconsulta(a.id)}
-                            className="px-3.5 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <span>🔒 Sala Jitsi</span>
-                          </button>
+                        ) : (
+                          onJoinTeleconsulta && (
+                            <button
+                              onClick={() => onJoinTeleconsulta(a.id)}
+                              className="px-3.5 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <span>📹 Sala Virtual</span>
+                            </button>
+                          )
                         )}
                       </>
                     )}
@@ -1783,7 +1785,7 @@ function ModalSubirDocumentoPaciente({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Archivo binario (máx. 25 MB)
+              Seleccionar archivo (PDF o Imagen, máx. 25 MB)
             </label>
             <input
               type="file"
@@ -2127,7 +2129,7 @@ function TabDocumentos() {
         <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center text-slate-400 space-y-2">
           <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-xs font-medium">
-            Obteniendo tus documentos duraderos...
+            Cargando tus documentos médicos y radiografías...
           </p>
         </div>
       )}

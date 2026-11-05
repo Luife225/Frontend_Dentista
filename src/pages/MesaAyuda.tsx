@@ -123,7 +123,7 @@ const OFFICIAL_CATALOG: CatalogPreset[] = [
     codigo: "INC-PAC-004",
     solicitanteRol: "PACIENTE",
     solicitud: "Falla de conexión, video o audio en sala de Teleodontología",
-    descripcion: "No se establece enlace WebRTC o token Jitsi en sesión en vivo remota.",
+    descripcion: "Problemas para conectarse a la videollamada, o fallas de audio y cámara durante la teleconsulta en vivo.",
     tipoItil: "Incidencia",
     impacto: 3,
     probabilidad: 3,
@@ -188,8 +188,8 @@ const OFFICIAL_CATALOG: CatalogPreset[] = [
   {
     codigo: "INC-ODO-002",
     solicitanteRol: "ODONTOLOGO",
-    solicitud: "Error 413 al cargar archivo binario pesado de radiografía (> 25MB)",
-    descripcion: "La imagen panorámica supera el umbral estándar configurado en el servidor.",
+    solicitud: "No se puede subir radiografía panorámica de gran tamaño (> 25 MB)",
+    descripcion: "El archivo de imagen radiográfica supera el límite estándar permitido en el sistema.",
     tipoItil: "Incidencia",
     impacto: 2,
     probabilidad: 2,
@@ -289,7 +289,7 @@ const OFFICIAL_CATALOG: CatalogPreset[] = [
     codigo: "INC-ADM-003",
     solicitanteRol: "ADMIN_CLINICA",
     solicitud: "Solicitud de creación de credenciales de acceso para nueva odontóloga especialista",
-    descripcion: "Alta de cuenta, membresía de clínica y perfil RBAC para personal odontológico nuevo.",
+    descripcion: "Alta de cuenta, asignación de sede y permisos de acceso para personal odontológico nuevo.",
     tipoItil: "Acceso",
     impacto: 2,
     probabilidad: 2,
@@ -306,8 +306,8 @@ const OFFICIAL_CATALOG: CatalogPreset[] = [
   {
     codigo: "INC-TI-001",
     solicitanteRol: "SUPER_ADMIN",
-    solicitud: "Caída de base de datos o error 500 en microservicios de Railway Cloud",
-    descripcion: "Indisponibilidad del backend o lentitud crítica generalizada en consultas de sede.",
+    solicitud: "Interrupción del servicio o lentitud crítica en el sistema clínico",
+    descripcion: "Indisponibilidad temporal o lentitud generalizada en la carga de expedientes y citas de la sede.",
     tipoItil: "Incidencia",
     impacto: 3,
     probabilidad: 3,
@@ -316,7 +316,7 @@ const OFFICIAL_CATALOG: CatalogPreset[] = [
     responsableRol: "SOPORTE_TECNICO",
     slaMinutos: 10,
     rutaAccion: "/app/super-admin",
-    accionLabel: "🖥️ Monitoreo Railway",
+    accionLabel: "🖥️ Monitoreo de Plataforma",
     justificacionMatriz: "Impacto Alto (3) × Probabilidad Alta (3) = Score 9 → CRÍTICO. Colapso operacional total de la clínica.",
   },
 
@@ -1184,7 +1184,7 @@ export default function MesaAyuda() {
                 <span className="text-xs text-slate-500 font-medium">Sede: Trujillo</span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200 shadow-2xs">
                   <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-                  Sincronizado en tiempo real (Base de Datos PostgreSQL)
+                  Sincronizado en tiempo real
                 </span>
               </div>
               <h1 className="text-2xl font-bold text-slate-900 mt-1" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -1420,7 +1420,7 @@ export default function MesaAyuda() {
             ? "➕ Solicitar Ayuda / Nueva Consulta"
             : isOdontologo
             ? "➕ Reportar Falla en Consultorio"
-            : "➕ Registrar Incidencia (Catálogo de Rol)"}
+            : "➕ Registrar Nueva Incidencia"}
         </button>
 
         {/* La pestaña de Matriz 3x3 SOLO se muestra a Operadores y Administrador */}
@@ -1441,7 +1441,7 @@ export default function MesaAyuda() {
       {/* ── PESTAÑA 1: TABLERO DE SEGUIMIENTO OPERATIVO ───────────────────── */}
       {activeTab === "tablero" && (
         <div className="space-y-4">
-          {/* Banner Didáctico: Solo visible para operadores y administradores (Oculto para Paciente) */}
+          {/* Banner de Priorización Clínica: Solo visible para operadores y administradores (Oculto para Paciente) */}
           {!isPaciente && (
             <div className="bg-gradient-to-r from-purple-50 via-indigo-50 to-emerald-50 border border-purple-200 rounded-xl p-3.5 shadow-2xs">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
@@ -1449,10 +1449,10 @@ export default function MesaAyuda() {
                   <span className="text-xl">⚖️</span>
                   <div>
                     <h4 className="text-xs font-bold text-slate-800">
-                      Triaje de Priorización ITIL (Caso Pedagógico: Alan, Chumbes y Pérez)
+                      Priorización Inteligente por Nivel de Urgencia Clínica (ITIL)
                     </h4>
                     <p className="text-[11px] text-slate-600">
-                      Aunque <strong>Alan</strong> reporte 1° (Consulta de Sábado: BAJA) y <strong>Chumbes</strong> 2° (Radiografía: MEDIA), el sistema atiende primero a <strong>Pérez</strong> (Aula cerrada / Teleconsulta caída: <strong>CRÍTICA</strong>) porque su impacto y riesgo detienen la operación clínica.
+                      Las incidencias <strong>Críticas</strong> que detienen una consulta en vivo (como una falla en Teleconsulta) se posicionan automáticamente en primer lugar de atención por encima de solicitudes administrativas o consultas regulares, garantizando la continuidad médica.
                     </p>
                   </div>
                 </div>
@@ -1974,7 +1974,7 @@ export default function MesaAyuda() {
               <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
                 {isPaciente
                   ? "¿Cuál es el motivo de tu solicitud? (Selecciona una opción)"
-                  : "Seleccione el requerimiento concurrente (1 Clic)"}
+                  : "Seleccione el motivo o tipo de incidencia"}
               </label>
               <select
                 value={selectedCatalogCode}
@@ -1985,7 +1985,7 @@ export default function MesaAyuda() {
                   <option key={opt.codigo} value={opt.codigo}>
                     {isPaciente
                       ? opt.solicitud
-                      : `[${opt.solicitanteRol}] [${opt.tipoItil.toUpperCase()}] ${opt.solicitud} (${opt.prioridad})`}
+                      : `${opt.solicitud} — Prioridad: ${opt.prioridad}`}
                   </option>
                 ))}
               </select>
@@ -2139,18 +2139,18 @@ export default function MesaAyuda() {
                 <div>
                   <label className="block text-[11px] font-bold text-amber-950 mb-1">
                     {isPaciente
-                      ? "Adjuntar foto o captura de pantalla (Opcional):"
-                      : "Captura de Pantalla / Evidencia Fotográfica (URL o Archivo):"}
+                      ? "Enlace a foto o captura de pantalla (Opcional):"
+                      : "Enlace a Captura de Pantalla / Evidencia Fotográfica (Opcional):"}
                   </label>
                   <input
                     type="text"
                     value={customAdjuntoUrl}
                     onChange={(e) => setCustomAdjuntoUrl(e.target.value)}
-                    placeholder="https://coronyx-evidencia.s3.railway.app/pantalla-error.png"
+                    placeholder="https://ejemplo.com/captura-evidencia.png"
                     className="w-full text-xs bg-white border border-amber-300 rounded-lg p-2 text-slate-800 font-mono"
                   />
                   <p className="text-[10px] text-amber-800 mt-1">
-                    📎 Se guardará en la columna <code>archivo_adjunto_url</code> de la base de datos de Railway.
+                    📎 Puedes pegar el enlace a una captura de pantalla o documento de referencia para facilitar la revisión.
                   </p>
                 </div>
               </div>
@@ -2247,7 +2247,7 @@ export default function MesaAyuda() {
                     <span className="text-[10px] font-extrabold text-white bg-purple-700 px-2 py-0.5 rounded">CRÍTICO 🔥</span>
                   </div>
                   <p className="text-[11px] text-white font-bold mt-1">
-                    Aula cerrada con llave / Teleconsulta caída / Caída Railway
+                    Interrupción de Teleconsulta en vivo / Urgencia en sillón dental
                   </p>
                   <span className="text-[10px] text-purple-200 font-mono">SLA: 10 min (Inmediato)</span>
                 </div>
@@ -2307,7 +2307,7 @@ export default function MesaAyuda() {
                     <span className="text-[10px] font-bold text-slate-700 bg-slate-200 px-1.5 py-0.2 rounded">BAJO</span>
                   </div>
                   <p className="text-[11px] text-slate-800 font-medium mt-1">
-                    Parlante que no funciona / Duda estética de UI
+                    Consulta general / Duda sobre uso del portal
                   </p>
                   <span className="text-[10px] text-slate-500 font-mono">SLA: 120 min</span>
                 </div>
@@ -2339,16 +2339,16 @@ export default function MesaAyuda() {
             </div>
           </div>
 
-          {/* Comparativa: El Aula Cerrada vs Parlante */}
+          {/* Comparativa Clínica de Priorización */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-              <span>🏫</span> Ejemplo Pedagógico del Profesor
+              <span>🏥</span> Ejemplos Clínicos de Priorización
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
-                <span className="font-bold text-purple-900 block text-xs">Caso A: Aula Cerrada con Llave</span>
+                <span className="font-bold text-purple-900 block text-xs">Caso A: Interrupción en Teleconsulta con Paciente en Línea</span>
                 <p className="text-[11px] text-slate-600 mt-1">
-                  El profesor y los alumnos no pueden ingresar. La clase se suspende totalmente si no se atiende de inmediato.
+                  El odontólogo y el paciente no pueden establecer audio/video durante una cita activa. La atención médica se detiene si no se resuelve de inmediato.
                 </p>
                 <div className="mt-2 text-[11px] font-mono font-bold text-purple-800">
                   Impacto Alto (3) × Probabilidad Alta (3) = 9 → <strong>CRÍTICO (Atención Inmediata)</strong>
@@ -2356,9 +2356,9 @@ export default function MesaAyuda() {
               </div>
 
               <div className="p-3 rounded-lg bg-slate-100 border border-slate-200">
-                <span className="font-bold text-slate-800 block text-xs">Caso B: Parlantes no funcionan</span>
+                <span className="font-bold text-slate-800 block text-xs">Caso B: Consulta de Horarios o Inducción en Sistema</span>
                 <p className="text-[11px] text-slate-600 mt-1">
-                  El docente puede continuar hablando a viva voz o usar la pizarra. No detiene la clase.
+                  El usuario solicita información de horarios de atención o capacitación programable. No interrumpe las consultas en curso.
                 </p>
                 <div className="mt-2 text-[11px] font-mono font-bold text-slate-700">
                   Impacto Bajo (1) × Probabilidad Baja (1) = 1 → <strong>BAJO (Atención Diferible)</strong>
@@ -2418,7 +2418,7 @@ export default function MesaAyuda() {
                 required
                 value={evidenceInput}
                 onChange={(e) => setEvidenceInput(e.target.value)}
-                placeholder="Ejemplo: Se corrigió el dígito del DNI en base de datos / Se reasignó al Sillón 2 / Se validó enlace WebRTC."
+                placeholder="Ejemplo: Se corrigió el número de DNI en la ficha del paciente / Se reasignó la cita al Sillón 2 / Se restableció la conexión de videollamada."
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
               />
             </div>

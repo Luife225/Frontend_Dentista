@@ -127,7 +127,7 @@ export default function UploadAttachmentModal({
       onClose()
     } catch (err: any) {
       setError(
-        err.message || "Error al subir el archivo al almacenamiento durable.",
+        err.message || "Error al subir el archivo al expediente clínico.",
       )
     } finally {
       setIsUploading(false)

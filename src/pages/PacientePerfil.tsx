@@ -1918,8 +1918,8 @@ function PacienteArchivosTab({
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
             {isRxMode
-              ? "Archivos radiográficos duraderos con control de visibilidad para el paciente"
-              : "Consentimientos informados, recetas y presupuestos almacenados de forma durable"}
+              ? "Radiografías panorámicas, periapicales y fotografías clínicas con control de visibilidad"
+              : "Consentimientos informados, recetas médicas, informes e indicaciones clínicas del paciente"}
           </p>
         </div>
 
@@ -1937,7 +1937,7 @@ function PacienteArchivosTab({
         <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center text-slate-400 space-y-2">
           <div className="w-8 h-8 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-xs font-medium">
-            Sincronizando archivos con el almacenamiento durable...
+            Cargando documentos y estudios del expediente...
           </p>
         </div>
       )}
@@ -1972,7 +1972,7 @@ function PacienteArchivosTab({
             </p>
             <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
               {isRxMode
-                ? "Suba radiografías panorámicas o periapicales para este paciente. El almacenamiento es seguro y durable."
+                ? "Suba radiografías panorámicas o periapicales para el expediente clínico de este paciente."
                 : "Suba consentimientos informados o recetas para este paciente."}
             </p>
           </div>
@@ -2425,8 +2425,8 @@ function PatientDetail({
                   : "Inactivo"}
             </span>
             {patient.usuarioId && (
-              <span className="text-[10px] font-mono bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-0.5 rounded-full">
-                Cuenta #{patient.usuarioId}
+              <span className="text-[10px] font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200 px-2 py-0.5 rounded-full">
+                Portal Activo
               </span>
             )}
           </div>
@@ -2493,26 +2493,32 @@ function PatientDetail({
           {isOdontologo && (
             <button
               onClick={() => {
+                const virtualAppt = patientAppointments.find(
+                  (a) => a.modalidad === "VIRTUAL" && !["CANCELADA", "FINALIZADA"].includes(a.estado),
+                )
+                if (virtualAppt?.enlaceTeleconsulta) {
+                  window.open(
+                    virtualAppt.enlaceTeleconsulta,
+                    "CoronyxMeetCall",
+                    "width=480,height=640,right=20,bottom=20,noopener,noreferrer",
+                  )
+                  return
+                }
                 if (teleconsultaCitaId) {
                   setIsTeleconsultaMinimized(!isTeleconsultaMinimized)
+                } else if (virtualAppt) {
+                  setTeleconsultaCitaId(virtualAppt.id)
+                  setIsTeleconsultaMinimized(false)
+                } else if (initialCitaId) {
+                  setTeleconsultaCitaId(initialCitaId)
+                  setIsTeleconsultaMinimized(false)
                 } else {
-                  const virtualAppt = patientAppointments.find(
-                    (a) => a.modalidad === "VIRTUAL" && !["CANCELADA", "FINALIZADA"].includes(a.estado),
+                  alert(
+                    "No se encontró una cita virtual programada para este paciente. Puedes agendar una cita virtual o iniciar la videollamada desde el módulo de Teleodontología.",
                   )
-                  if (virtualAppt) {
-                    setTeleconsultaCitaId(virtualAppt.id)
-                    setIsTeleconsultaMinimized(false)
-                  } else if (initialCitaId) {
-                    setTeleconsultaCitaId(initialCitaId)
-                    setIsTeleconsultaMinimized(false)
-                  } else {
-                    alert(
-                      "No se encontró una cita virtual programada para este paciente. Puedes agendar una cita virtual o seleccionarla desde la agenda.",
-                    )
-                  }
                 }
               }}
-              title="Abrir o alternar teleconsulta integrada"
+              title="Abrir videollamada de teleconsulta"
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors shadow-sm cursor-pointer ${
                 teleconsultaCitaId
                   ? "bg-purple-700 text-white hover:bg-purple-800"

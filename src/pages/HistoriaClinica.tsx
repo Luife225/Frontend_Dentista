@@ -465,12 +465,17 @@ function ModalEncounterForm({
 
           {/* Signos Vitales */}
           <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-            <p
-              className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2.5"
-              style={{ fontFamily: "Outfit" }}
-            >
-              Signos vitales
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-1 mb-2.5">
+              <p
+                className="text-[11px] font-bold text-slate-500 uppercase tracking-widest"
+                style={{ fontFamily: "Outfit" }}
+              >
+                Signos vitales
+              </p>
+              <span className="text-[10px] text-slate-400 font-medium">
+                Opcional en teleconsulta — completar si el paciente cuenta con tensiómetro/termómetro o en cita presencial
+              </span>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
               {[
                 ["Sistólica", "systolic", "mmHg"],
@@ -511,12 +516,12 @@ function ModalEncounterForm({
           {/* Diagnóstico */}
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
-              Diagnóstico Estomatológico (CIE-10 / Diagnóstico Dental) *
+              Diagnóstico Odontológico (Código CIE-10 opcional) *
             </label>
             <input
               value={form.diagnostico}
               onChange={setF("diagnostico")}
-              placeholder="Ej. K02.1 Caries de la dentina en pieza 36, Pulpitis irreversible..."
+              placeholder="Ej. Caries dental en pieza 36, Sensibilidad dentinaria (o código K02.1)..."
               className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-medium text-slate-800"
             />
           </div>
@@ -609,7 +614,7 @@ function ModalEncounterForm({
         {/* Footer con dos acciones distintas: Guardar borrador vs Confirmar y firmar */}
         <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
           <p className="text-[11px] text-slate-400">
-            {autoStatus || "Al confirmar, la versión queda inmutable."}
+            {autoStatus || "Al confirmar y firmar, la atención clínica queda registrada oficialmente."}
           </p>
           <div className="flex gap-2">
             <button

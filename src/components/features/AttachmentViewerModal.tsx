@@ -60,7 +60,12 @@ export default function AttachmentViewerModal({
         }
       } catch (err: any) {
         if (!isCancelled) {
-          setError(err.message || 'No se pudo cargar el archivo binario del servidor.')
+          const rawMsg = err?.message || ''
+          if (rawMsg.includes('archivo binario') || rawMsg.includes('no fue encontrado') || rawMsg.includes('clinica_')) {
+            setError('Este documento pertenece a un registro histórico previo y su vista previa no está disponible en este servidor. Sube un nuevo archivo o radiografía para visualizarlo aquí.')
+          } else {
+            setError(rawMsg || 'No se pudo cargar la vista previa del documento.')
+          }
         }
       } finally {
         if (!isCancelled) {
@@ -267,12 +272,12 @@ export default function AttachmentViewerModal({
                     {isAnalyzingMl ? (
                       <>
                         <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Analizando en GPU...
+                        Analizando radiografía...
                       </>
                     ) : (
                       <>
                         <span>🤖</span>
-                        Analizar con IA (YOLOv8n)
+                        Analizar con Asistente IA
                       </>
                     )}
                   </button>
@@ -362,7 +367,7 @@ export default function AttachmentViewerModal({
             {loading && (
               <div className="flex flex-col items-center gap-3 text-slate-300">
                 <div className="w-8 h-8 border-3 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs font-medium">Cargando archivo desde almacenamiento durable...</p>
+                <p className="text-xs font-medium">Cargando documento clínico...</p>
               </div>
             )}
 
@@ -465,12 +470,12 @@ export default function AttachmentViewerModal({
                 <div>
                   <h4 className="font-bold text-xs text-cyan-400 flex items-center gap-1.5" style={{ fontFamily: 'Outfit' }}>
                     <span>🧠</span>
-                    Detección Asistida de Caries (YOLOv8n)
+                    Detección Asistida de Caries por IA
                   </h4>
                   <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
-                    <span>{currentAttachment.iaNombreModelo}</span>
+                    <span>Asistente Radiográfico</span>
                     <span>·</span>
-                    <span className="text-emerald-400">GPU: {timing.inference_ms || 11} ms</span>
+                    <span className="text-emerald-400">Tiempo: {timing.inference_ms || 11} ms</span>
                   </div>
                 </div>
                 <button
@@ -570,8 +575,7 @@ export default function AttachmentViewerModal({
                             </p>
                           ) : (
                             <span>
-                              Caja px: [{Math.round(f.bboxPixels?.xMin || 0)}, {Math.round(f.bboxPixels?.yMin || 0)},{' '}
-                              {Math.round(f.bboxPixels?.xMax || 0)}, {Math.round(f.bboxPixels?.yMax || 0)}]
+                              Región señalada en radiografía
                             </span>
                           )}
                         </div>
@@ -697,11 +701,11 @@ export default function AttachmentViewerModal({
           <div className="font-mono text-[11px] text-slate-400 flex items-center gap-2">
             {hasMlAnalysis && (
               <span className="text-cyan-700 font-sans font-semibold">
-                Original IA preservado intacto ({originalOutput.length} hallazgos)
+                Análisis IA verificado ({originalOutput.length} hallazgos)
               </span>
             )}
             <span>·</span>
-            <span>ID #{currentAttachment.id}</span>
+            <span>Doc #{currentAttachment.id}</span>
           </div>
         </div>
       </div>

@@ -55,8 +55,8 @@ Cuando hagas `git pull` o clones el repositorio en tu otra máquina:
 
 3. **Iniciar el frontend:**
    ```bash
-   npm install
-   npm run dev
+   pnpm install --frozen-lockfile
+   pnpm dev
    ```
 
 ---

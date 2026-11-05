@@ -248,7 +248,7 @@ Portal web del paciente (solo `PACIENTE`):
 
 ### Requisitos previos
 - Node.js 18+
-- npm 9+ o pnpm 8+
+- pnpm 10 (versión fijada en `package.json`)
 
 ### Instalación
 
@@ -256,9 +256,7 @@ Portal web del paciente (solo `PACIENTE`):
 git clone <url-del-repo>
 cd Frontend_Dentista
 
-npm install
-# o con pnpm
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
 ### Desarrollo local

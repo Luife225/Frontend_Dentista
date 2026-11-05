@@ -12,7 +12,7 @@ import coronixLogo from "../imports/coronixLogoData"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ModuleId = "dashboard" | "agenda" | "pacientes" | "teleodontologia" | "notificaciones" | "inventario" | "caja" | "consultorio"
+type ModuleId = "dashboard" | "agenda" | "pacientes" | "teleodontologia" | "notificaciones" | "inventario" | "caja" | "consultorio" | "solicitudes"
 
 interface NavItem {
   id: ModuleId
@@ -162,12 +162,21 @@ const ALL_NAV: NavItem[] = [
       "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
     route: "/app/consultorio",
   },
+
+  {
+    id: "solicitudes",
+    label: "Mesa de Ayuda",
+    group: "Gestión",
+    iconPath:
+      "M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z",
+    route: "/app/solicitudes",
+  },
 ]
 
 // Modules each role can access
 
 const ROLE_MODULES: Record<Role, ModuleId[]> = {
-  SUPER_ADMIN: [],
+  SUPER_ADMIN: ["dashboard", "agenda", "pacientes", "solicitudes"],
 
   ODONTOLOGO: [
     "dashboard",
@@ -176,6 +185,7 @@ const ROLE_MODULES: Record<Role, ModuleId[]> = {
     "teleodontologia",
     "notificaciones",
     "caja",
+    "solicitudes",
   ],
 
   RECEPCIONISTA: [
@@ -185,6 +195,7 @@ const ROLE_MODULES: Record<Role, ModuleId[]> = {
     "notificaciones",
     "inventario",
     "caja",
+    "solicitudes",
   ],
 
   ADMIN_CLINICA: [
@@ -194,9 +205,10 @@ const ROLE_MODULES: Record<Role, ModuleId[]> = {
     "inventario",
     "caja",
     "consultorio",
+    "solicitudes",
   ],
 
-  PACIENTE: [],
+  PACIENTE: ["solicitudes"],
 }
 
 const ROLE_META: Record<Role, {
@@ -205,7 +217,7 @@ const ROLE_META: Record<Role, {
   avatarBg: string
 }> = {
   SUPER_ADMIN: {
-    label: "Super Admin",
+    label: "Soporte Técnico TI",
     color: "text-amber-400",
     avatarBg: "from-amber-400 to-orange-600",
   },
@@ -236,7 +248,7 @@ const ROLE_META: Record<Role, {
 }
 
 const ROLE_LABELS: Record<Role, string> = {
-  SUPER_ADMIN: "Super Admin",
+  SUPER_ADMIN: "Soporte Técnico TI",
   ODONTOLOGO: "Odontólogo",
   RECEPCIONISTA: "Recepcionista",
   ADMIN_CLINICA: "Administrador",
@@ -254,6 +266,7 @@ const TITLES: Record<ModuleId, string> = {
   inventario: "Inventario",
   caja: "Caja y Reportes",
   consultorio: "Configuración",
+  solicitudes: "Mesa de Ayuda",
 }
 
 const STATIC_BADGES: Partial<Record<ModuleId, number>> = {}
@@ -276,6 +289,8 @@ const ROUTE_TO_MODULE: Record<string, ModuleId> = {
   caja: "caja",
 
   consultorio: "consultorio",
+
+  solicitudes: "solicitudes",
 }
 
 // ─── Dashboard Layout ─────────────────────────────────────────────────────────
@@ -508,6 +523,30 @@ export default function DashboardLayout() {
                   ))}
                 </span>
               )}
+            </button>
+          </div>
+        )}
+
+        {/* Return to dedicated portal buttons */}
+        {role === "PACIENTE" && !collapsed && (
+          <div className="px-3 pb-2">
+            <button
+              onClick={() => navigate("/app/patient-portal")}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all cursor-pointer"
+            >
+              <span>←</span>
+              <span>Volver a Mi Portal</span>
+            </button>
+          </div>
+        )}
+        {role === "SUPER_ADMIN" && !collapsed && (
+          <div className="px-3 pb-2">
+            <button
+              onClick={() => navigate("/app/super-admin")}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all cursor-pointer"
+            >
+              <span>←</span>
+              <span>Portal Super Admin</span>
             </button>
           </div>
         )}

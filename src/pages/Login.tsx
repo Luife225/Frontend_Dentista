@@ -44,6 +44,12 @@ const ROLE_FEATURES: { icon: string ;label: string ;desc: string }[] = [
     label: "Paciente",
     desc: "Portal de citas y documentos médicos",
   },
+
+  {
+    icon: "🛠️",
+    label: "Soporte Técnico",
+    desc: "Mesa de ayuda, ITIL e incidencias del sistema",
+  },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────

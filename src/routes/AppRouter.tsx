@@ -34,6 +34,8 @@ import PatientApp from "../pages/PatientApp"
 
 import Unauthorized from "../pages/Unauthorized"
 
+import MesaAyuda from "../pages/MesaAyuda"
+
 export default function AppRouter() {
   return (
     <Routes>
@@ -84,7 +86,7 @@ export default function AppRouter() {
         path="/app"
         element={
           <ProtectedRoute
-            allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA"]}
+            allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA", "SUPER_ADMIN", "PACIENTE"]}
           >
             <DashboardLayout />
           </ProtectedRoute>
@@ -93,24 +95,24 @@ export default function AppRouter() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
 
-        {/* Agenda clínica: Odontólogo, Recepcionista y Administrador de Clínica */}
+        {/* Agenda clínica: Odontólogo, Recepcionista, Administrador de Clínica y Soporte */}
         <Route
           path="agenda"
           element={
             <ProtectedRoute
-              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA"]}
+              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA", "SUPER_ADMIN"]}
             >
               <Agenda />
             </ProtectedRoute>
           }
         />
 
-        {/* Perfil e historias de pacientes: Odontólogo, Recepcionista y Administrador de Clínica */}
+        {/* Perfil e historias de pacientes: Odontólogo, Recepcionista, Administrador de Clínica y Soporte */}
         <Route
           path="pacientes"
           element={
             <ProtectedRoute
-              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA"]}
+              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA", "SUPER_ADMIN"]}
             >
               <PacientePerfil />
             </ProtectedRoute>
@@ -168,9 +170,23 @@ export default function AppRouter() {
             </ProtectedRoute>
           }
         />
+
+        {/* Mesa de Ayuda / Gestión de Incidencias e ITIL: Odontólogo, Recepcionista y Administrador de Clínica */}
+        <Route
+          path="solicitudes"
+          element={
+            <ProtectedRoute
+              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA", "SUPER_ADMIN", "PACIENTE"]}
+            >
+              <MesaAyuda />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* ── Aliases y compatibilidad de rutas ───────────────────────────── */}
+      <Route path="/solicitudes" element={<Navigate to="/app/solicitudes" replace />} />
+      <Route path="/soporte" element={<Navigate to="/app/solicitudes" replace />} />
       <Route path="/agenda" element={<Navigate to="/app/agenda" replace />} />
       <Route path="/admin" element={<Navigate to="/app/dashboard" replace />} />
       <Route

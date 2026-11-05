@@ -1,0 +1,48 @@
+name: Integración Continua - Coronyx Frontend (CI)
+
+on:
+  push:
+    branches:
+      - feature/login-base-gamboa
+      - feature/sebastian
+      - develop
+      - main
+  pull_request:
+    branches:
+      - feature/login-base-gamboa
+      - develop
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-verify:
+    name: Compilación, Validación TypeScript y Pruebas (React 19 + Vite)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout del código fuente (Git)
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar gestor de paquetes pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.3
+
+      - name: 3. Configurar entorno Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: 4. Instalar dependencias del proyecto
+        run: pnpm install --no-frozen-lockfile
+
+      - name: 5. Validación del código y tipado estático (TypeScript)
+        run: pnpm run typecheck
+
+      - name: 6. Ejecución de pruebas automatizadas (Frontend Services & Teleconsulta)
+        run: pnpm test
+
+      - name: 7. Compilación de versión final de despliegue (Vite Build)
+        run: pnpm run build
+

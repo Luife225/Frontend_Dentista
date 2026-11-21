@@ -1773,7 +1773,7 @@ export default function HistoriaClinica({
               </div>
 
               {/* Botones de Acción */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <div className="flex max-w-full flex-wrap items-center gap-2">
                 {activeEncounter.estado === "BORRADOR" ? (
                   <>
                     <button

@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useOptionalCoroVoz } from '../../contexts/CoroVozContext'
 import type { DentalProposal } from '../../services/coroVozService'
 import { applyDentalFinding } from '../../utils/coroVozDental'
+import { normalizeCoroVoz } from '../../utils/coroVozConversation'
 
 export type FaceCode = 'OCLUSAL' | 'VESTIBULAR' | 'LINGUAL' | 'MESIAL' | 'DISTAL' | 'GENERAL'
 
@@ -105,13 +106,29 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
   }, [])
 
   useEffect(() => {
-    if (!registerCoroVoz) return
+    if (!registerCoroVoz || !isOdontologo) return
     return registerCoroVoz({
       key: `${patientId}:${version?.id || 'new'}`,
+      patientId,
       patientName: patientName || 'Paciente seleccionado',
       selectedPiece: selectedTooth,
       editable: Boolean(canDictate),
       describe: describeVoiceChange,
+      query: text => {
+        const normalized = normalizeCoroVoz(text)
+          if (!/\b(que|cuales|muestra|muestrame|abre|ver|observaciones|informacion)\b/.test(normalized)) return null
+        if (isLoading || errorMessage || version?.pacienteId !== patientId) return 'Espera a que se cargue el odontograma autorizado del paciente.'
+        if (/\b(ausentes|extraidos|faltan)\b/.test(normalized)) {
+          const pieces = [...new Set([...findingsRef.current.entries()].filter(([, finding]) => finding.condition === 'EXTRAIDO').map(([key]) => key.split(':')[0]))]
+          return pieces.length ? `Piezas registradas como extraídas en la versión en pantalla: ${pieces.join(', ')}.` : 'No hay piezas registradas como extraídas en esta versión. Esto no confirma que todas estén presentes.'
+        }
+        const match = normalized.match(/\b(?:pieza|diente)\s+(\d{2})\b/)
+        if (!match) return null
+        const entries = [...findingsRef.current.entries()].filter(([key]) => key.startsWith(`${match[1]}:`))
+        if (![...UPPER_ARCH, ...LOWER_ARCH].includes(Number(match[1]))) return 'Indica una pieza válida del odontograma abierto.'
+        setSelectedTooth(Number(match[1]))
+        return entries.length ? `Pieza ${match[1]} en la versión en pantalla: ${entries.map(([key, finding]) => `${key.split(':')[1].toLowerCase()}, ${CONDITIONS_MAP[finding.condition]?.label || finding.condition}${finding.note ? `. Observación: ${finding.note}` : ', sin observaciones registradas'}`).join('; ')}.` : `No hay hallazgos ni observaciones registrados para la pieza ${match[1]} en esta versión.`
+      },
       select: piece => {
         if (![...UPPER_ARCH, ...LOWER_ARCH].includes(piece)) return false
         setSelectedTooth(piece)
@@ -121,7 +138,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
       apply: applyVoiceFinding,
       save: saveVoiceDraft,
     })
-  }, [registerCoroVoz, patientId, patientName, version?.id, selectedTooth, canDictate, describeVoiceChange, applyVoiceFinding, saveVoiceDraft])
+  }, [registerCoroVoz, patientId, patientName, version?.id, version?.pacienteId, selectedTooth, canDictate, describeVoiceChange, applyVoiceFinding, saveVoiceDraft, isOdontologo, isLoading, errorMessage])
 
   const showToast = (msg: string, isErr = false) => {
     if (isErr) {
@@ -436,7 +453,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
         <div className="flex items-center gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
                 Odontograma 2D {patientName ? `— ${patientName}` : ''}
               </h2>
@@ -461,7 +478,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {history.length > 1 && (
             <button
               onClick={() => setShowHistoryModal(true)}
@@ -591,7 +608,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
           </div>
 
           {!isReadOnly && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={handleApplyGeneral}
                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
@@ -613,7 +630,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
       {/* History Modal */}
       {showHistoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 p-5 space-y-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-full flex flex-col border border-slate-100 p-5 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-bold text-slate-800 text-base" style={{ fontFamily: 'Outfit' }}>
                 Historial de Versiones de Odontograma

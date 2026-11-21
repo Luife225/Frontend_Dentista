@@ -1,3 +1,4 @@
+import { useOptionalCoroVoz } from '../contexts/CoroVozContext'
 import { listCharges } from "../services/businessService"
 
 import { getAppointmentsByPatient } from "../services/appointmentService"
@@ -1876,7 +1877,7 @@ function PacienteArchivosTab({
   })
 
   return (
-    <div className="h-full overflow-y-auto p-5 space-y-4">
+    <div className="p-5 space-y-4">
       {/* Modals */}
       {showUploadModal && (
         <UploadAttachmentModal
@@ -2226,6 +2227,9 @@ function PatientDetail({
 
   const isAdministrative = role === "ADMIN_CLINICA" || role === "RECEPCIONISTA"
 
+  const registerPatient = useOptionalCoroVoz()?.registerPatient
+  useEffect(() => registerPatient?.({ id: patient.id, name: `${patient.nombres} ${patient.apellidos}`.trim() }), [registerPatient, patient.id, patient.nombres, patient.apellidos])
+
   const [tab, setTab] = useState<Tab>(initialTab || "resumen")
   const [teleconsultaCitaId, setTeleconsultaCitaId] = useState<string | null>(initialCitaId || null)
   const [isTeleconsultaMinimized, setIsTeleconsultaMinimized] = useState(false)
@@ -2334,7 +2338,7 @@ function PatientDetail({
     : allTabs.filter((t) => t.id === "resumen" || t.id === "documentos")
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <section aria-label="Ficha del paciente" className="flex-1 min-w-0 lg:overflow-auto">
       {modal === "cita" && (
         <AgendarCitaModal
           isOpen
@@ -2420,7 +2424,7 @@ function PatientDetail({
         </div>
 
         {/* Acciones principales */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Vincular cuenta de usuario (exclusivo para administración) */}
           {isAdministrative && (
             <button
@@ -2520,7 +2524,7 @@ function PatientDetail({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+      <div className="flex flex-col xl:flex-row">
         {/* Panel docked de Teleconsulta Integrada */}
         {teleconsultaCitaId && !isTeleconsultaMinimized && (
           <div className="w-full md:w-[460px] lg:w-[500px] shrink-0 border-r border-slate-800 flex flex-col p-2 bg-slate-950 min-h-[360px]">
@@ -2550,7 +2554,7 @@ function PatientDetail({
         )}
 
         {/* Panel de pestañas clínicas persistentes */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 min-w-0">
           {/* Tabs header */}
           <div className="bg-white border-b border-slate-100 px-5 flex gap-1 overflow-x-auto shrink-0">
             {tabs.map((t) => (
@@ -2569,8 +2573,8 @@ function PatientDetail({
           </div>
 
           {/* Contenido persistente de pestañas */}
-          <div className="flex-1 overflow-hidden relative">
-            <div className={tab === "resumen" ? "h-full overflow-y-auto p-5 space-y-4" : "hidden"}>
+          <div className="relative">
+            <div hidden={tab !== "resumen"} className="p-5 space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 {[
                   {
@@ -2679,7 +2683,7 @@ function PatientDetail({
               )}
             </div>
 
-            <div className={tab === "historia" ? "h-full overflow-hidden" : "hidden"}>
+            <div hidden={tab !== "historia"}>
               {isOdontologo ? (
                 <HistoriaClinica
                   initialPatientId={patient.id}
@@ -2708,7 +2712,7 @@ function PatientDetail({
               )}
             </div>
 
-            <div className={tab === "odontograma" ? "h-full overflow-hidden" : "hidden"}>
+            <div hidden={tab !== "odontograma"}>
               {isOdontologo && (
                 <Odontogram
                   patientId={patient.id}
@@ -2717,19 +2721,19 @@ function PatientDetail({
               )}
             </div>
 
-            <div className={tab === "radiografias" ? "h-full overflow-hidden" : "hidden"}>
+            <div hidden={tab !== "radiografias"}>
               {isOdontologo && (
                 <PacienteArchivosTab patient={patient} mode="radiografias" />
               )}
             </div>
 
-            <div className={tab === "documentos" ? "h-full overflow-hidden" : "hidden"}>
+            <div hidden={tab !== "documentos"}>
               <PacienteArchivosTab patient={patient} mode="documentos" />
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -3160,7 +3164,7 @@ export default function PacientePerfil() {
   }
 
   return (
-    <div className="flex h-full relative">
+    <div className="relative flex min-h-full flex-col lg:h-full lg:flex-row">
       {/* Toast notification */}
       {toastMessage && (
         <div className="absolute top-4 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs flex items-center gap-2 border border-slate-700 animate-bounce">
@@ -3178,7 +3182,7 @@ export default function PacientePerfil() {
       )}
 
       {/* Sidebar de Pacientes */}
-      <aside className="w-64 shrink-0 flex flex-col border-r border-slate-200 bg-white">
+      <aside className="w-full max-h-64 shrink-0 flex flex-col border-r border-slate-200 bg-white lg:w-56 lg:max-h-none xl:w-64">
         {/* Status header */}
         <div className="px-3 pt-2.5 pb-1 flex items-center justify-between border-b border-slate-50">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">

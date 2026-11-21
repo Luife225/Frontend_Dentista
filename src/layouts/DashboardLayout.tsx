@@ -3,7 +3,8 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, type Role } from '../contexts/AuthContext'
 import { getUnreadCount } from '../services/notificationService'
 import AIAssistant from '../components/features/AIAssistant'
-import { CoroVozProvider } from '../contexts/CoroVozContext'
+import AgendarCitaModal from '../components/agenda/AgendarCitaModal'
+import { CoroVozProvider, useCoroVoz } from '../contexts/CoroVozContext'
 import coronixLogo from '../imports/coronixLogoData'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -282,6 +283,7 @@ export default function DashboardLayout() {
 }
 
 function DashboardContent() {
+  const { appointmentDraft, editAppointment, closeAppointment } = useCoroVoz()
   const { role, logout, user } = useAuth()
 
   const navigate = useNavigate()
@@ -290,7 +292,14 @@ function DashboardContent() {
 
   const [showAI, setShowAI] = useState(false)
 
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => window.matchMedia('(max-width: 900px)').matches)
+
+  useEffect(() => {
+    const compact = window.matchMedia('(max-width: 900px)')
+    const resize = () => setCollapsed(compact.matches)
+    compact.addEventListener('change', resize)
+    return () => compact.removeEventListener('change', resize)
+  }, [])
 
   const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0)
 
@@ -356,9 +365,10 @@ function DashboardContent() {
         : "bg-slate-500/15"
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="relative flex h-dvh overflow-hidden">
       {/* Sidebar */}
       <aside
+        data-dashboard-sidebar
         className={`${
           collapsed ? "w-14" : "w-56"
         } shrink-0 flex flex-col h-full transition-all duration-200`}
@@ -467,31 +477,6 @@ function DashboardContent() {
           ))}
         </nav>
 
-        {/* CoroVoz general para odontología y recepción */}
-        {(role === 'ODONTOLOGO' || role === 'RECEPCIONISTA') && (
-          <div className={`px-3 pb-2 ${collapsed?'flex justify-center':''}`}>
-            <button onClick={() => setShowAI(!showAI)}
-              title="CoroVoz"
-              className={`${collapsed?'w-9 h-9':'w-full'} flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all ${
-                showAI ? 'bg-rose-500 text-white shadow-lg shadow-rose-900/50' : 'bg-white/8 text-white/60 hover:bg-white/15 hover:text-white'
-              }`}>
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3zM19 10v2a7 7 0 01-14 0v-2H3v2a9 9 0 008 8.94V23h2v-2.06A9 9 0 0021 12v-2h-2z"/></svg>
-              {!collapsed && <span className="text-sm font-semibold" style={{fontFamily:'Outfit'}}>{showAI?'Cerrar CoroVoz':'CoroVoz'}</span>}
-              {showAI && !collapsed && (
-                <span className="ml-auto flex gap-0.5">
-                  {[1, 2, 3].map((i) => (
-                    <span
-                      key={i}
-                      className="wave-bar w-0.5 h-3 bg-white rounded-full"
-                      style={{ animationDelay: `${i * 0.1}s` }}
-                    ></span>
-                  ))}
-                </span>
-              )}
-            </button>
-          </div>
-        )}
-
         {/* User row + collapse */}
         <div
           className={`p-3 border-t border-white/5 flex ${
@@ -551,9 +536,9 @@ function DashboardContent() {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Top bar */}
-        <header className="h-12 bg-white border-b border-slate-100 flex items-center px-5 gap-4 shrink-0">
+        <header className="h-12 bg-white border-b border-slate-100 flex items-center px-2 gap-2 sm:px-5 sm:gap-4 shrink-0">
           <h2
             className="text-sm font-semibold text-slate-700"
             style={{ fontFamily: "Outfit" }}
@@ -562,11 +547,11 @@ function DashboardContent() {
           </h2>
           {isReadOnly && (
             <span className="text-xs bg-violet-100 text-violet-600 px-2 py-0.5 rounded-full font-medium">
-              Solo lectura clínica
+              Gestión administrativa
             </span>
           )}
           <div className="flex-1" />
-          <div className="relative">
+          <div className="relative min-w-0 w-44 focus-within:w-60 transition-[width]">
             <svg
               className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400"
               fill="none"
@@ -581,12 +566,12 @@ function DashboardContent() {
               />
             </svg>
             <input
-              className="pl-8 pr-4 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400/50 bg-slate-50 w-44 focus:w-60 transition-all"
+              className="w-full pl-8 pr-2 sm:pr-4 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400/50 bg-slate-50"
               placeholder="Buscar paciente, cita..."
             />
           </div>
 
-          <button className="relative p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
+          <button className="relative shrink-0 p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
             <svg
               className="w-5 h-5"
               fill="none"
@@ -603,7 +588,7 @@ function DashboardContent() {
             <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
           </button>
           <div
-            className={`w-7 h-7 rounded-full bg-gradient-to-br ${meta.avatarBg} flex items-center justify-center text-white text-xs font-bold cursor-pointer`}
+            className={`w-7 h-7 shrink-0 rounded-full bg-gradient-to-br ${meta.avatarBg} flex items-center justify-center text-white text-xs font-bold cursor-pointer`}
           >
             {(user?.nombreCompleto || meta.label)
               .split(" ")
@@ -614,15 +599,18 @@ function DashboardContent() {
         </header>
 
         {/* Page content — rendered by react-router Outlet */}
-        <main className="flex-1 overflow-hidden bg-slate-50">
-          <div className="h-full overflow-y-auto">
-            <Outlet />
+        <main className="corovoz-workspace">
+          <div className="corovoz-page">
+            <div hidden={Boolean(appointmentDraft)} className="h-full"><Outlet /></div>
+            {appointmentDraft && <AgendarCitaModal isOpen embedded assistedDraft={appointmentDraft}
+              onAssistedChange={editAppointment} onClose={closeAppointment}
+              onSuccess={() => { closeAppointment(); window.dispatchEvent(new Event('coronyx:appointments-changed')) }} />}
           </div>
+          {['ODONTOLOGO', 'RECEPCIONISTA', 'ADMIN_CLINICA'].includes(role) && <AIAssistant expanded={showAI} onOpen={() => setShowAI(true)} onClose={() => setShowAI(false)} />}
         </main>
       </div>
 
       {/* El asistente aplica los permisos de cada modo */}
-      {showAI && (role === 'ODONTOLOGO' || role === 'RECEPCIONISTA') && <AIAssistant onClose={() => setShowAI(false)} />}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import useAppointmentSlots from "../../hooks/useAppointmentSlots"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useId } from "react"
 
 import {
   fetchPatientsFromApi,
@@ -30,6 +30,7 @@ import {
 } from "../../utils/appointmentRules"
 
 import { createOfficialGoogleMeet } from "../../services/googleMeetService"
+import type { CoroVozAppointmentDraft } from "../../services/coroVozService"
 
 interface AgendarCitaModalProps {
   isOpen: boolean
@@ -50,6 +51,9 @@ interface AgendarCitaModalProps {
   initialReason?: string
   initialModality?: 'PRESENCIAL' | 'VIRTUAL'
   preserveRequestedTime?: boolean
+  assistedDraft?: CoroVozAppointmentDraft
+  onAssistedChange?: (patch: Partial<CoroVozAppointmentDraft>) => void
+  embedded?: boolean
 }
 
 const MOTIVOS_FRECUENTES = [
@@ -87,8 +91,12 @@ export default function AgendarCitaModal({
   initialReason,
   initialModality,
   preserveRequestedTime = false,
+  assistedDraft,
+  onAssistedChange,
+  embedded = false,
 }: AgendarCitaModalProps) {
   const { role, user } = useAuth()
+  const formId = useId()
 
   const minDate = useMemo(() => getMinDateString(), [])
 
@@ -97,6 +105,7 @@ export default function AgendarCitaModal({
   // Inicializar fecha garantizando que no sea pasada
 
   const [fecha, setFecha] = useState(() => {
+    if (assistedDraft) return assistedDraft.date || ''
     if (initialDate && initialDate >= getMinDateString()) {
       return initialDate
     }
@@ -104,7 +113,7 @@ export default function AgendarCitaModal({
     return getMinDateString()
   })
 
-  const [odontologoId, setOdontologoId] = useState(initialDoctorId || "")
+  const [odontologoId, setOdontologoId] = useState(assistedDraft?.dentistId || initialDoctorId || "")
 
   const slotData = useAppointmentSlots(odontologoId, fecha)
 
@@ -113,6 +122,7 @@ export default function AgendarCitaModal({
   // Hora de inicio y fin
 
   const [horaInicio, setHoraInicio] = useState(() => {
+    if (assistedDraft) return assistedDraft.time || ''
     if (initialTime) return initialTime
 
     return ""
@@ -122,17 +132,27 @@ export default function AgendarCitaModal({
 
   // Form State
 
-  const [pacienteId, setPacienteId] = useState(initialPatientId || "")
+  const [pacienteId, setPacienteId] = useState(assistedDraft?.patientId || initialPatientId || "")
 
   const [consultorio, setConsultorio] = useState<string>(CONSULTORIOS[0])
 
-  const [modalidad, setModalidad] = useState<"PRESENCIAL" | "VIRTUAL">(
-    initialModality || "PRESENCIAL",
+  const [modalidad, setModalidad] = useState<"PRESENCIAL" | "VIRTUAL" | ''>(
+    assistedDraft ? assistedDraft.modality || '' : initialModality || "PRESENCIAL",
   )
 
   const [enlaceTeleconsulta, setEnlaceTeleconsulta] = useState("")
 
-  const [motivo, setMotivo] = useState(initialReason || "")
+  const [motivo, setMotivo] = useState(assistedDraft?.reason || initialReason || "")
+
+  useEffect(() => {
+    if (!assistedDraft) return
+    setFecha(assistedDraft.date || '')
+    setHoraInicio(assistedDraft.time || '')
+    setPacienteId(assistedDraft.patientId || '')
+    setOdontologoId(assistedDraft.dentistId || '')
+    setMotivo(assistedDraft.reason || '')
+    setModalidad(assistedDraft.modality || '')
+  }, [assistedDraft])
 
   const [isGeneratingMeet, setIsGeneratingMeet] = useState(false)
 
@@ -227,6 +247,7 @@ export default function AgendarCitaModal({
   // Sincronizar fecha y hora inicial si se proporcionan al abrir
 
   useEffect(() => {
+    if (assistedDraft) return
     if (initialDate) {
       const validDate =
         initialDate < getMinDateString() ? getMinDateString() : initialDate
@@ -239,6 +260,10 @@ export default function AgendarCitaModal({
 
   useEffect(() => {
     if (slotData.loading || !odontologoId) return
+    if (assistedDraft) {
+      setHoraFin(slots.find(s => s.time === horaInicio && !s.isPast)?.endTime || '')
+      return
+    }
     if (preserveRequestedTime && fecha === initialDate && horaInicio === initialTime) {
       const requested = slots.find(s => s.time === initialTime && !s.isPast)
       setHoraFin(requested?.endTime || '')
@@ -271,7 +296,7 @@ export default function AgendarCitaModal({
     } else {
       setHoraFin(currentSlot.endTime)
     }
-  }, [fecha, slots, isSunday, slotData.loading, odontologoId, preserveRequestedTime, initialDate, initialTime, horaInicio])
+  }, [fecha, slots, isSunday, slotData.loading, odontologoId, preserveRequestedTime, initialDate, initialTime, horaInicio, assistedDraft])
 
   // Cargar pacientes y doctores al abrir
 
@@ -298,7 +323,7 @@ export default function AgendarCitaModal({
 
         setPatients(patientsData || [])
 
-        if (patientsData && patientsData.length > 0 && !pacienteId) {
+        if (!assistedDraft && patientsData && patientsData.length > 0 && !pacienteId) {
           const firstPatientId = patientsData[0].id
 
           if (!firstPatientId) {
@@ -351,7 +376,7 @@ export default function AgendarCitaModal({
 
         // Asignar doctor por defecto usando estrictamente usuarioClinicaId
 
-        if (odontologos.length > 0) {
+        if (!assistedDraft && odontologos.length > 0) {
           const selectedDoc = initialDoctorId
             ? odontologos.find((d) => d.usuarioClinicaId === initialDoctorId)
             : odontologos[0]
@@ -383,6 +408,7 @@ export default function AgendarCitaModal({
   // Manejo de cambio de hora de inicio
 
   const handleHoraInicioChange = (nuevaHora: string) => {
+    onAssistedChange?.({ time: nuevaHora || null })
     setHoraInicio(nuevaHora)
 
     setConflictError(null)
@@ -416,6 +442,12 @@ export default function AgendarCitaModal({
     setConflictError(null)
 
     setApiError(null)
+
+    if (!fecha || !modalidad) {
+      setApiError('Completa la fecha y selecciona la modalidad de atención.')
+      return
+    }
+    if (isSubmitting) return
 
     if (!pacienteId) {
       setApiError("Por favor selecciona un paciente.")
@@ -531,13 +563,13 @@ export default function AgendarCitaModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{
+      className={embedded ? 'corovoz-appointment-form flex min-h-full justify-center p-3' : 'fixed inset-0 z-50 flex items-center justify-center p-4'}
+      style={embedded ? undefined : {
         backgroundColor: "rgba(15, 23, 42, 0.7)",
         backdropFilter: "blur(5px)",
       }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-100">
+      <div className={`bg-white rounded-2xl w-full max-w-xl flex flex-col border border-slate-100 ${embedded ? 'shadow-sm' : 'max-h-[92vh] overflow-hidden shadow-2xl'}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -559,6 +591,7 @@ export default function AgendarCitaModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Cerrar formulario de cita"
             className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/50 transition-colors"
           >
             <svg
@@ -580,8 +613,8 @@ export default function AgendarCitaModal({
         {/* Form Body */}
         <form
           onSubmit={handleSubmit}
-          id="agendar-cita-form"
-          className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+          id={formId}
+          className={`flex-1 px-6 py-5 space-y-4 ${embedded ? '' : 'overflow-y-auto'}`}
         >
           {/* Regla 5: Alerta 409 Conflict */}
           {conflictError && (
@@ -646,7 +679,9 @@ export default function AgendarCitaModal({
               <select
                 required
                 value={pacienteId}
+                aria-label="Paciente de la cita"
                 onChange={(e) => {
+                  onAssistedChange?.({ patientId: e.target.value || null })
                   setPacienteId(e.target.value)
 
                   setConflictError(null)
@@ -677,7 +712,9 @@ export default function AgendarCitaModal({
             <select
               required
               value={odontologoId}
+              aria-label="Odontólogo responsable"
               onChange={(e) => {
+                onAssistedChange?.({ dentistId: e.target.value || null })
                 setOdontologoId(e.target.value)
 
                 setConflictError(null)
@@ -731,7 +768,9 @@ export default function AgendarCitaModal({
                 min={minDate}
                 max={maxDate}
                 value={fecha}
+                aria-label="Fecha de la cita"
                 onChange={(e) => {
+                  onAssistedChange?.({ date: e.target.value || null })
                   setFecha(e.target.value)
 
                   setConflictError(null)
@@ -796,9 +835,12 @@ export default function AgendarCitaModal({
                     required
                     disabled={slots.length === 0 || allPassed}
                     value={horaInicio}
+                    aria-label="Hora de inicio"
                     onChange={(e) => handleHoraInicioChange(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 text-slate-800 font-medium cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
                   >
+                    {assistedDraft && <option value="">Selecciona un horario...</option>}
+                    {assistedDraft && horaInicio && !slots.some(s => s.time === horaInicio) && <option value={horaInicio}>{horaInicio} — sin turno disponible</option>}
                     {preserveRequestedTime && horaInicio === initialTime && !slots.some(s => s.time === initialTime) && <option value={initialTime}>{initialTime} — hora solicitada sin turno disponible</option>}
                     {slots.length === 0 ? (
                       <option value="">Sin horarios disponibles</option>
@@ -818,6 +860,7 @@ export default function AgendarCitaModal({
                     profesional.
                   </p>
                   {preserveRequestedTime && fecha === initialDate && horaInicio === initialTime && !slotData.loading && !horaFin && <p role="alert" className="text-xs text-amber-800 mt-2">La hora solicitada ({initialTime}) no está disponible para este odontólogo. Selecciona otro turno para continuar.</p>}
+                  {assistedDraft && horaInicio && odontologoId && !slotData.loading && !horaFin && <p role="alert" className="text-xs text-amber-800 mt-2">La hora solicitada ({horaInicio}) no está disponible. Selecciona otro turno.</p>}
                 </div>
 
                 {/* Hora Fin (Cálculo Automático +45 min y validación con cierre) */}
@@ -892,7 +935,7 @@ export default function AgendarCitaModal({
                     name="modalidad"
                     value="PRESENCIAL"
                     checked={modalidad === "PRESENCIAL"}
-                    onChange={() => setModalidad("PRESENCIAL")}
+                    onChange={() => { onAssistedChange?.({ modality: 'PRESENCIAL' }); setModalidad("PRESENCIAL") }}
                     className="hidden"
                   />
                   <span>🏥 Presencial</span>
@@ -911,6 +954,7 @@ export default function AgendarCitaModal({
                     value="VIRTUAL"
                     checked={modalidad === "VIRTUAL"}
                     onChange={() => {
+                      onAssistedChange?.({ modality: 'VIRTUAL' })
                       setModalidad("VIRTUAL")
                     }}
                     className="hidden"
@@ -1022,7 +1066,8 @@ export default function AgendarCitaModal({
             <input
               type="text"
               value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
+              aria-label="Motivo de consulta"
+              onChange={(e) => { onAssistedChange?.({ reason: e.target.value }); setMotivo(e.target.value) }}
               placeholder="Ej: Limpieza dental, dolor en molar, ajuste de ortodoncia..."
               className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40 mb-2"
             />
@@ -1032,7 +1077,7 @@ export default function AgendarCitaModal({
                 <button
                   key={m}
                   type="button"
-                  onClick={() => setMotivo(m)}
+                  onClick={() => { onAssistedChange?.({ reason: m }); setMotivo(m) }}
                   className={`text-[11px] px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
                     motivo === m
                       ? "bg-teal-100 border-teal-300 text-teal-800 font-semibold"
@@ -1085,7 +1130,7 @@ export default function AgendarCitaModal({
             </button>
             <button
               type="submit"
-              form="agendar-cita-form"
+              form={formId}
               disabled={
                 isSubmitting ||
                 loadingData ||
@@ -1093,7 +1138,11 @@ export default function AgendarCitaModal({
                 !!slotData.error ||
                 isSunday ||
                 allPassed ||
-                !horaInicio
+                !pacienteId ||
+                !odontologoId ||
+                !fecha ||
+                !modalidad ||
+                !slots.some(slot => slot.time === horaInicio && !slot.isPast)
               }
               className="px-5 py-2 text-white rounded-xl text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center gap-2 transition-all cursor-pointer"
               style={{ backgroundColor: "#1E8C82" }}

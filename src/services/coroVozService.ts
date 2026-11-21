@@ -1,12 +1,19 @@
 import { apiClient, ApiError } from './apiClient'
 
 export interface CoroVozAppointmentDraft {
-  date: string
-  time: string
+  date: string | null
+  time: string | null
   patientId: string | null
-  reason: string
-  modality: 'PRESENCIAL' | 'VIRTUAL'
+  reason: string | null
+  modality: 'PRESENCIAL' | 'VIRTUAL' | null
+  dentistId?: string | null
+  dentistSearch?: string | null
+  serviceSearch?: string | null
+  updatedFields?: string[]
+  missingFields?: string[]
 }
+
+export interface CoroVozAgendaContext { date?: string | null; endDate?: string | null; status?: string | null; appointmentId?: string | null; selectedDate?: string | null; dentistSearch?: string[]; patientSearch?: string[] }
 
 export interface CoroVozAnswer {
   intent: string
@@ -19,6 +26,7 @@ export interface CoroVozAnswer {
   patientName: string | null
   suggestions: { intent: string; label: string }[]
   appointmentDraft?: CoroVozAppointmentDraft | null
+  agendaContext?: CoroVozAgendaContext | null
 }
 
 export interface DentalProposal {
@@ -41,8 +49,8 @@ export interface DentalInterpretation {
   suggestions: { value: string; label: string }[]
 }
 
-export function askCoroVoz(text: string, signal?: AbortSignal, patientId?: string | null, selectedIntent?: string, patientConfirmed = false) {
-  return corovozRequest<CoroVozAnswer>('/general', { method: 'POST', body: JSON.stringify({ text, patientId, selectedIntent, patientConfirmed }), signal })
+export function askCoroVoz(text: string, signal?: AbortSignal, patientId?: string | null, selectedIntent?: string, patientConfirmed = false, appointmentDraft?: CoroVozAppointmentDraft | null, agendaContext?: CoroVozAgendaContext | null) {
+  return corovozRequest<CoroVozAnswer>('/general', { method: 'POST', body: JSON.stringify({ text, patientId, selectedIntent, patientConfirmed, appointmentDraft, agendaContext }), signal })
 }
 
 export function interpretDentalCommand(text: string, signal?: AbortSignal, contextPiece?: number | null) {
@@ -53,8 +61,8 @@ export function reviseDentalCommand(text: string, field: string, draft: unknown,
   return corovozRequest<DentalInterpretation>('/odontograma/editar', { method: 'POST', body: JSON.stringify({ text, field, draft }), signal })
 }
 
-export function getCoroVozStatus() {
-  return corovozRequest<{ version: number; speechReady: boolean }>('/status')
+export function getCoroVozStatus(signal?: AbortSignal) {
+  return corovozRequest<{ version: number; speechReady: boolean }>('/status', { signal })
 }
 
 export function transcribeCoroVoz(wav: Blob, signal?: AbortSignal) {

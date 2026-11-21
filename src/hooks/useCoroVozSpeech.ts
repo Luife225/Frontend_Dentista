@@ -6,130 +6,268 @@ import { getCoroVozStatus, transcribeCoroVoz } from '../services/coroVozService'
 import { encodeCoroVozWav, prepareCoroVozAudio } from '../utils/coroVozAudio'
 import { emptySpeechActivity, pauseReached, shouldStopConversationIdle, speechDetectionMode, updateSpeechActivity } from '../utils/coroVozActivity'
 
+const RATE = 16000 // Silero delivers mono frames resampled to 16 kHz.
+const QUIET_MS = 96 // Three 32 ms Silero frames.
 const emptyCapture = () => ({ chunks: [] as Float32Array[], samples: 0, activity: emptySpeechActivity() })
 
-/** Captura estándar getUserMedia; el backend transcribe localmente, también en Brave. */
-export default function useCoroVozSpeech(onText: (text: string, reviewOnly: boolean) => void, awaitingReply = false) {
-  const awaitingReplyRef = useRef(awaitingReply)
-  awaitingReplyRef.current = awaitingReply
+type VoicePhase = 'IDLE' | 'SPEAKING' | 'INTERRUPTING' | 'PREPARING_MIC' | 'LISTENING' | 'PROCESSING' | 'ERROR'
+interface SpeechFeedbackOptions { activationSound?: boolean }
+interface Microphone {
+  controller: AbortController
+  context?: AudioContext
+  stream?: MediaStream
+  vad?: MicVAD
+  ready: boolean
+  needsQuiet: boolean
+  quietSamples: number
+  unmutedAt: number
+  quietTimer?: number
+  cancelCue?: () => void
+}
+interface Output {
+  utterance?: SpeechSynthesisUtterance
+  draining?: Promise<void>
+  cancelled?: boolean
+}
+
+function mute(mic: Microphone | null) {
+  if (!mic) return
+  mic.stream?.getAudioTracks().forEach(track => { track.enabled = false })
+  window.clearTimeout(mic.quietTimer)
+  mic.quietTimer = undefined
+  mic.quietSamples = 0
+}
+
+/** A cancelled utterance need not dispatch 'end'. Observe both native queue flags. */
+async function waitForOutput(synth: SpeechSynthesis, current: () => boolean) {
+  const start = performance.now()
+  let silentSince: number | undefined
+  while (current()) {
+    const now = performance.now()
+    if (synth.speaking || synth.pending) silentSince = undefined
+    else if (silentSince === undefined) silentSince = now
+    else if (now - silentSince >= 64) return
+    if (now - start >= 2000) throw new Error('El navegador sigue indicando que hay audio en reproducción. Vuelve a iniciar la escucha.')
+    await new Promise<void>(resolve => window.setTimeout(resolve, 20))
+  }
+}
+
+/** Silence the optional chime before any microphone frame can enter the dictation. */
+function activationCue(context: AudioContext, finish: () => void): (() => void) | undefined {
+  if (context.state !== 'running') return
+  try {
+    const tone = context.createOscillator()
+    const volume = context.createGain()
+    const now = context.currentTime
+    tone.type = 'sine'
+    tone.frequency.setValueAtTime(740, now)
+    tone.frequency.exponentialRampToValueAtTime(980, now + 0.1)
+    volume.gain.setValueAtTime(0, now)
+    volume.gain.linearRampToValueAtTime(0.025, now + 0.015)
+    volume.gain.linearRampToValueAtTime(0, now + 0.12)
+    tone.connect(volume)
+    volume.connect(context.destination)
+    const cleanup = () => { window.clearTimeout(timer); tone.onended = null; tone.disconnect(); volume.disconnect() }
+    const end = () => { cleanup(); finish() }
+    // Disconnect even if the device is suspended before dispatching 'ended'.
+    const timer = window.setTimeout(end, 500)
+    tone.onended = end
+    tone.start(now)
+    tone.stop(now + 0.12)
+    return cleanup
+  } catch {
+    return
+  }
+}
+
+export default function useCoroVozSpeech(onText: (text: string, reviewOnly: boolean) => void, awaitingReply = false, feedback: SpeechFeedbackOptions = {}) {
+  const [phase, setPhase] = useState<VoicePhase>('IDLE')
+  const phaseRef = useRef<VoicePhase>('IDLE')
+  const enter = useCallback((next: VoicePhase) => {
+    phaseRef.current = next
+    setPhase(next)
+  }, [])
   const [supported, setSupported] = useState(false)
   const [enabled, setEnabled] = useState(false)
-  const [listening, setListening] = useState(false)
-  const [starting, setStarting] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [level, setLevel] = useState(0)
-  const [interim, setInterim] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [speaking, setSpeaking] = useState(false)
+  const [spokenText, setSpokenText] = useState('')
   const [sendMode, setSendMode] = useState<'manual' | 'pause'>('manual')
-  const sendModeRef = useRef(sendMode)
-  sendModeRef.current = sendMode
-  const callbackRef = useRef(onText)
-  callbackRef.current = onText
-  const streamRef = useRef<MediaStream | null>(null)
-  const contextRef = useRef<AudioContext | null>(null)
-  const vadRef = useRef<MicVAD | null>(null)
-  const captureRef = useRef(emptyCapture())
-  const activeRef = useRef(false)
-  const startingRef = useRef(false)
-  const pausedRef = useRef(false)
-  const speakingRef = useRef(false)
-  const processingRef = useRef(false)
-  const resumeAtRef = useRef(0)
-  const generationRef = useRef(0)
-  const utteranceRef = useRef(0)
+  const options = useRef({ onText, awaitingReply, feedback, sendMode })
+  options.current = { onText, awaitingReply, feedback, sendMode }
+
+  const micRef = useRef<Microphone | null>(null)
+  const outputRef = useRef<Output | null>(null)
+  const queuedOutput = useRef<(() => void) | null>(null)
+  const recentOutputUntil = useRef(-Infinity)
   const requestRef = useRef<AbortController | null>(null)
+  const pausedRef = useRef(false)
+  const captureRef = useRef(emptyCapture())
 
   const releaseMicrophone = useCallback(() => {
-    const vad = vadRef.current
-    vadRef.current = null
-    streamRef.current?.getTracks().forEach(track => { track.onended = null; track.stop() })
-    streamRef.current = null
-    const context = contextRef.current
-    contextRef.current = null
-    void (async () => {
-      await vad?.destroy().catch(() => {})
-      if (context?.state !== 'closed') await context?.close().catch(() => {})
-    })()
-    setEnabled(false); setListening(false); setLevel(0)
+    const mic = micRef.current
+    micRef.current = null
+    if (mic) {
+      mic.controller.abort()
+      mute(mic)
+      mic.cancelCue?.()
+      mic.stream?.getTracks().forEach(track => { track.onended = null; track.stop() })
+      // A start() still settling destroys its own VAD in its finally block.
+      if (mic.ready) void mic.vad?.destroy().catch(() => {})
+      if (mic.context && mic.context.state !== 'closed') void mic.context.close().catch(() => {})
+    }
+    captureRef.current = emptyCapture()
+    setEnabled(false)
+    setLevel(0)
   }, [])
 
   const stop = useCallback(() => {
-    generationRef.current++
-    utteranceRef.current++
-    activeRef.current = false
-    startingRef.current = false
-    pausedRef.current = false
-    speakingRef.current = false
-    setSpeaking(false)
-    processingRef.current = false
+    const output = outputRef.current
+    queuedOutput.current = null
+    outputRef.current = null
+    if (output) {
+      if (output.utterance) output.utterance.onend = output.utterance.onerror = null
+      window.speechSynthesis?.cancel()
+      recentOutputUntil.current = performance.now() + 750
+    }
     requestRef.current?.abort()
     requestRef.current = null
+    pausedRef.current = false
     releaseMicrophone()
+    setTranscribing(false)
+    setSpokenText('')
+    enter('IDLE')
+  }, [enter, releaseMicrophone])
+
+  const fail = useCallback((message: string) => {
+    stop()
+    setError(message)
+    enter('ERROR')
+  }, [enter, stop])
+
+  // Sole transition to LISTENING. Every caller, including natural TTS completion and
+  // automatic conversation, must satisfy the same output, request and microphone gates.
+  const resumeInput = useCallback(() => {
+    if (outputRef.current) return
+    const mic = micRef.current
+    if (pausedRef.current || requestRef.current) {
+      mute(mic)
+      enter('PROCESSING')
+    } else if (!mic) {
+      enter('IDLE')
+    } else if (!mic.ready || mic.cancelCue) {
+      enter('PREPARING_MIC')
+    } else {
+      mic.stream?.getAudioTracks().forEach(track => { track.enabled = true })
+      if (mic.needsQuiet) {
+        enter('PREPARING_MIC')
+        if (mic.quietTimer === undefined) {
+          mic.unmutedAt = performance.now()
+          mic.quietTimer = window.setTimeout(() => {
+            if (mic === micRef.current && mic.needsQuiet) fail('Aún se oye sonido en el micrófono. Espera un momento y vuelve a iniciar la escucha.')
+          }, 3000)
+        }
+      } else {
+        enter('LISTENING')
+      }
+    }
+  }, [enter, fail])
+
+  const drainOutput = useCallback((cancel: boolean) => {
+    const synth = window.speechSynthesis
+    if (!synth) return
+    const output = outputRef.current ?? {}
+    if (output.draining) {
+      if (cancel && !output.cancelled) { output.cancelled = true; synth.cancel() }
+      return output.draining
+    }
+    outputRef.current = output
+    if (output.utterance) output.utterance.onend = output.utterance.onerror = null
+    mute(micRef.current)
+    if (micRef.current) micRef.current.needsQuiet = true
     captureRef.current = emptyCapture()
-    window.speechSynthesis?.cancel()
-    setEnabled(false); setListening(false); setStarting(false); setTranscribing(false); setLevel(0); setInterim('')
-  }, [releaseMicrophone])
+    enter('INTERRUPTING')
+    setSpokenText('')
+    if (cancel) { output.cancelled = true; synth.cancel() }
+    output.draining = waitForOutput(synth, () => outputRef.current === output).then(() => {
+      if (outputRef.current !== output) return
+      recentOutputUntil.current = performance.now() + 750
+      outputRef.current = null
+      const next = queuedOutput.current
+      queuedOutput.current = null
+      if (next) next()
+      else resumeInput()
+    }).catch((cause: Error) => { if (outputRef.current === output) fail(cause.message) })
+    return output.draining
+  }, [enter, fail, resumeInput])
 
   const sendCapture = useCallback(async (reviewOnly = false) => {
-    if (!activeRef.current || pausedRef.current || speakingRef.current || processingRef.current) return
+    if (phaseRef.current !== 'LISTENING') return
     const capture = captureRef.current
-    const rate = 16000 // Silero frames are resampled to 16 kHz by MicVAD.
-    if (!capture.activity.voiced || capture.samples < rate * 0.2) { setError('No detecté voz en la grabación. Comprueba el micrófono y vuelve a intentarlo.'); return }
-    captureRef.current = emptyCapture()
-    processingRef.current = true
-    if (reviewOnly || sendModeRef.current === 'manual') {
-      activeRef.current = false
-      releaseMicrophone()
+    if (!capture.activity.voiced || capture.samples < RATE * 0.2) {
+      setError('No detecté voz en la grabación. Comprueba el micrófono y vuelve a intentarlo.')
+      return
     }
-    setTranscribing(true); setListening(false); setInterim('Transcribiendo…'); setError('')
+    captureRef.current = emptyCapture()
     const controller = new AbortController()
     requestRef.current = controller
-    const generation = generationRef.current
+    if (reviewOnly || options.current.sendMode === 'manual') releaseMicrophone()
+    resumeInput()
+    setTranscribing(true)
+    setError('')
     try {
-      const result = await transcribeCoroVoz(encodeCoroVozWav(prepareCoroVozAudio(capture.chunks, capture.activity.silenceSamples), rate), controller.signal)
-      if (controller.signal.aborted || generation !== generationRef.current) return
+      const wav = encodeCoroVozWav(prepareCoroVozAudio(capture.chunks, capture.activity.silenceSamples), RATE)
+      const result = await transcribeCoroVoz(wav, controller.signal)
+      if (requestRef.current !== controller) return
+      if (!result.text.trim()) {
+        fail('Se recibió audio pero no se entendieron palabras. Acércate al micrófono y vuelve a hablar.')
+        return
+      }
+      // The callback may synchronously submit a question, stop the mic or start speaking.
       requestRef.current = null
-      if (result.text.trim()) callbackRef.current(result.text.trim(), reviewOnly)
-      else setError('Se recibió audio pero no se entendieron palabras. Acércate al micrófono y vuelve a hablar.')
+      setTranscribing(false)
+      options.current.onText(result.text.trim(), reviewOnly)
+      resumeInput()
     } catch (cause) {
-      if (!controller.signal.aborted && generation === generationRef.current) {
-        const message = cause instanceof Error ? cause.message : 'No se pudo transcribir la voz.'
-        setError(message)
-      }
-    } finally {
-      if (generation === generationRef.current) {
-        requestRef.current = null
-        processingRef.current = false
-        resumeAtRef.current = performance.now() + 350
-        setTranscribing(false); setInterim('')
-        setListening(activeRef.current && !pausedRef.current && !speakingRef.current)
-      }
+      if (requestRef.current === controller) fail(cause instanceof Error ? cause.message : 'No se pudo transcribir la voz.')
     }
-  }, [releaseMicrophone])
+  }, [fail, releaseMicrophone, resumeInput])
 
   const start = useCallback(async () => {
-    if (activeRef.current || startingRef.current || processingRef.current) return
-    if (!window.isSecureContext || typeof navigator.mediaDevices?.getUserMedia !== 'function' || typeof window.AudioContext !== 'function') {
-      setError('El micrófono requiere una conexión segura y permiso de acceso.'); return
+    const synth = window.speechSynthesis
+    const hasOutput = Boolean(outputRef.current || synth?.speaking || synth?.pending)
+    const existing = micRef.current
+    if ((existing && !hasOutput) || requestRef.current || pausedRef.current) return
+    queuedOutput.current = null
+    const draining = hasOutput ? drainOutput(true) : undefined // synchronous cancel in the click handler
+    if (existing) return draining
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.AudioContext) {
+      fail('El micrófono requiere una conexión segura y permiso de acceso.')
+      return
     }
-    const generation = ++generationRef.current
-    startingRef.current = true
-    setStarting(true); setError(''); setNotice('')
+    const mic: Microphone = { controller: new AbortController(), ready: false,
+      needsQuiet: hasOutput || performance.now() < recentOutputUntil.current, quietSamples: 0, unmutedAt: 0 }
+    micRef.current = mic
+    const signal = mic.controller.signal
+    setError('')
+    setNotice('')
+    resumeInput()
     try {
-      const status = await getCoroVozStatus()
+      if (draining) await draining
+      if (signal.aborted) return
+      const status = await getCoroVozStatus(signal)
+      if (signal.aborted) return
       if (status.version < 4) throw new Error('El servicio de voz necesita actualizarse. Contacta al administrador.')
       if (!status.speechReady) throw new Error('El reconocimiento de voz no está disponible. Contacta al administrador.')
-      if (generation !== generationRef.current) return
-      const context = new AudioContext({ sampleRate: 16000 })
-      contextRef.current = context
+      const context = new AudioContext({ sampleRate: RATE })
+      mic.context = context
       const { MicVAD } = await import('@ricky0123/vad-web')
-      if (generation !== generationRef.current) return
+      if (signal.aborted) return
       const vad = await MicVAD.new({
         model: 'v5', audioContext: context, startOnLoad: false,
         baseAssetPath: `${import.meta.env.BASE_URL}corovoz-vad/`,
-        // Vite owns these URLs in dev and production. Importing a module from public fails in dev.
         ortConfig: ort => {
           ort.env.wasm.wasmPaths = {
             mjs: new URL(ortModuleUrl, window.location.href).href,
@@ -138,117 +276,150 @@ export default function useCoroVozSpeech(onText: (text: string, reviewOnly: bool
           ort.env.wasm.numThreads = 1
           ort.env.logLevel = 'error'
         },
-        // Load the model before opening the microphone so its loading time cannot swallow the first words.
         getStream: async () => {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
-          if (generation !== generationRef.current) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+            channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+          } })
+          if (signal.aborted) {
             stream.getTracks().forEach(track => track.stop())
             throw new Error('Escucha cancelada')
           }
-          streamRef.current = stream
+          mic.stream = stream
+          mute(mic)
+          stream.getAudioTracks().forEach(track => {
+            track.onended = () => {
+              if (!signal.aborted) fail('El micrófono se desconectó. Vuelve a iniciar la escucha.')
+            }
+          })
           return stream
         },
         resumeStream: async stream => stream,
         pauseStream: async () => {},
-        onSpeechStart: () => {}, onSpeechRealStart: () => {}, onSpeechEnd: () => {}, onVADMisfire: () => {},
         onFrameProcessed: (probabilities, chunk) => {
-        if (generation !== generationRef.current) return
-        let energy = 0
-        for (const sample of chunk) energy += sample * sample
-        const rms = Math.sqrt(energy / chunk.length)
-        setLevel(Math.min(1, rms * 12))
-        if (!activeRef.current || pausedRef.current || speakingRef.current || processingRef.current || performance.now() < resumeAtRef.current) {
-          captureRef.current = emptyCapture(); return
-        }
-        setListening(true)
-        const capture = captureRef.current
-        capture.chunks.push(chunk.slice())
-        capture.samples += chunk.length
-        capture.activity = updateSpeechActivity(capture.activity, probabilities.isSpeech, chunk.length, speechDetectionMode(sendModeRef.current, awaitingReplyRef.current))
-        if (shouldStopConversationIdle(capture.activity, 16000, sendModeRef.current, awaitingReplyRef.current)) {
-          stop(); setNotice('Micrófono apagado tras 15 segundos sin voz. Pulsa Iniciar escucha para continuar.'); return
-        }
-        if (!capture.activity.voiced) {
-          while (capture.samples > 16000 * 1.2 && capture.chunks.length > 1) capture.samples -= capture.chunks.shift()!.length
-        } else if (capture.samples > 16000 * 25) {
-          // El límite guarda el texto para revisión; no ejecuta una frase cortada.
-          void sendCapture(true)
-        } else if (pauseReached(capture.activity, 16000)) {
-          void sendCapture(sendModeRef.current === 'manual')
-        }
-      } })
-      if (generation !== generationRef.current) { await vad.destroy(); return }
-      vadRef.current = vad
+          if (signal.aborted || !mic.ready || outputRef.current || pausedRef.current || requestRef.current || mic.cancelCue) return
+          let energy = 0
+          for (const sample of chunk) energy += sample * sample
+          const rms = Math.sqrt(energy / chunk.length)
+          if (mic.needsQuiet) {
+            const quiet = probabilities.isSpeech < 0.35 && rms <= 0.04
+            mic.quietSamples = quiet ? mic.quietSamples + chunk.length : 0
+            if (mic.quietTimer !== undefined && mic.quietSamples >= RATE * QUIET_MS / 1000 && performance.now() - mic.unmutedAt >= QUIET_MS) {
+              window.clearTimeout(mic.quietTimer)
+              mic.quietTimer = undefined
+              mic.needsQuiet = false
+              resumeInput()
+            }
+            return // All tail frames, including the last quiet frame, are discarded.
+          }
+          if (phaseRef.current !== 'LISTENING') return
+          setLevel(Math.min(1, rms * 12))
+          const capture = captureRef.current
+          capture.chunks.push(chunk.slice())
+          capture.samples += chunk.length
+          const { sendMode: mode, awaitingReply: awaiting } = options.current
+          capture.activity = updateSpeechActivity(capture.activity, probabilities.isSpeech, chunk.length, speechDetectionMode(mode, awaiting))
+          if (shouldStopConversationIdle(capture.activity, RATE, mode, awaiting)) {
+            stop()
+            setNotice('Micrófono apagado tras 15 segundos sin voz. Pulsa Iniciar escucha para continuar.')
+          } else if (!capture.activity.voiced) {
+            while (capture.samples > RATE * 1.2 && capture.chunks.length > 1) capture.samples -= capture.chunks.shift()!.length
+          } else if (capture.samples > RATE * 25) {
+            void sendCapture(true)
+          } else if (pauseReached(capture.activity, RATE)) {
+            void sendCapture(mode === 'manual')
+          }
+        },
+      })
+      mic.vad = vad
+      if (signal.aborted) return
       await context.resume()
-      if (generation !== generationRef.current) return
-      activeRef.current = true
-      pausedRef.current = false
-      captureRef.current = emptyCapture()
+      if (signal.aborted) return
       await vad.start()
-      if (generation !== generationRef.current) return
-      setEnabled(true); setListening(true)
-      streamRef.current?.getAudioTracks().forEach(track => { track.onended = () => { stop(); setError('El micrófono se desconectó. Vuelve a iniciar la escucha.') } })
+      if (signal.aborted) return
+      mic.ready = true
+      setEnabled(true)
+      // Barge-in stays silent. A normal activation cue finishes before arming input.
+      if (!mic.needsQuiet && !outputRef.current && !pausedRef.current && options.current.feedback.activationSound) {
+        mic.cancelCue = activationCue(context, () => {
+          if (signal.aborted) return
+          mic.cancelCue = undefined
+          resumeInput()
+        })
+        if (mic.cancelCue) mic.needsQuiet = true
+      }
+      resumeInput()
     } catch (cause) {
-      if (generation !== generationRef.current) return
+      if (signal.aborted) return
       const messages: Record<string, string> = {
         NotAllowedError: 'No tengo permiso para usar el micrófono. Habilítalo en tu navegador e inténtalo de nuevo.',
         NotFoundError: 'No se encontró un micrófono disponible.',
         NotReadableError: 'No se puede abrir el micrófono. Revisa si otra aplicación lo está usando.',
       }
-      stop()
-      setError(cause instanceof Error ? messages[cause.name] || cause.message : 'No se pudo abrir el micrófono.')
+      fail(cause instanceof Error ? messages[cause.name] || cause.message : 'No se pudo abrir el micrófono.')
     } finally {
-      startingRef.current = false
-      setStarting(false)
+      if (signal.aborted && !mic.ready) await mic.vad?.destroy().catch(() => {})
     }
-  }, [sendCapture, stop])
+  }, [drainOutput, fail, resumeInput, sendCapture, stop])
+
+  const interrupt = useCallback(() => {
+    queuedOutput.current = null
+    if (outputRef.current) void drainOutput(true)
+  }, [drainOutput])
 
   const pause = useCallback((value: boolean) => {
     pausedRef.current = value
     captureRef.current = emptyCapture()
-    if (value) requestRef.current?.abort()
-    resumeAtRef.current = performance.now() + 350
-    setListening(activeRef.current && !value && !speakingRef.current && !processingRef.current)
-  }, [])
+    if (value) {
+      requestRef.current?.abort()
+      requestRef.current = null
+      setTranscribing(false)
+      interrupt()
+    }
+    resumeInput()
+  }, [interrupt, resumeInput])
 
   const speak = useCallback((text: string) => {
-    if (!window.speechSynthesis) return
-    const generation = ++utteranceRef.current
-    speakingRef.current = true
-    setSpeaking(true)
-    captureRef.current = emptyCapture()
-    setListening(false)
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    const spanish = window.speechSynthesis.getVoices().find(voice => voice.lang.startsWith('es'))
-    if (spanish) utterance.voice = spanish
-    utterance.lang = spanish?.lang || 'es-ES'
-    const finish = () => {
-      if (generation !== utteranceRef.current) return
-      speakingRef.current = false
-      setSpeaking(false)
-      resumeAtRef.current = performance.now() + 350
-      setListening(activeRef.current && !pausedRef.current && !processingRef.current)
+    const synth = window.speechSynthesis
+    if (!synth || !text.trim() || requestRef.current) return
+    const mic = micRef.current
+    // The microphone gesture owns the turn until it is ready. An old read-aloud
+    // callback cannot preempt that gesture while the OS or detector is settling.
+    if ((phaseRef.current === 'INTERRUPTING' || phaseRef.current === 'PREPARING_MIC') && mic && !pausedRef.current) return
+    mute(mic)
+    if (mic) {
+      mic.cancelCue?.()
+      mic.cancelCue = undefined
+      mic.needsQuiet = true
     }
-    utterance.onend = finish; utterance.onerror = finish
-    window.speechSynthesis.speak(utterance)
-  }, [])
-
-  const interrupt = useCallback(() => {
-    utteranceRef.current++
-    window.speechSynthesis?.cancel()
-    speakingRef.current = false
-    setSpeaking(false)
     captureRef.current = emptyCapture()
-    resumeAtRef.current = performance.now() + 150
-    setListening(activeRef.current && !pausedRef.current && !processingRef.current)
-  }, [])
+    const play = () => {
+      const utterance = new SpeechSynthesisUtterance(text)
+      const output = { utterance }
+      outputRef.current = output
+      const spanish = synth.getVoices().find(voice => voice.lang.startsWith('es'))
+      if (spanish) utterance.voice = spanish
+      utterance.lang = spanish?.lang || 'es-ES'
+      const finish = () => { if (outputRef.current === output) void drainOutput(false) }
+      utterance.onend = finish
+      utterance.onerror = finish
+      enter('SPEAKING')
+      setLevel(0)
+      setSpokenText(text)
+      try { synth.speak(utterance) }
+      catch { fail('El navegador no pudo reproducir la respuesta de voz.') }
+    }
+    if (outputRef.current || synth.speaking || synth.pending) {
+      queuedOutput.current = play
+      void drainOutput(true)
+    } else play()
+  }, [drainOutput, enter, fail])
 
   useEffect(() => {
     setSupported(window.isSecureContext && typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof window.AudioContext === 'function')
     return stop
   }, [stop])
 
-  return { supported, enabled, listening, starting, transcribing, speaking, sendMode, setSendMode, interrupt, notice,
-    level, interim, error, start, stop, pause, speak, finish: () => sendCapture(false) }
+  return { phase, supported, enabled, listening: phase === 'LISTENING', starting: phase === 'PREPARING_MIC' || phase === 'INTERRUPTING',
+    speaking: phase === 'SPEAKING', transcribing, spokenText, sendMode, setSendMode, interrupt, notice, level,
+    interim: transcribing ? 'Transcribiendo…' : '', error, start, stop, pause, speak, finish: () => sendCapture(false) }
 }

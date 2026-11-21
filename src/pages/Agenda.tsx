@@ -230,7 +230,7 @@ function PatientPanel({
   }
 
   return (
-    <div className="w-80 shrink-0 flex flex-col bg-white border-l border-slate-200 shadow-xl z-20 animate-in slide-in-from-right duration-150">
+    <div className="absolute inset-0 md:static md:w-80 shrink-0 flex flex-col overflow-y-auto bg-white border-l border-slate-200 shadow-xl z-20 animate-in slide-in-from-right duration-150">
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0"
@@ -258,7 +258,7 @@ function PatientPanel({
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="grow shrink-0 p-4 space-y-3">
         {/* Procedure box */}
         <div
           className="rounded-xl p-3.5"
@@ -876,13 +876,36 @@ export default function Agenda() {
     const draft = readCoroVozAppointment(location.state?.coroVozAppointment)
     if (!draft || consumedDraft.current === location.key) return
     consumedDraft.current = location.key
-    const date = new Date(`${draft.date}T12:00:00`)
+    const date = new Date(`${draft.date || getMinDateString()}T12:00:00`)
     setRefDate(date)
     setDayIdx(Math.min(5, (date.getDay() + 6) % 7))
     setView('week')
-    setPrefill({ date: draft.date, time: draft.time, patientId: draft.patientId || undefined, reason: draft.reason, modality: draft.modality, fromCoroVoz: true })
+    setPrefill({ date: draft.date || undefined, time: draft.time || undefined, patientId: draft.patientId || undefined, reason: draft.reason || undefined, modality: draft.modality || undefined, fromCoroVoz: true })
     setShowModal(true)
     navigate(location.pathname, { replace: true, state: null })
+  }, [location.key, location.state, location.pathname, navigate])
+
+  useEffect(() => {
+    const target = location.state?.coroVozAppointmentTarget
+    if (!target) return
+    const date = readCoroVozAppointment({ date: target.date })?.date
+    if (typeof target.id !== 'string' || !/^[1-9]\d{0,17}$/.test(target.id) || !date) return
+    const end = new Date(`${date}T00:00:00Z`)
+    end.setUTCDate(end.getUTCDate() + 1)
+    let active = true
+    // Re-read the authorized agenda on navigation. The browser context never grants record access.
+    void getAppointments(toLimaIsoString(date, '00:00'), toLimaIsoString(end.toISOString().slice(0, 10), '00:00'))
+      .then(records => {
+        if (!active) return
+        const appointment = records.find(record => record.id === target.id && toLimaDateString(record.inicioEn) === date)
+        if (!appointment) { showToast('La cita ya no está disponible en esta fecha.'); return }
+        setRefDate(new Date(`${date}T12:00:00`))
+        setView('week')
+        setSelCita(appointment)
+      })
+      .catch(() => { if (active) showToast('No se pudo abrir la cita. Revisa tu agenda.') })
+      .finally(() => { if (active) navigate(location.pathname, { replace: true, state: null }) })
+    return () => { active = false }
   }, [location.key, location.state, location.pathname, navigate])
 
   // Sincronizar dayIdx cuando cambia la semana o se detecta el día actual
@@ -1065,7 +1088,9 @@ export default function Agenda() {
       loadPendingRequests(true)
     }, 5000)
 
-    return () => clearInterval(interval)
+    const refresh = () => { void loadWeekCitas(true); void loadPendingRequests(true) }
+    window.addEventListener('coronyx:appointments-changed', refresh)
+    return () => { clearInterval(interval); window.removeEventListener('coronyx:appointments-changed', refresh) }
   }, [weekDays, filterDoc, role])
 
   // ── Filtrado por Doctor ────────────────────────────────────────────────────
@@ -1338,7 +1363,7 @@ export default function Agenda() {
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* ── TOOLBAR (Matching Image 1 EXACTLY) ────────────────────────────── */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 shrink-0">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 shrink-0 overflow-x-auto [&>*]:shrink-0">
           {/* View Toggle */}
           <div className="flex bg-slate-100 rounded-lg p-0.5">
             {(["week", "day"] as const).map((v) => (

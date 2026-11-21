@@ -2,6 +2,14 @@ export const normalizeCoroVoz = (text: string) => text.toLowerCase().normalize('
   .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ')
   .replace(/\bcoro voz\b/g, 'corovoz').trim()
 
+/** Queries about the patient's record use the authorized backend, not the finding parser. */
+export function isDentalRecordQuestion(text: string): boolean {
+  const value = normalizeCoroVoz(text)
+  return /\b(que|cuales|cuando|tiene|consulta|consultar|muestra|muestrame|ver|ultima|ultimo|proxima|siguiente)\b/.test(value)
+    && /\b(citas?|atencion|atenciones|tratamientos?|historia|historial|antecedentes|alergias?|medicamentos?|diagnosticos?)\b/.test(value)
+    && !/\b(registra|registrar|agrega|agregar|modifica|modificar|elimina|eliminar|borra|borrar)\b/.test(value)
+}
+
 /** Conserva fragmentos sin repetir una pieza o condición al corregir el dictado. */
 export function mergeDentalDictation(previous: string, next: string): string {
   const number = /\b(?:\d+|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|veinti\w+|treinta|cuarenta|veinte|uno|dos|tres|cuatro)\b/

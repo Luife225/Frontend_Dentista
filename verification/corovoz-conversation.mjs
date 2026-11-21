@@ -4,9 +4,11 @@ import ts from 'typescript'
 
 const source = await readFile(new URL('../src/utils/coroVozConversation.ts', import.meta.url), 'utf8')
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText
-const { normalizeCoroVoz, mergeDentalDictation, stripSendCommand, isCoroVozControl, dentalVoiceControl, coroVozChoiceIndex, resolvePatientReply } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
+const { normalizeCoroVoz, mergeDentalDictation, stripSendCommand, isCoroVozControl, dentalVoiceControl, coroVozChoiceIndex, resolvePatientReply, isDentalRecordQuestion } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
 
 assert.equal(normalizeCoroVoz('¡Coro Voz, correcto!'), 'corovoz correcto')
+for (const question of ['¿Cuándo fue la última atención registrada?', '¿Qué tratamientos tiene pendientes?', '¿Cuándo tiene su siguiente cita?', 'Muéstrame sus antecedentes']) assert.equal(isDentalRecordQuestion(question), true)
+for (const command of ['Caries en pieza 36', 'Observación: tratamiento pendiente', 'Registra el diagnóstico', 'Modifica el tratamiento que tiene', 'Abre la pieza 24']) assert.equal(isDentalRecordQuestion(command), false)
 assert.equal(mergeDentalDictation('pieza 14', 'corona'), 'pieza 14 corona')
 assert.equal(mergeDentalDictation('caries oclusal', 'pieza treinta y seis'), 'caries oclusal pieza treinta y seis')
 assert.equal(mergeDentalDictation('pieza 14', 'corona en pieza quince'), 'corona en pieza quince')

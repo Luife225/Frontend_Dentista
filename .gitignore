@@ -34,3 +34,4 @@ Planificacion_CORONYX/
 tests/*
 !tests/services.test.cjs
 !tests/inventory_teleconsultation.test.cjs
+!tests/corovoz-mascot.test.cjs

@@ -1691,7 +1691,7 @@ export default function Consultorio() {
   return (
     <div className="flex h-full flex-col">
       {/* Sub-nav */}
-      <div className="bg-white border-b border-slate-100 px-5 flex gap-1 shrink-0">
+      <div className="bg-white border-b border-slate-100 px-5 flex gap-1 shrink-0 overflow-x-auto [&>*]:shrink-0">
         {tabs.map((t) => (
           <button
             key={t.id}

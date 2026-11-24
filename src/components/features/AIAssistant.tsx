@@ -5,24 +5,22 @@ import { resolveMascotState } from '../../utils/coroVozMascot'
 import './CoroVozAssistant.css'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { coroVozDestination } from '../../utils/coroVozNavigation'
+import { permittedPatientTab } from '../../routes/moduleAccess'
 import { useCoroVoz } from '../../contexts/CoroVozContext'
 import useCoroVozSpeech from '../../hooks/useCoroVozSpeech'
 import { appointmentRequestPatient, mergeAppointmentReply } from '../../utils/coroVozAppointment'
 import { askCoroVoz, interpretDentalCommand, reviseDentalCommand, type CoroVozAnswer, type DentalProposal } from '../../services/coroVozService'
 import { dentalField, dentalFieldAction, describeDentalDraft, dentalDraftFragment, FIELD_LABELS, type DentalDialog, type DentalDraft, type DentalField } from '../../utils/coroVozDentalDialog'
-import { normalizeCoroVoz, mergeDentalDictation, stripSendCommand, isCoroVozControl, dentalVoiceControl, coroVozChoiceIndex, resolvePatientReply, isPatientConfirmation, isDentalRecordQuestion, type PatientQuestion } from '../../utils/coroVozConversation'
+import { normalizeCoroVoz, mergeDentalDictation, stripSendCommand, isCoroVozControl, dentalVoiceControl, coroVozChoiceIndex, resolvePatientReply, isPatientConfirmation, isDentalRecordQuestion, isModuleNavigation, type PatientQuestion } from '../../utils/coroVozConversation'
 
 type Mode = 'general' | 'odontograma' | null
 interface Pending { finding: DentalProposal; targetKey: string }
 const LABELS: Record<string, string> = { SANO: 'Sano', CARIES: 'Caries', RESTAURADO: 'Restauración', CORONA: 'Corona', EXTRAIDO: 'Extraído', ENDODONCIA: 'Endodoncia', IMPLANTE: 'Implante', FRACTURA: 'Fractura' }
-const ROUTES: Record<string, string[]> = {
-  ODONTOLOGO: ['/app/dashboard', '/app/agenda', '/app/pacientes', '/app/notificaciones', '/app/caja', '/app/teleodontologia'],
-  RECEPCIONISTA: ['/app/dashboard', '/app/agenda', '/app/pacientes', '/app/notificaciones', '/app/inventario'],
-  ADMIN_CLINICA: ['/app/dashboard', '/app/agenda', '/app/pacientes', '/app/inventario', '/app/caja', '/app/consultorio'],
-}
 
 export default function AIAssistant({ onClose, onOpen, expanded = true }: { onClose?: () => void; onOpen?: () => void; expanded?: boolean }) {
   const { role } = useAuth()
+  const canUseOdontogram = Boolean(permittedPatientTab(role, 'odontograma'))
   const navigate = useNavigate()
   const { target, memory, dentalMemory, patient, appointmentDraft, appointmentRevision, applyAppointment, closeAppointment } = useCoroVoz()
   const targetRef = useRef(target)
@@ -85,9 +83,9 @@ export default function AIAssistant({ onClose, onOpen, expanded = true }: { onCl
   }, [patient?.id, speech.stop])
 
   useEffect(() => {
-    if (role === 'ODONTOLOGO' && target?.key) changeMode('odontograma')
+    if (canUseOdontogram && target?.key) changeMode('odontograma')
     else if (mode === 'odontograma') changeMode('general')
-  }, [target?.key, role])
+  }, [target?.key, canUseOdontogram])
 
   function clearVisualFeedback() { setResponseError(false); setSuccessMessage(''); setAcknowledgedSpeechError(speech.error) }
   function markSuccess(label: string) { setResponseError(false); setSuccessMessage(label) }
@@ -288,9 +286,10 @@ export default function AIAssistant({ onClose, onOpen, expanded = true }: { onCl
   async function handleInput(rawText: string, patientId = selectedPatient, selectedIntent?: string, patientConfirmed = false) {
     let text = rawText.trim()
     if (!text || busyRef.current) return
-    const recordQuery = mode === 'odontograma' && role === 'ODONTOLOGO' && Boolean(targetRef.current?.patientId) && isDentalRecordQuestion(text)
-    const requestMode = recordQuery ? 'general' : mode
-    if (recordQuery) { patientId = targetRef.current!.patientId!; changeMode('general') }
+    const generalQuery = mode === 'odontograma' && canUseOdontogram && !dialogRef.current?.field
+      && (isDentalRecordQuestion(text) || isModuleNavigation(text))
+    const requestMode = generalQuery ? 'general' : mode
+    if (generalQuery) { patientId = targetRef.current?.patientId || patientId; changeMode('general') }
     clearVisualFeedback()
     if (requestMode === 'general' && appointmentDraft && /^(?:cancelar|descartar|cerrar)(?: el| la)? (?:borrador|formulario|cita en preparacion)\b/.test(normalizeCoroVoz(text))) {
       closeAppointment(); setAppointmentQuestion(''); setAnswer(null)
@@ -338,7 +337,8 @@ export default function AIAssistant({ onClose, onOpen, expanded = true }: { onCl
       return
     }
     if (requestMode === 'odontograma') {
-      const registered = role === 'ODONTOLOGO' ? targetRef.current?.query?.(text) : null
+      if (!canUseOdontogram) return
+      const registered = targetRef.current?.query?.(text)
       if (registered) { setLastPrompt(text); setInput(''); respond(registered); return }
       const voiceCommand = dentalVoiceControl(text)
       if (voiceCommand || dentalFieldAction(text)) setInput('')
@@ -392,7 +392,7 @@ export default function AIAssistant({ onClose, onOpen, expanded = true }: { onCl
     const revision = appointmentRevision.current
     try {
       if (requestMode === 'general') {
-        const result = await askCoroVoz(text, controller.signal, recordQuery ? patientId : appointmentRequestPatient(appointmentDraft, patientId, patientConfirmed), selectedIntent, patientConfirmed, appointmentDraft, agendaContext)
+        const result = await askCoroVoz(text, controller.signal, generalQuery ? patientId : appointmentRequestPatient(appointmentDraft, patientId, patientConfirmed), selectedIntent, patientConfirmed, appointmentDraft, agendaContext)
         if (generation !== generationRef.current) return
         if (result.appointmentDraft && !applyAppointment(result.appointmentDraft, revision)) {
           respond('El formulario cambió mientras procesaba tu solicitud. Conservé tus cambios; vuelve a indicar la corrección que necesitas.')
@@ -477,6 +477,12 @@ export default function AIAssistant({ onClose, onOpen, expanded = true }: { onCl
   const status = { idle: 'Aquí para ayudarte', listening: 'Te escucho · puedes hablar', thinking: speech.phase === 'INTERRUPTING' ? 'Deteniendo la voz' : speech.starting ? 'Preparando micrófono' : speech.transcribing ? 'Transcribiendo' : 'Pensando', speaking: 'Hablando contigo', choosing: 'Elige o responde por voz', success: successMessage, error: 'Necesito tu atención', minimized: 'Abrir CoroVoz' }[state]
   const micLabel = speech.speaking ? 'Interrumpir y hablar' : speech.listening ? 'Detener escucha' : speech.starting ? status : 'Iniciar escucha'
   const reply = speech.speaking ? speech.spokenText : message || answer?.answer
+  const destination = coroVozDestination(role, answer, selectedPatient)
+  const generalExamples = [
+    '¿Cómo agendo una cita?',
+    'Próxima cita del paciente [nombre o DNI]',
+    canUseOdontogram ? '¿Qué alergias tiene [nombre del paciente]?' : role === 'ADMIN_CLINICA' ? '¿Cómo veo usuarios inactivos?' : '¿Cómo consulto el inventario?',
+  ]
   function choose(label: string, action: () => void) { setSelectedOption(label); action() }
   function minimize() { clearVisualFeedback(); cancelRequest(); speech.stop(); onClose?.() }
   // Closing always stops microphone capture and invalidates pending responses.
@@ -492,7 +498,7 @@ export default function AIAssistant({ onClose, onOpen, expanded = true }: { onCl
         </header>
         <nav className="corovoz-modes" aria-label="Modo del asistente">
           <button type="button" aria-pressed={mode === 'general'} onClick={() => changeMode('general')}><CoroVozIcon name="chat" />General</button>
-          {role === 'ODONTOLOGO' && <button type="button" aria-pressed={mode === 'odontograma'} onClick={() => changeMode('odontograma')}><CoroVozIcon name="tooth" />Odontograma</button>}
+          {canUseOdontogram && <button type="button" aria-pressed={mode === 'odontograma'} onClick={() => changeMode('odontograma')}><CoroVozIcon name="tooth" />Odontograma</button>}
         </nav>
         <div className="corovoz-scroll">
           {!mode ? <div className="corovoz-welcome"><span className="corovoz-eyebrow">HOLA, SOY CORONIX</span><h3>¿En qué te ayudo hoy?</h3><p>Elige General para consultar citas y pacientes{role === 'ODONTOLOGO' ? ', u Odontograma para dictar tus hallazgos.' : '.'}</p><span className="corovoz-hint">Puedes hablar o escribir. Tú eliges.</span></div> : <>
@@ -507,13 +513,13 @@ export default function AIAssistant({ onClose, onOpen, expanded = true }: { onCl
             {visibleSpeechError && <p role="alert" className="corovoz-error">{visibleSpeechError}</p>}
             {speech.notice && <p role="status" className="corovoz-hint">{speech.notice}</p>}
             {speech.interim && <p className="corovoz-interim">{speech.interim}</p>}
-            {answer?.route && !answer.appointmentDraft && ROUTES[role || '']?.includes(answer.route) && <button className="corovoz-primary" onClick={() => {
+            {answer && destination && <button className="corovoz-primary" onClick={() => {
               speech.stop()
               const { appointmentId, selectedDate } = answer.agendaContext || {}
               if (answer.route === '/app/agenda' && appointmentId && selectedDate) {
-                navigate(answer.route, { state: { coroVozAppointmentTarget: { id: appointmentId, date: selectedDate } } })
+                navigate(destination, { state: { coroVozAppointmentTarget: { id: appointmentId, date: selectedDate } } })
               } else {
-                navigate(answer.route)
+                navigate(destination)
               }
             }}>{answer.targetLabel} <span aria-hidden="true">↗</span></button>}
             {appointmentDraft && mode === 'general' && <div className="corovoz-detail"><strong>Formulario de cita abierto</strong><p>Completa los campos por voz o directamente en el formulario. Revisa y pulsa Agendar Cita para guardar.</p><button className="corovoz-link" onClick={() => { closeAppointment(); setAppointmentQuestion(''); setAnswer(null) }}>Descartar borrador</button></div>}
@@ -538,7 +544,7 @@ export default function AIAssistant({ onClose, onOpen, expanded = true }: { onCl
               <div className="corovoz-proposal-actions"><button className="corovoz-primary" onClick={confirmProposal} disabled={!pending || !target?.editable || !!dialog || busy}><CoroVozIcon name="check" />Correcto: agregar</button><button className="corovoz-link" disabled={busy} onClick={() => void handleInput('corovoz edita')}>Editar</button><button className="corovoz-link is-danger" disabled={busy} onClick={() => void handleInput('corovoz elimina')}>Eliminar propuesta</button></div>
             </div>}
             {mode === 'odontograma' && (proposalForm || dentalFragment) && <button className="corovoz-link" onClick={repeatDictation} disabled={busy}>Repetir propuesta</button>}
-            {!lastPrompt && !pending && <div className="corovoz-examples"><span className="corovoz-eyebrow">PRUEBA CON UNA IDEA</span>{(mode === 'general' ? ['¿Qué es Coronyx?', '¿Cómo veo usuarios inactivos?', '¿Cómo agendo una cita?', 'Próxima cita del paciente [nombre o DNI]'] : ['Corona en pieza catorce', 'Caries en diente treinta y seis cara oclusal']).map(example => <button key={example} onClick={() => setInput(example)}>{example}<span aria-hidden="true">↗</span></button>)}</div>}
+            {!lastPrompt && !pending && <div className="corovoz-examples"><span className="corovoz-eyebrow">PRUEBA CON UNA IDEA</span>{(mode === 'general' ? generalExamples : ['Corona en pieza catorce', 'Caries en diente treinta y seis cara oclusal']).map(example => <button key={example} onClick={() => setInput(example)}>{example}<span aria-hidden="true">↗</span></button>)}</div>}
           </>}
         </div>
         {mode && <div className="corovoz-composer-area">

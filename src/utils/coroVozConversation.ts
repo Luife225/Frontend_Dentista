@@ -2,12 +2,22 @@ export const normalizeCoroVoz = (text: string) => text.toLowerCase().normalize('
   .replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ')
   .replace(/\bcoro voz\b/g, 'corovoz').trim()
 
+/** The user can open another section directly from the chart. The server checks its role. */
+export function isModuleNavigation(text: string): boolean {
+  const value = normalizeCoroVoz(text)
+  return /^(?:corovoz )?(?:(?:por favor|quiero|puedes) )?(?:abre|abrir|ir|ve|lleva(?:me)?|entra|entrar) (?:(?:a|al|en|la|el|los|las|modulo|apartado|de|del|mi|mis) )*(?:dashboard|panel principal|agenda|pacientes|caja(?: y reportes)?|inventario|tele ?odontologia|notificaciones|configuracion|consultorio|usuarios y roles|odontograma|historia clinica|documentos|radiografias)(?: por favor)?$/.test(value)
+}
+
 /** Queries about the patient's record use the authorized backend, not the finding parser. */
 export function isDentalRecordQuestion(text: string): boolean {
   const value = normalizeCoroVoz(text)
-  return /\b(que|cuales|cuando|tiene|consulta|consultar|muestra|muestrame|ver|ultima|ultimo|proxima|siguiente)\b/.test(value)
-    && /\b(citas?|atencion|atenciones|tratamientos?|historia|historial|antecedentes|alergias?|medicamentos?|diagnosticos?)\b/.test(value)
-    && !/\b(registra|registrar|agrega|agregar|modifica|modificar|elimina|eliminar|borra|borrar)\b/.test(value)
+  if (/^(?:corovoz )?(?:nota|observacion)\b|\b(registra|registrar|agrega|agregar|modifica|modificar|elimina|eliminar|borra|borrar)\b/.test(value)) return false
+  if (/\b(?:pieza|diente|odontograma|piezas|dientes)\b/.test(value) && /\b(?:del paciente|de la paciente|odontograma de)\b/.test(value)) return true
+  if (/\b(?:nota|observacion)\b/.test(value)) return false
+  if (/\b(notificaciones?|avisos?|teleconsultas?|agenda|inventario|insumos|caja|cargos|indicadores|configuracion)\b/.test(value)) return true
+  if (/^(?:alergias?|antecedentes|medicamentos?|documentos?|radiografias?)(?: del? | de la | registrad[oa]s?\b|$)/.test(value)) return true
+  return /\b(citas?|atencion|atenciones|tratamientos?|historia|historial|antecedentes|alergias?|alergic[oa]|medicamentos?|diagnosticos?|documentos?|radiografias?)\b/.test(value)
+    && /\b(que|cuales|cuando|tiene|consulta|consultar|muestra|muestrame|ver|ultim[oa]s?|proxim[oa]s?|siguientes?)\b/.test(value)
 }
 
 /** Conserva fragmentos sin repetir una pieza o condición al corregir el dictado. */

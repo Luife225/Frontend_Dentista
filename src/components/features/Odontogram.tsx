@@ -40,9 +40,10 @@ interface OdontogramProps {
   patientId: string
   patientName?: string
   readOnly?: boolean
+  active?: boolean
 }
 
-export default function Odontogram({ patientId, patientName, readOnly: propReadOnly = false }: OdontogramProps) {
+export default function Odontogram({ patientId, patientName, readOnly: propReadOnly = false, active = true }: OdontogramProps) {
   const { role } = useAuth()
   const isOdontologo = role === 'ODONTOLOGO'
 
@@ -68,7 +69,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
   const [voiceChanges, setVoiceChanges] = useState(false)
   const findingsRef = useRef(findingsMap)
   findingsRef.current = findingsMap
-  const canDictate = !isReadOnly && !isLoading && !isSaving && !errorMessage && version?.pacienteId === patientId
+  const canDictate = active && !isReadOnly && !isLoading && !isSaving && !errorMessage && version?.pacienteId === patientId
   const canDictateRef = useRef(false)
   canDictateRef.current = canDictate
   const saveDraftRef = useRef<(() => Promise<boolean>) | null>(null)
@@ -106,7 +107,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
   }, [])
 
   useEffect(() => {
-    if (!registerCoroVoz || !isOdontologo) return
+    if (!active || !registerCoroVoz || !isOdontologo || version?.pacienteId !== patientId) return
     return registerCoroVoz({
       key: `${patientId}:${version?.id || 'new'}`,
       patientId,
@@ -116,7 +117,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
       describe: describeVoiceChange,
       query: text => {
         const normalized = normalizeCoroVoz(text)
-          if (!/\b(que|cuales|muestra|muestrame|abre|ver|observaciones|informacion)\b/.test(normalized)) return null
+        if (!/\b(que|cuales|muestra|muestrame|abre|ver|observaciones|informacion)\b/.test(normalized)) return null
         if (isLoading || errorMessage || version?.pacienteId !== patientId) return 'Espera a que se cargue el odontograma autorizado del paciente.'
         if (/\b(ausentes|extraidos|faltan)\b/.test(normalized)) {
           const pieces = [...new Set([...findingsRef.current.entries()].filter(([, finding]) => finding.condition === 'EXTRAIDO').map(([key]) => key.split(':')[0]))]
@@ -138,7 +139,7 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
       apply: applyVoiceFinding,
       save: saveVoiceDraft,
     })
-  }, [registerCoroVoz, patientId, patientName, version?.id, version?.pacienteId, selectedTooth, canDictate, describeVoiceChange, applyVoiceFinding, saveVoiceDraft, isOdontologo, isLoading, errorMessage])
+  }, [active, registerCoroVoz, patientId, patientName, version?.id, version?.pacienteId, selectedTooth, canDictate, describeVoiceChange, applyVoiceFinding, saveVoiceDraft, isOdontologo, isLoading, errorMessage])
 
   const showToast = (msg: string, isErr = false) => {
     if (isErr) {
@@ -184,9 +185,13 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
     }
   }, [patientId])
 
+  const loadedPatient = useRef<string | null>(null)
   useEffect(() => {
-    loadOdontogram()
-  }, [loadOdontogram])
+    if (active && loadedPatient.current !== patientId) {
+      loadedPatient.current = patientId
+      void loadOdontogram()
+    }
+  }, [active, patientId, loadOdontogram])
 
   // Obtener condición de una cara
   const getConditionForFace = (piece: number, face: FaceCode): string => {

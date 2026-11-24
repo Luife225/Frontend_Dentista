@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth, type Role } from '../contexts/AuthContext'
+import { MODULE_ROLES, type ModuleId } from '../routes/moduleAccess'
 import { getUnreadCount } from '../services/notificationService'
 import AIAssistant from '../components/features/AIAssistant'
 import AgendarCitaModal from '../components/agenda/AgendarCitaModal'
@@ -8,8 +9,6 @@ import { CoroVozProvider, useCoroVoz } from '../contexts/CoroVozContext'
 import coronixLogo from '../imports/coronixLogoData'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type ModuleId = "dashboard" | "agenda" | "pacientes" | "teleodontologia" | "notificaciones" | "inventario" | "caja" | "consultorio"
 
 interface NavItem {
   id: ModuleId
@@ -161,41 +160,6 @@ const ALL_NAV: NavItem[] = [
   },
 ]
 
-// Modules each role can access
-
-const ROLE_MODULES: Record<Role, ModuleId[]> = {
-  SUPER_ADMIN: [],
-
-  ODONTOLOGO: [
-    "dashboard",
-    "agenda",
-    "pacientes",
-    "teleodontologia",
-    "notificaciones",
-    "caja",
-  ],
-
-  RECEPCIONISTA: [
-    "dashboard",
-    "agenda",
-    "pacientes",
-    "notificaciones",
-    "inventario",
-    "caja",
-  ],
-
-  ADMIN_CLINICA: [
-    "dashboard",
-    "agenda",
-    "pacientes",
-    "inventario",
-    "caja",
-    "consultorio",
-  ],
-
-  PACIENTE: [],
-}
-
 const ROLE_META: Record<Role, {
   label: string
   color: string
@@ -338,9 +302,7 @@ function DashboardContent() {
 
   const active: ModuleId = ROUTE_TO_MODULE[pathSegment] || "dashboard"
 
-  const allowedModules = ROLE_MODULES[role]
-
-  const navItems = ALL_NAV.filter((n) => allowedModules.includes(n.id))
+  const navItems = ALL_NAV.filter((item) => MODULE_ROLES[item.id].includes(role))
 
   const groups = [...new Set(navItems.map((n) => n.group))]
 

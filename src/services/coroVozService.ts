@@ -13,7 +13,7 @@ export interface CoroVozAppointmentDraft {
   missingFields?: string[]
 }
 
-export interface CoroVozAgendaContext { date?: string | null; endDate?: string | null; status?: string | null; appointmentId?: string | null; selectedDate?: string | null; dentistSearch?: string[]; patientSearch?: string[] }
+export interface CoroVozAgendaContext { date?: string | null; endDate?: string | null; status?: string | null; appointmentId?: string | null; selectedDate?: string | null; dentistSearch?: string[]; patientSearch?: string[]; upcomingOnly?: boolean | null }
 
 export interface CoroVozAnswer {
   intent: string

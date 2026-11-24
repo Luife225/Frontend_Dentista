@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom"
 
 import ProtectedRoute from "./ProtectedRoute"
+import { MODULE_ROLES } from "./moduleAccess"
 
 import PublicRoute from "./PublicRoute"
 
@@ -83,9 +84,7 @@ export default function AppRouter() {
       <Route
         path="/app"
         element={
-          <ProtectedRoute
-            allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA"]}
-          >
+          <ProtectedRoute allowedRoles={MODULE_ROLES.dashboard}>
             <DashboardLayout />
           </ProtectedRoute>
         }
@@ -97,9 +96,7 @@ export default function AppRouter() {
         <Route
           path="agenda"
           element={
-            <ProtectedRoute
-              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA"]}
-            >
+            <ProtectedRoute allowedRoles={MODULE_ROLES.agenda}>
               <Agenda />
             </ProtectedRoute>
           }
@@ -109,9 +106,7 @@ export default function AppRouter() {
         <Route
           path="pacientes"
           element={
-            <ProtectedRoute
-              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA"]}
-            >
+            <ProtectedRoute allowedRoles={MODULE_ROLES.pacientes}>
               <PacientePerfil />
             </ProtectedRoute>
           }
@@ -121,7 +116,7 @@ export default function AppRouter() {
         <Route
           path="teleodontologia"
           element={
-            <ProtectedRoute allowedRoles={["ODONTOLOGO"]}>
+            <ProtectedRoute allowedRoles={MODULE_ROLES.teleodontologia}>
               <Teleodontologia />
             </ProtectedRoute>
           }
@@ -131,7 +126,7 @@ export default function AppRouter() {
         <Route
           path="notificaciones"
           element={
-            <ProtectedRoute allowedRoles={["ODONTOLOGO", "RECEPCIONISTA"]}>
+            <ProtectedRoute allowedRoles={MODULE_ROLES.notificaciones}>
               <Notificaciones />
             </ProtectedRoute>
           }
@@ -141,19 +136,17 @@ export default function AppRouter() {
         <Route
           path="inventario"
           element={
-            <ProtectedRoute allowedRoles={["RECEPCIONISTA", "ADMIN_CLINICA"]}>
+            <ProtectedRoute allowedRoles={MODULE_ROLES.inventario}>
               <Inventario />
             </ProtectedRoute>
           }
         />
 
-        {/* Caja y finanzas: Odontólogo y Administrador de Clínica */}
+        {/* Caja operativa del personal clínico */}
         <Route
           path="caja"
           element={
-            <ProtectedRoute
-              allowedRoles={["ODONTOLOGO", "RECEPCIONISTA", "ADMIN_CLINICA"]}
-            >
+            <ProtectedRoute allowedRoles={MODULE_ROLES.caja}>
               <Caja />
             </ProtectedRoute>
           }
@@ -163,7 +156,7 @@ export default function AppRouter() {
         <Route
           path="consultorio"
           element={
-            <ProtectedRoute allowedRoles={["ADMIN_CLINICA"]}>
+            <ProtectedRoute allowedRoles={MODULE_ROLES.consultorio}>
               <Consultorio />
             </ProtectedRoute>
           }

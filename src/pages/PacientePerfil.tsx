@@ -27,6 +27,7 @@ import {
 } from "../services/clinicUserService"
 
 import { useAuth } from "../contexts/AuthContext"
+import { permittedPatientTab, type PatientTab as Tab } from "../routes/moduleAccess"
 
 import {
   getAttachmentsByPatient,
@@ -44,8 +45,6 @@ import UploadAttachmentModal from "../components/features/UploadAttachmentModal"
 import Odontogram from "../components/features/Odontogram"
 import TeleconsultationRoom from "../components/features/TeleconsultationRoom"
 import type { Appointment } from "../types/appointment"
-
-type Tab = "resumen" | "historia" | "odontograma" | "radiografias" | "documentos"
 
 function Icon({ d, className = "w-4 h-4" }: { d: string ;className?: string }) {
   return (
@@ -2333,9 +2332,7 @@ function PatientDetail({
 
   // Separación por permisos: personal administrativo solo accede a tabs administrativas (Resumen, Documentos)
 
-  const tabs = isOdontologo
-    ? allTabs
-    : allTabs.filter((t) => t.id === "resumen" || t.id === "documentos")
+  const tabs = allTabs.filter((t) => permittedPatientTab(role, t.id))
 
   return (
     <section aria-label="Ficha del paciente" className="flex-1 min-w-0 lg:overflow-auto">
@@ -2717,6 +2714,7 @@ function PatientDetail({
                 <Odontogram
                   patientId={patient.id}
                   patientName={`${patient.nombres} ${patient.apellidos}`}
+                  active={tab === "odontograma"}
                 />
               )}
             </div>
@@ -2746,19 +2744,29 @@ export default function PacientePerfil() {
 
   const isOdontologo = role === "ODONTOLOGO"
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const urlPatientId = searchParams.get("pacienteId")
 
   const urlCitaId = searchParams.get("citaId")
 
-  const urlTab = searchParams.get("tab") as Tab | null
+  const urlTab = permittedPatientTab(role, searchParams.get("tab"))
 
   const urlAtender = searchParams.get("atender") === "true"
 
   const [patients, setPatients] = useState<Patient[]>([])
 
-  const [selId, setSelId] = useState<string>(urlPatientId || "")
+  const [selectedId, setSelectedId] = useState("")
+  const selId = urlPatientId || selectedId
+
+  function selectPatient(id: string) {
+    setSelectedId(id)
+    if (urlPatientId || urlCitaId || searchParams.has("tab") || urlAtender) {
+      const next = new URLSearchParams(searchParams)
+      for (const key of ["pacienteId", "citaId", "tab", "atender"]) next.delete(key)
+      setSearchParams(next, { replace: true })
+    }
+  }
 
   const [search, setSearch] = useState("")
 
@@ -2854,15 +2862,11 @@ export default function PacientePerfil() {
 
         setPatients(mapped)
 
-        if (urlPatientId && mapped.some((p) => p.id === urlPatientId)) {
-          setSelId(urlPatientId)
-        } else if (!selId || !mapped.some((p) => p.id === selId)) {
-          setSelId(mapped[0].id)
-        }
+        setSelectedId(current => mapped.some((p) => p.id === current) ? current : mapped[0].id)
       } else {
         setPatients([])
 
-        setSelId("")
+        setSelectedId("")
       }
     } catch (err: any) {
       console.error("Error al consultar /api/v1/patients:", err)
@@ -2892,7 +2896,7 @@ export default function PacientePerfil() {
     return matchSearch && matchFilter
   })
 
-  const sel = patients.find((p) => p.id === selId) || patients[0]
+  const sel = patients.find((p) => p.id === selId)
 
   async function addPatient(data: PatientFormData) {
     setIsSaving(true)
@@ -2993,7 +2997,7 @@ export default function PacientePerfil() {
 
       setPatients((ps) => [np, ...ps])
 
-      setSelId(np.id)
+      selectPatient(np.id)
 
       showToast(`✓ Paciente registrado exitosamente (ID: #${created.id})`)
 
@@ -3283,7 +3287,7 @@ export default function PacientePerfil() {
             visible.map((p) => (
               <button
                 key={p.id}
-                onClick={() => setSelId(p.id)}
+                onClick={() => selectPatient(p.id)}
                 className={`w-full text-left px-4 py-3 border-b border-slate-50 transition-all flex items-center gap-2.5 cursor-pointer ${
                   selId === p.id
                     ? "bg-cyan-50 border-l-2 border-l-cyan-500"
@@ -3336,6 +3340,7 @@ export default function PacientePerfil() {
       {/* Detalle del paciente seleccionado */}
       {sel ? (
         <PatientDetail
+          key={sel.id}
           patient={sel}
           onUpdate={handleUpdatePatient}
           onArchive={handleArchivePatient}
@@ -3343,7 +3348,7 @@ export default function PacientePerfil() {
           onLinked={handlePatientLinked}
           initialTab={urlTab || undefined}
           initialCitaId={urlCitaId || undefined}
-          autoAtender={urlAtender}
+          autoAtender={urlAtender && isOdontologo}
         />
       ) : (
         <div className="flex-1 flex items-center justify-center p-8 text-center text-slate-400">

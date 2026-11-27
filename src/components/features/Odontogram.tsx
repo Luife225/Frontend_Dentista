@@ -148,6 +148,17 @@ export default function Odontogram({ patientId, patientName, readOnly: propReadO
     loadOdontogram()
   }, [loadOdontogram])
 
+  useEffect(() => {
+    const handleExternalUpdate = (e: Event) => {
+      const detail = (e as CustomEvent<{ patientId?: string }>).detail
+      if (!detail?.patientId || String(detail.patientId) === String(patientId)) {
+        loadOdontogram()
+      }
+    }
+    window.addEventListener('coronyx:odontogram-updated', handleExternalUpdate)
+    return () => window.removeEventListener('coronyx:odontogram-updated', handleExternalUpdate)
+  }, [patientId, loadOdontogram])
+
   // Obtener condición de una cara
   const getConditionForFace = (piece: number, face: FaceCode): string => {
     const generalKey = `${piece}:GENERAL`

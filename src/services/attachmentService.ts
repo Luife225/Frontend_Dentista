@@ -35,23 +35,28 @@ export interface MlBboxPixels {
 export interface MlFindingItem {
   findingId: string
   finding_id?: string
+  origin?: 'ML_YOLOV8N' | 'MANUAL_ODONTOLOGO' | string
   classId: number
   class_id?: number
   className: string
   class_name?: string
-  originalClassId: number
-  original_class_id?: number
-  originalClassName: string
-  original_class_name?: string
-  score: number
+  originalClassId?: number | null
+  original_class_id?: number | null
+  originalClassName?: string | null
+  original_class_name?: string | null
+  score?: number | null
   bboxPixels: MlBboxPixels
   bbox_pixels?: MlBboxPixels
-  originalBboxPixels: MlBboxPixels
-  original_bbox_pixels?: MlBboxPixels
+  originalBboxPixels?: MlBboxPixels | null
+  original_bbox_pixels?: MlBboxPixels | null
   reviewStatus: 'PENDIENTE' | 'ACEPTADO' | 'RECHAZADO' | 'CORREGIDO' | string
   review_status?: string
   clinicalNote?: string | null
   clinical_note?: string | null
+  toothFdi?: string | null
+  tooth_fdi?: string | null
+  toothFace?: string | null
+  tooth_face?: string | null
   reviewedByUsuarioClinicaId?: string | null
   reviewed_by_usuario_clinica_id?: string | null
   reviewedByNombre?: string | null
@@ -66,15 +71,27 @@ export interface MlReviewPayload {
   correctedClassName?: 'caries' | 'caries_profunda' | string
   correctedBboxPixels?: MlBboxPixels
   clinicalNote?: string
+  toothFdi?: string
+  toothFace?: string
   reviews?: Array<{
     findingId: string
     decision: string
     correctedClassName?: string
     correctedBboxPixels?: MlBboxPixels
     clinicalNote?: string
+    toothFdi?: string
+    toothFace?: string
   }>
   overallDecision?: 'ACEPTADO' | 'RECHAZADO' | 'CORREGIDO' | string
   overallClinicalNote?: string
+}
+
+export interface MlManualFindingPayload {
+  className: 'caries' | 'caries_profunda'
+  bboxPixels: MlBboxPixels
+  toothFdi?: string
+  toothFace?: string
+  clinicalNote?: string
 }
 
 export interface UploadAttachmentPayload {
@@ -171,6 +188,28 @@ export async function reviewAttachmentMl(id: string, payload: MlReviewPayload): 
   return apiClient<AttachmentDto>(`/attachments/${id}/review-ml`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  })
+}
+
+/**
+ * Registra un hallazgo clínico manual (falso negativo no detectado por el modelo ML)
+ */
+export async function addManualAttachmentFinding(
+  id: string,
+  payload: MlManualFindingPayload
+): Promise<AttachmentDto> {
+  return apiClient<AttachmentDto>(`/attachments/${id}/manual-finding`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+/**
+ * Elimina un hallazgo clínico manual registrado por el odontólogo
+ */
+export async function deleteManualAttachmentFinding(id: string, findingId: string): Promise<AttachmentDto> {
+  return apiClient<AttachmentDto>(`/attachments/${id}/manual-finding/${encodeURIComponent(findingId)}`, {
+    method: 'DELETE',
   })
 }
 

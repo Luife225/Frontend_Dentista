@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   AttachmentDto,
+  MlBboxPixels,
   MlFindingItem,
   downloadAttachmentBlob,
   formatFileSize,
@@ -8,7 +9,15 @@ import {
   revokeAttachment,
   analyzeAttachmentMl,
   reviewAttachmentMl,
+  addManualAttachmentFinding,
+  deleteManualAttachmentFinding,
 } from '../../services/attachmentService'
+import { getCurrentOdontogram, saveOdontogramDraft } from '../../services/odontogramService'
+import {
+  FDI_ALL_TEETH,
+  TOOTH_FACES,
+  estimateToothFdiFromBbox,
+} from '../../utils/panoramicToothMapper'
 
 interface AttachmentViewerModalProps {
   attachment: AttachmentDto
@@ -41,7 +50,23 @@ export default function AttachmentViewerModal({
   const [editingFindingId, setEditingFindingId] = useState<string | null>(null)
   const [editClassName, setEditClassName] = useState<'caries' | 'caries_profunda'>('caries')
   const [editClinicalNote, setEditClinicalNote] = useState<string>('')
+  const [editToothFdi, setEditToothFdi] = useState<string>('')
+  const [editToothFace, setEditToothFace] = useState<string>('GENERAL')
+  const [toothDrafts, setToothDrafts] = useState<Record<string, { fdi: string; face: string }>>({})
   const [imageNaturalDims, setImageNaturalDims] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
+
+  // Estados para marcado manual (falso negativo) y sincronización con odontograma
+  const [isDrawingMode, setIsDrawingMode] = useState<boolean>(false)
+  const [drawStartPct, setDrawStartPct] = useState<{ x: number; y: number } | null>(null)
+  const [drawCurrentPct, setDrawCurrentPct] = useState<{ x: number; y: number } | null>(null)
+  const [pendingManualBox, setPendingManualBox] = useState<MlBboxPixels | null>(null)
+  const [manualClassName, setManualClassName] = useState<'caries' | 'caries_profunda'>('caries')
+  const [manualToothFdi, setManualToothFdi] = useState<string>('46')
+  const [manualToothFace, setManualToothFace] = useState<string>('GENERAL')
+  const [manualNote, setManualNote] = useState<string>('')
+  const [isSavingManual, setIsSavingManual] = useState<boolean>(false)
+  const [isSyncingOdontogram, setIsSyncingOdontogram] = useState<boolean>(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
 
   const imageRef = useRef<HTMLImageElement | null>(null)
 
@@ -138,10 +163,11 @@ export default function AttachmentViewerModal({
   const handleReviewDecision = async (
     findingId: string,
     decision: 'ACEPTADO' | 'RECHAZADO' | 'CORREGIDO',
-    extras?: { correctedClassName?: string; clinicalNote?: string }
+    extras?: { correctedClassName?: string; clinicalNote?: string; toothFdi?: string; toothFace?: string }
   ) => {
     setIsReviewingMl(true)
     setMlError(null)
+    setSyncMessage(null)
     try {
       const updated = await reviewAttachmentMl(currentAttachment.id, {
         findingId,
@@ -161,6 +187,7 @@ export default function AttachmentViewerModal({
   const handleBulkAccept = async () => {
     setIsReviewingMl(true)
     setMlError(null)
+    setSyncMessage(null)
     try {
       const updated = await reviewAttachmentMl(currentAttachment.id, {
         overallDecision: 'ACEPTADO',
@@ -176,12 +203,12 @@ export default function AttachmentViewerModal({
 
   const isImage = currentAttachment.tipoMime.startsWith('image/')
   const isPdf = currentAttachment.tipoMime === 'application/pdf'
-  const isRadiografia = currentAttachment.tipoArchivo === 'RADIOGRAFIA' || isImage
 
   const hasMlAnalysis = Boolean(currentAttachment.iaHallazgos && currentAttachment.iaNombreModelo)
   const findings: MlFindingItem[] = currentAttachment.iaHallazgos?.findings || []
   const originalOutput = currentAttachment.iaHallazgos?.originalModelOutput || []
   const timing = currentAttachment.iaHallazgos?.timing_ms || {}
+  const showSidePanel = showMlPanel && (hasMlAnalysis || findings.length > 0 || pendingManualBox !== null || isDrawingMode)
 
   // Contadores
   const pendingCount = findings.filter(
@@ -200,6 +227,194 @@ export default function AttachmentViewerModal({
   // Dimensiones base de la imagen para calcular los porcentajes de las cajas
   const baseWidth = currentAttachment.iaHallazgos?.image?.width || imageNaturalDims.width || 1
   const baseHeight = currentAttachment.iaHallazgos?.image?.height || imageNaturalDims.height || 1
+
+  const resolveToothForFinding = (f: MlFindingItem, idx: number) => {
+    const fId = f.findingId || f.finding_id || `hallazgo-${idx + 1}`
+    const draft = toothDrafts[fId]
+    const persistedFdi = f.toothFdi || f.tooth_fdi || ''
+    const persistedFace = f.toothFace || f.tooth_face || 'GENERAL'
+    const bbox = f.bboxPixels || f.bbox_pixels
+    const suggestedFdi = estimateToothFdiFromBbox(bbox, baseWidth, baseHeight)
+    return {
+      fdi: draft?.fdi || persistedFdi || suggestedFdi,
+      face: draft?.face || persistedFace,
+      isPersisted: Boolean(persistedFdi),
+      suggestedFdi,
+    }
+  }
+
+  const getRelativePercent = (clientX: number, clientY: number) => {
+    const imgEl = imageRef.current
+    if (!imgEl) return null
+    const rect = imgEl.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return null
+    const x = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100))
+    const y = Math.min(100, Math.max(0, ((clientY - rect.top) / rect.height) * 100))
+    return { x, y }
+  }
+
+  const handleImageMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDrawingMode || !isDentistOrAdmin) return
+    e.preventDefault()
+    const pt = getRelativePercent(e.clientX, e.clientY)
+    if (!pt) return
+    setDrawStartPct(pt)
+    setDrawCurrentPct(pt)
+    setPendingManualBox(null)
+    setSyncMessage(null)
+  }
+
+  const handleImageMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDrawingMode || !drawStartPct) return
+    const pt = getRelativePercent(e.clientX, e.clientY)
+    if (pt) {
+      setDrawCurrentPct(pt)
+    }
+  }
+
+  const handleImageMouseUp = () => {
+    if (!isDrawingMode || !drawStartPct || !drawCurrentPct) {
+      setDrawStartPct(null)
+      setDrawCurrentPct(null)
+      return
+    }
+    const minX = Math.min(drawStartPct.x, drawCurrentPct.x)
+    const maxX = Math.max(drawStartPct.x, drawCurrentPct.x)
+    const minY = Math.min(drawStartPct.y, drawCurrentPct.y)
+    const maxY = Math.max(drawStartPct.y, drawCurrentPct.y)
+    setDrawStartPct(null)
+    setDrawCurrentPct(null)
+
+    if (maxX - minX < 1.2 || maxY - minY < 1.2) {
+      return
+    }
+
+    const bbox: MlBboxPixels = {
+      xMin: Math.round((minX / 100) * baseWidth * 10) / 10,
+      yMin: Math.round((minY / 100) * baseHeight * 10) / 10,
+      xMax: Math.round((maxX / 100) * baseWidth * 10) / 10,
+      yMax: Math.round((maxY / 100) * baseHeight * 10) / 10,
+    }
+    setPendingManualBox(bbox)
+    setManualToothFdi(estimateToothFdiFromBbox(bbox, baseWidth, baseHeight))
+    setManualToothFace('GENERAL')
+    setManualClassName('caries')
+    setManualNote('')
+    setShowMlPanel(true)
+    setShowMlBoxes(true)
+    setIsDrawingMode(false)
+  }
+
+  const handleSaveManualFinding = async () => {
+    if (!pendingManualBox) return
+    setIsSavingManual(true)
+    setMlError(null)
+    setSyncMessage(null)
+    try {
+      const updated = await addManualAttachmentFinding(currentAttachment.id, {
+        className: manualClassName,
+        bboxPixels: pendingManualBox,
+        toothFdi: manualToothFdi,
+        toothFace: manualToothFace,
+        clinicalNote: manualNote.trim() || undefined,
+      })
+      notifyUpdate(updated)
+      setPendingManualBox(null)
+      setManualNote('')
+    } catch (err: any) {
+      setMlError(err.message || 'No se pudo guardar el hallazgo manual.')
+    } finally {
+      setIsSavingManual(false)
+    }
+  }
+
+  const handleDeleteManualFinding = async (findingId: string) => {
+    setIsReviewingMl(true)
+    setMlError(null)
+    setSyncMessage(null)
+    try {
+      const updated = await deleteManualAttachmentFinding(currentAttachment.id, findingId)
+      notifyUpdate(updated)
+    } catch (err: any) {
+      setMlError(err.message || 'No se pudo eliminar el hallazgo manual.')
+    } finally {
+      setIsReviewingMl(false)
+    }
+  }
+
+  const validatedFindingsForOdontogram = findings.filter((f) => {
+    const status = (f.reviewStatus || f.review_status || 'PENDIENTE').toUpperCase()
+    return status === 'ACEPTADO' || status === 'CORREGIDO'
+  })
+
+  const handleSendToOdontogram = async () => {
+    if (validatedFindingsForOdontogram.length === 0) return
+    setIsSyncingOdontogram(true)
+    setMlError(null)
+    setSyncMessage(null)
+    try {
+      const currentOdo = await getCurrentOdontogram(currentAttachment.pacienteId)
+      const mergedMap = new Map<string, {
+        codigoPiezaDental: number
+        codigoSuperficieCara: string
+        codigoCondicion: string
+        notaObservacion?: string
+      }>()
+
+      for (const existing of currentOdo.hallazgos || []) {
+        const key = `${existing.codigoPiezaDental}:${existing.codigoSuperficieCara.toUpperCase()}`
+        mergedMap.set(key, {
+          codigoPiezaDental: existing.codigoPiezaDental,
+          codigoSuperficieCara: existing.codigoSuperficieCara.toUpperCase(),
+          codigoCondicion: existing.codigoCondicion.toUpperCase(),
+          notaObservacion: existing.notaObservacion,
+        })
+      }
+
+      let syncedCount = 0
+      findings.forEach((f, idx) => {
+        const status = (f.reviewStatus || f.review_status || 'PENDIENTE').toUpperCase()
+        if (status !== 'ACEPTADO' && status !== 'CORREGIDO') return
+        const { fdi, face } = resolveToothForFinding(f, idx)
+        const pieceNum = Number(fdi)
+        if (!Number.isInteger(pieceNum)) return
+
+        const cls = (f.className || f.class_name || 'caries') === 'caries_profunda'
+          ? 'Caries profunda'
+          : 'Caries'
+        const isManual = (f.origin || '').toUpperCase() === 'MANUAL_ODONTOLOGO'
+        const originLabel = isManual
+          ? 'Marcado manual en radiografía'
+          : `Asistente IA (${((f.score || 0) * 100).toFixed(0)}%)`
+        const extraNote = (f.clinicalNote || f.clinical_note || '').trim()
+        const fullNote = `${cls} · ${originLabel} · Doc #${currentAttachment.id}${extraNote ? ` · ${extraNote}` : ''}`
+
+        const key = `${pieceNum}:${face.toUpperCase()}`
+        mergedMap.set(key, {
+          codigoPiezaDental: pieceNum,
+          codigoSuperficieCara: face.toUpperCase(),
+          codigoCondicion: 'CARIES',
+          notaObservacion: fullNote,
+        })
+        syncedCount += 1
+      })
+
+      await saveOdontogramDraft(currentAttachment.pacienteId, {
+        hallazgos: Array.from(mergedMap.values()),
+        observacionGeneral: `Actualizado desde radiografía Doc #${currentAttachment.id}`,
+      })
+      window.dispatchEvent(
+        new CustomEvent('coronyx:odontogram-updated', {
+          detail: { patientId: currentAttachment.pacienteId },
+        })
+      )
+      setSyncMessage(`✓ ${syncedCount} hallazgo(s) enviados al borrador del Odontograma.`)
+    } catch (err: any) {
+      setMlError(err.message || 'No se pudo enviar los hallazgos al Odontograma.')
+    } finally {
+      setIsSyncingOdontogram(false)
+    }
+  }
 
   return (
     <div
@@ -260,9 +475,26 @@ export default function AttachmentViewerModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Botón de análisis IA si es odontólogo y es imagen */}
+            {/* Botón de análisis IA y marcado manual si es odontólogo y es imagen */}
             {isDentistOrAdmin && isImage && (
               <>
+                <button
+                  onClick={() => {
+                    setIsDrawingMode((prev) => !prev)
+                    setShowMlBoxes(true)
+                    setShowMlPanel(true)
+                  }}
+                  disabled={loading}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-50 ${
+                    isDrawingMode
+                      ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm'
+                      : 'bg-cyan-50 text-cyan-800 border-cyan-200 hover:bg-cyan-100'
+                  }`}
+                  title="Dibujar manualmente un recuadro sobre una caries no detectada por la IA"
+                >
+                  <span>＋</span>
+                  {isDrawingMode ? 'Cancelar Trazo' : 'Marcar Manual'}
+                </button>
                 {!hasMlAnalysis ? (
                   <button
                     onClick={() => handleRunMl(0.25)}
@@ -290,7 +522,7 @@ export default function AttachmentViewerModal({
                           ? 'bg-white text-cyan-700 font-bold shadow-xs'
                           : 'text-slate-500 hover:text-slate-700'
                       }`}
-                      title="Activar u ocultar cajas delimitadoras de la IA"
+                      title="Activar u ocultar cajas delimitadoras"
                     >
                       {showMlBoxes ? '👁️ Cajas Visibles' : '🚫 Ocultar Cajas'}
                     </button>
@@ -379,12 +611,27 @@ export default function AttachmentViewerModal({
             )}
 
             {!loading && !error && blobUrl && isImage && (
-              <div className="relative inline-block max-w-full max-h-[75vh]">
+              <div
+                onMouseDown={handleImageMouseDown}
+                onMouseMove={handleImageMouseMove}
+                onMouseUp={handleImageMouseUp}
+                onMouseLeave={handleImageMouseUp}
+                className={`relative inline-block max-w-full max-h-[75vh] ${
+                  isDrawingMode ? 'cursor-crosshair ring-2 ring-cyan-400 rounded-lg' : ''
+                }`}
+              >
+                {isDrawingMode && (
+                  <div className="absolute top-2 left-2 z-30 bg-cyan-950/90 text-cyan-100 border border-cyan-400/60 px-2.5 py-1 rounded-lg text-[11px] font-semibold pointer-events-none shadow-lg">
+                    ✏️ Arrastra un recuadro sobre la zona con caries
+                  </div>
+                )}
+
                 {/* Imagen base */}
                 <img
                   ref={imageRef}
                   src={blobUrl}
                   alt={currentAttachment.nombreOriginal}
+                  draggable={false}
                   className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl block"
                   onLoad={(e) => {
                     setImageNaturalDims({
@@ -394,8 +641,38 @@ export default function AttachmentViewerModal({
                   }}
                 />
 
-                {/* Cajas delimitadoras de IA superpuestas */}
-                {hasMlAnalysis && showMlBoxes && findings.map((f, idx) => {
+                {/* Caja temporal mientras el odontólogo arrastra */}
+                {drawStartPct && drawCurrentPct && (
+                  <div
+                    style={{
+                      left: `${Math.min(drawStartPct.x, drawCurrentPct.x)}%`,
+                      top: `${Math.min(drawStartPct.y, drawCurrentPct.y)}%`,
+                      width: `${Math.abs(drawCurrentPct.x - drawStartPct.x)}%`,
+                      height: `${Math.abs(drawCurrentPct.y - drawStartPct.y)}%`,
+                    }}
+                    className="absolute border-2 border-dashed border-cyan-300 bg-cyan-400/25 z-30 pointer-events-none rounded-xs"
+                  />
+                )}
+
+                {/* Caja pendiente de confirmación antes de guardar */}
+                {pendingManualBox && (
+                  <div
+                    style={{
+                      left: `${(pendingManualBox.xMin / baseWidth) * 100}%`,
+                      top: `${(pendingManualBox.yMin / baseHeight) * 100}%`,
+                      width: `${((pendingManualBox.xMax - pendingManualBox.xMin) / baseWidth) * 100}%`,
+                      height: `${((pendingManualBox.yMax - pendingManualBox.yMin) / baseHeight) * 100}%`,
+                    }}
+                    className="absolute border-2 border-dashed border-cyan-300 bg-cyan-400/30 z-30 pointer-events-none rounded-xs ring-2 ring-cyan-400/60"
+                  >
+                    <span className="absolute -top-5 left-0 text-[10px] px-1.5 py-0.5 rounded bg-cyan-600 text-white font-bold whitespace-nowrap shadow-sm">
+                      Nuevo Manual · #{manualToothFdi}
+                    </span>
+                  </div>
+                )}
+
+                {/* Cajas delimitadoras de IA y manuales superpuestas */}
+                {(hasMlAnalysis || findings.length > 0) && showMlBoxes && findings.map((f, idx) => {
                   const fId = f.findingId || f.finding_id || `hallazgo-${idx + 1}`
                   const b = f.bboxPixels || f.bbox_pixels
                   if (!b) return null
@@ -407,19 +684,25 @@ export default function AttachmentViewerModal({
 
                   const className = f.className || f.class_name || 'caries'
                   const isProfunda = className === 'caries_profunda'
+                  const isManual = (f.origin || '').toUpperCase() === 'MANUAL_ODONTOLOGO'
                   const isSelected = selectedFindingId === fId
                   const status = f.reviewStatus || f.review_status || 'PENDIENTE'
+                  const toothFdi = f.toothFdi || f.tooth_fdi
 
-                  // Color según clase y estado
+                  // Color según origen, clase y estado
                   const isRejected = status === 'RECHAZADO'
                   const borderColor = isRejected
                     ? 'border-slate-500/60 bg-slate-500/10'
+                    : isManual
+                    ? 'border-cyan-400 border-dashed bg-cyan-400/20'
                     : isProfunda
                     ? 'border-red-500 bg-red-500/20'
                     : 'border-amber-400 bg-amber-400/20'
 
                   const labelBg = isRejected
                     ? 'bg-slate-700 text-slate-300'
+                    : isManual
+                    ? 'bg-cyan-600 text-white font-bold'
                     : isProfunda
                     ? 'bg-red-600 text-white'
                     : 'bg-amber-500 text-slate-900 font-bold'
@@ -427,7 +710,9 @@ export default function AttachmentViewerModal({
                   return (
                     <div
                       key={fId}
-                      onClick={() => {
+                      onClick={(e) => {
+                        if (isDrawingMode) return
+                        e.stopPropagation()
                         setSelectedFindingId(fId)
                         setShowMlPanel(true)
                       }}
@@ -440,14 +725,21 @@ export default function AttachmentViewerModal({
                       className={`absolute border-2 transition-all cursor-pointer rounded-xs ${borderColor} ${
                         isSelected ? 'ring-3 ring-cyan-400 ring-offset-1 z-20 scale-[1.01]' : 'z-10 hover:border-cyan-300'
                       } ${isRejected ? 'opacity-40' : 'opacity-90'}`}
-                      title={`${fId}: ${className} (${((f.score || 0) * 100).toFixed(1)}%) - Estado: ${status}`}
+                      title={
+                        isManual
+                          ? `${fId}: ${className} (Manual Odontólogo)${toothFdi ? ` · Pieza #${toothFdi}` : ''}`
+                          : `${fId}: ${className} (${((f.score || 0) * 100).toFixed(1)}%) - Estado: ${status}`
+                      }
                     >
-                      {/* Tag con clase y confianza */}
+                      {/* Tag con clase y confianza/origen */}
                       <span
                         className={`absolute -top-5 left-0 text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap pointer-events-none ${labelBg}`}
                       >
-                        {isProfunda ? '■ Caries Prof.' : '■ Caries'} {((f.score || 0) * 100).toFixed(0)}%
-                        {status !== 'PENDIENTE' && ` (${status})`}
+                        {isManual ? '✎ Manual · ' : ''}
+                        {isProfunda ? 'Caries Prof.' : 'Caries'}{' '}
+                        {!isManual && f.score != null ? `${(f.score * 100).toFixed(0)}%` : ''}
+                        {toothFdi ? ` #${toothFdi}` : ''}
+                        {!isManual && status !== 'PENDIENTE' ? ` (${status})` : ''}
                       </span>
                     </div>
                   )
@@ -463,7 +755,7 @@ export default function AttachmentViewerModal({
           </div>
 
           {/* Lado derecho: Panel lateral de revisión clínica asistida por IA */}
-          {hasMlAnalysis && showMlPanel && isDentistOrAdmin && (
+          {showSidePanel && isDentistOrAdmin && (
             <div className="w-full lg:w-96 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col shrink-0 text-slate-200 overflow-hidden">
               {/* Header del Panel */}
               <div className="p-3.5 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">
@@ -474,8 +766,12 @@ export default function AttachmentViewerModal({
                   </h4>
                   <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
                     <span>Asistente Radiográfico</span>
-                    <span>·</span>
-                    <span className="text-emerald-400">Tiempo: {timing.inference_ms || 11} ms</span>
+                    {timing.inference_ms != null && (
+                      <>
+                        <span>·</span>
+                        <span className="text-emerald-400">Tiempo: {timing.inference_ms} ms</span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <button
@@ -511,20 +807,99 @@ export default function AttachmentViewerModal({
                 )}
               </div>
 
+              {/* Formulario para confirmar caja manual recién dibujada */}
+              {pendingManualBox && (
+                <div className="m-3 mb-0 p-3 rounded-xl bg-cyan-950/50 border border-cyan-500/60 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-cyan-300 text-[11px]">✎ Nuevo Hallazgo Manual</span>
+                    <span className="text-[10px] text-cyan-200/70">Sin % de ML (Criterio clínico)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-slate-300 block mb-0.5">Tipo:</label>
+                      <select
+                        value={manualClassName}
+                        onChange={(e) => setManualClassName(e.target.value as 'caries' | 'caries_profunda')}
+                        className="w-full bg-slate-950 border border-slate-700 text-white rounded p-1 text-[11px]"
+                      >
+                        <option value="caries">Caries</option>
+                        <option value="caries_profunda">Caries Profunda</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-300 block mb-0.5">Pieza FDI:</label>
+                      <select
+                        value={manualToothFdi}
+                        onChange={(e) => setManualToothFdi(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 text-white rounded p-1 text-[11px]"
+                      >
+                        {FDI_ALL_TEETH.map((t) => (
+                          <option key={t} value={t}>
+                            Pieza #{t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-300 block mb-0.5">Superficie / Cara:</label>
+                    <select
+                      value={manualToothFace}
+                      onChange={(e) => setManualToothFace(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 text-white rounded p-1 text-[11px]"
+                    >
+                      {TOOTH_FACES.map((face) => (
+                        <option key={face.value} value={face.value}>
+                          {face.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      value={manualNote}
+                      onChange={(e) => setManualNote(e.target.value)}
+                      placeholder="Nota clínica opcional (ej. Caries interproximal)..."
+                      className="w-full bg-slate-950 border border-slate-700 text-white rounded p-1.5 text-[11px]"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-1.5 pt-1">
+                    <button
+                      onClick={() => setPendingManualBox(null)}
+                      className="px-2 py-1 text-[10px] text-slate-300 hover:text-white cursor-pointer"
+                    >
+                      Descartar
+                    </button>
+                    <button
+                      onClick={handleSaveManualFinding}
+                      disabled={isSavingManual}
+                      className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50"
+                    >
+                      {isSavingManual ? 'Guardando...' : '✓ Guardar Hallazgo Manual'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Lista scrollable de hallazgos */}
               <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
                 {findings.length === 0 ? (
                   <div className="text-center py-8 text-slate-500 text-xs">
-                    No se detectaron hallazgos por encima del umbral en esta radiografía.
+                    {isDrawingMode
+                      ? 'Arrastra un rectángulo sobre la radiografía para marcar una caries.'
+                      : 'No se detectaron hallazgos por encima del umbral en esta radiografía. Puedes usar "＋ Marcar Manual" si detectas una caries.'}
                   </div>
                 ) : (
                   findings.map((f, idx) => {
                     const fId = f.findingId || f.finding_id || `hallazgo-${idx + 1}`
                     const className = f.className || f.class_name || 'caries'
                     const isProfunda = className === 'caries_profunda'
+                    const isManual = (f.origin || '').toUpperCase() === 'MANUAL_ODONTOLOGO'
                     const status = f.reviewStatus || f.review_status || 'PENDIENTE'
                     const isSelected = selectedFindingId === fId
                     const isEditing = editingFindingId === fId
+                    const toothInfo = resolveToothForFinding(f, idx)
 
                     return (
                       <div
@@ -537,8 +912,8 @@ export default function AttachmentViewerModal({
                         }`}
                       >
                         {/* Cabecera del hallazgo */}
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-1.5">
+                        <div className="flex items-center justify-between mb-1.5 gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono text-[10px] text-slate-400">{fId}</span>
                             <span
                               className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
@@ -547,24 +922,102 @@ export default function AttachmentViewerModal({
                             >
                               {isProfunda ? 'Caries Profunda' : 'Caries'}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {((f.score || 0) * 100).toFixed(1)}%
-                            </span>
+                            {isManual ? (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                                Manual · Odontólogo
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {((f.score || 0) * 100).toFixed(1)}%
+                              </span>
+                            )}
                           </div>
 
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                              status === 'ACEPTADO'
-                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                                : status === 'CORREGIDO'
-                                ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                                : status === 'RECHAZADO'
-                                ? 'bg-slate-800 text-slate-400'
-                                : 'bg-amber-950 text-amber-400 border border-amber-800 animate-pulse'
-                            }`}
-                          >
-                            {status}
+                          <div className="flex items-center gap-1">
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                status === 'ACEPTADO'
+                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  : status === 'CORREGIDO'
+                                  ? 'bg-purple-950 text-purple-300 border border-purple-800'
+                                  : status === 'RECHAZADO'
+                                  ? 'bg-slate-800 text-slate-400'
+                                  : 'bg-amber-950 text-amber-400 border border-amber-800 animate-pulse'
+                              }`}
+                            >
+                              {status}
+                            </span>
+                            {isManual && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteManualFinding(fId)
+                                }}
+                                disabled={isReviewingMl}
+                                className="text-[10px] text-rose-400 hover:text-rose-300 px-1 cursor-pointer"
+                                title="Eliminar hallazgo manual"
+                              >
+                                🗑
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Selector rápido de Pieza FDI para el Odontograma */}
+                        <div className="flex items-center gap-1.5 mb-2 bg-slate-900/70 px-2 py-1 rounded border border-slate-800">
+                          <span className="text-[10px] text-slate-400 shrink-0">
+                            {toothInfo.isPersisted ? '🦷 Pieza:' : '🦷 Sugerida:'}
                           </span>
+                          <select
+                            value={toothInfo.fdi}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              const newFdi = e.target.value
+                              setToothDrafts((prev) => ({
+                                ...prev,
+                                [fId]: { fdi: newFdi, face: toothInfo.face },
+                              }))
+                              if (status === 'ACEPTADO' || status === 'CORREGIDO') {
+                                handleReviewDecision(fId, status as 'ACEPTADO' | 'CORREGIDO', {
+                                  toothFdi: newFdi,
+                                  toothFace: toothInfo.face,
+                                  clinicalNote: f.clinicalNote || f.clinical_note || undefined,
+                                })
+                              }
+                            }}
+                            className="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded px-1.5 py-0.5 text-[10px]"
+                          >
+                            {FDI_ALL_TEETH.map((t) => (
+                              <option key={t} value={t}>
+                                #{t}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={toothInfo.face}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              const newFace = e.target.value
+                              setToothDrafts((prev) => ({
+                                ...prev,
+                                [fId]: { fdi: toothInfo.fdi, face: newFace },
+                              }))
+                              if (status === 'ACEPTADO' || status === 'CORREGIDO') {
+                                handleReviewDecision(fId, status as 'ACEPTADO' | 'CORREGIDO', {
+                                  toothFdi: toothInfo.fdi,
+                                  toothFace: newFace,
+                                  clinicalNote: f.clinicalNote || f.clinical_note || undefined,
+                                })
+                              }
+                            }}
+                            className="flex-1 bg-slate-950 border border-slate-700 text-slate-300 rounded px-1 py-0.5 text-[10px]"
+                          >
+                            {TOOTH_FACES.map((face) => (
+                              <option key={face.value} value={face.value}>
+                                {face.value}
+                              </option>
+                            ))}
+                          </select>
                         </div>
 
                         {/* Coordenadas o Nota clínica */}
@@ -575,7 +1028,7 @@ export default function AttachmentViewerModal({
                             </p>
                           ) : (
                             <span>
-                              Región señalada en radiografía
+                              {isManual ? 'Región marcada manualmente' : 'Región señalada en radiografía'}
                             </span>
                           )}
                         </div>
@@ -583,16 +1036,32 @@ export default function AttachmentViewerModal({
                         {/* Formulario de corrección expandible */}
                         {isEditing ? (
                           <div className="bg-slate-900 p-2 rounded-lg border border-slate-700 space-y-2 mt-2">
-                            <div>
-                              <label className="text-[10px] text-slate-400 block mb-1">Clasificación clínica:</label>
-                              <select
-                                value={editClassName}
-                                onChange={(e) => setEditClassName(e.target.value as any)}
-                                className="w-full bg-slate-950 border border-slate-700 text-white rounded p-1 text-xs"
-                              >
-                                <option value="caries">Caries</option>
-                                <option value="caries_profunda">Caries Profunda</option>
-                              </select>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div>
+                                <label className="text-[10px] text-slate-400 block mb-1">Clasificación:</label>
+                                <select
+                                  value={editClassName}
+                                  onChange={(e) => setEditClassName(e.target.value as any)}
+                                  className="w-full bg-slate-950 border border-slate-700 text-white rounded p-1 text-xs"
+                                >
+                                  <option value="caries">Caries</option>
+                                  <option value="caries_profunda">Caries Profunda</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-slate-400 block mb-1">Pieza FDI:</label>
+                                <select
+                                  value={editToothFdi}
+                                  onChange={(e) => setEditToothFdi(e.target.value)}
+                                  className="w-full bg-slate-950 border border-slate-700 text-white rounded p-1 text-xs"
+                                >
+                                  {FDI_ALL_TEETH.map((t) => (
+                                    <option key={t} value={t}>
+                                      Pieza #{t}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                             <div>
                               <label className="text-[10px] text-slate-400 block mb-1">Nota del odontólogo:</label>
@@ -616,6 +1085,8 @@ export default function AttachmentViewerModal({
                                   handleReviewDecision(fId, 'CORREGIDO', {
                                     correctedClassName: editClassName,
                                     clinicalNote: editClinicalNote,
+                                    toothFdi: editToothFdi,
+                                    toothFace: editToothFace,
                                   })
                                 }
                                 disabled={isReviewingMl}
@@ -629,7 +1100,12 @@ export default function AttachmentViewerModal({
                           /* Botones de acción del odontólogo */
                           <div className="flex items-center gap-1.5 pt-1 border-t border-slate-800/60">
                             <button
-                              onClick={() => handleReviewDecision(fId, 'ACEPTADO')}
+                              onClick={() =>
+                                handleReviewDecision(fId, 'ACEPTADO', {
+                                  toothFdi: toothInfo.fdi,
+                                  toothFace: toothInfo.face,
+                                })
+                              }
                               disabled={isReviewingMl}
                               className={`flex-1 py-1 rounded text-[10px] font-bold cursor-pointer transition-all ${
                                 status === 'ACEPTADO'
@@ -639,22 +1115,26 @@ export default function AttachmentViewerModal({
                             >
                               ✓ Aceptar
                             </button>
-                            <button
-                              onClick={() => handleReviewDecision(fId, 'RECHAZADO')}
-                              disabled={isReviewingMl}
-                              className={`flex-1 py-1 rounded text-[10px] font-bold cursor-pointer transition-all ${
-                                status === 'RECHAZADO'
-                                  ? 'bg-slate-700 text-white'
-                                  : 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800 hover:text-slate-200'
-                              } disabled:opacity-50`}
-                            >
-                              ✕ Rechazar
-                            </button>
+                            {!isManual && (
+                              <button
+                                onClick={() => handleReviewDecision(fId, 'RECHAZADO')}
+                                disabled={isReviewingMl}
+                                className={`flex-1 py-1 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                                  status === 'RECHAZADO'
+                                    ? 'bg-slate-700 text-white'
+                                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                                } disabled:opacity-50`}
+                              >
+                                ✕ Rechazar
+                              </button>
+                            )}
                             <button
                               onClick={() => {
                                 setEditingFindingId(fId)
                                 setEditClassName(isProfunda ? 'caries_profunda' : 'caries')
                                 setEditClinicalNote(f.clinicalNote || f.clinical_note || '')
+                                setEditToothFdi(toothInfo.fdi)
+                                setEditToothFace(toothInfo.face)
                               }}
                               disabled={isReviewingMl}
                               className={`px-2 py-1 rounded text-[10px] font-medium cursor-pointer transition-all ${
@@ -672,6 +1152,26 @@ export default function AttachmentViewerModal({
                   })
                 )}
               </div>
+
+              {/* Acción de integración al Odontograma */}
+              {validatedFindingsForOdontogram.length > 0 && (
+                <div className="p-3 bg-slate-950/90 border-t border-slate-800 space-y-2">
+                  {syncMessage && (
+                    <div className="text-[11px] text-emerald-300 bg-emerald-950/60 border border-emerald-700/70 rounded-lg px-2.5 py-1.5 font-medium">
+                      {syncMessage}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleSendToOdontogram}
+                    disabled={isSyncingOdontogram}
+                    className="w-full py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSyncingOdontogram
+                      ? 'Enviando al Odontograma...'
+                      : `🦷 Enviar ${validatedFindingsForOdontogram.length} validado(s) al Odontograma`}
+                  </button>
+                </div>
+              )}
 
               {/* Footer del Panel: Auditoría */}
               {currentAttachment.iaRevisadoPorNombre && (
